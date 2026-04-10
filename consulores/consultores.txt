@@ -1,0 +1,17 @@
+fabian enrique beleño robles = consultor 4
+iaconsultor4@camarabaq.org.co
+
+adrian gutierrez = consultor 1
+iaconsultor1@camarabaq.org.co
+
+yiseth gutierrez = consultor 2
+iaconsultor2@camarabaq.org.co
+
+santiago comas = consultor 5
+iaconsultor5@camarabaq.org.co
+
+carlos ortiz = consultor 6
+iaconsultor6@camarabaq.org.co
+
+snaider villafañe = consultor 3
+iaconsultor3@camarabaq.org.co
