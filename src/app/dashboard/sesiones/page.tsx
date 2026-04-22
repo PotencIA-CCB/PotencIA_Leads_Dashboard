@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Sesion, SesionStatus, Lead, Consultor } from '@/types'
+import { Sesion, SesionStatus, Lead } from '@/types'
 
 const statusColors: Record<SesionStatus, { bg: string; color: string }> = {
   'Resuelto':        { bg: '#ECFDF5', color: '#065F46' },
-  'En seguimiento':  { bg: '#EEF4FF', color: '#0050C8' },
+  'En seguimiento':  { bg: '#EEF4FF', color: '#004BB5' },
   'Cancelado':       { bg: '#FEF2F2', color: '#991B1B' },
 }
 
@@ -36,9 +36,7 @@ export default function SesionesPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  useEffect(() => { fetchData() }, [])
-
-  async function fetchData() {
+  const fetchData = async () => {
     setLoading(true)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -63,6 +61,15 @@ export default function SesionesPage() {
 
     setLoading(false)
   }
+
+  useEffect(() => {
+    let ignore = false
+    async function load() {
+      await fetchData()
+    }
+    if (!ignore) load()
+    return () => { ignore = true }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -135,12 +142,18 @@ export default function SesionesPage() {
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <nav className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
-            <span>Analysis</span>
-            <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-            <span className="text-[#00AEEF]">Sesiones</span>
+          <nav aria-label="Breadcrumb" className="mb-2">
+            <ol className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wider list-none p-0 m-0">
+              <li className="flex items-center">
+                <span>Analysis</span>
+                <span className="material-symbols-outlined text-[14px] mx-1" aria-hidden="true">chevron_right</span>
+              </li>
+              <li>
+                <span className="text-[#00C8FF]" aria-current="page">Sesiones</span>
+              </li>
+            </ol>
           </nav>
-          <h2 className="text-4xl font-extrabold text-[#001d59] tracking-tight" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h2 className="text-4xl font-extrabold text-[#001d59] tracking-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             Seguimiento de Sesiones
           </h2>
         </div>
@@ -163,7 +176,7 @@ export default function SesionesPage() {
       {/* Formulario */}
       {showForm && (
         <div className="bg-white rounded-[10px] border border-[#E5E7EB] shadow-sm p-8 mb-8">
-          <h3 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h3 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             Registrar nueva sesión
           </h3>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -310,7 +323,7 @@ export default function SesionesPage() {
       {/* Tabla de sesiones */}
       <div className="bg-white rounded-[10px] border border-[#E5E7EB] shadow-sm overflow-hidden">
         <div className="px-8 py-5 border-b border-[#E5E7EB] flex items-center justify-between">
-          <h3 className="text-base font-bold text-[#003087]" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h3 className="text-base font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             Historial de sesiones
           </h3>
           <span className="text-xs text-slate-400">{sesiones.length} sesiones registradas</span>
@@ -360,7 +373,7 @@ export default function SesionesPage() {
                         <span className={`text-xs font-medium px-3 py-1 rounded-full ${
                           s.modalidad === 'Presencial' ? 'bg-amber-50 text-amber-700' :
                           s.modalidad === 'Híbrida' ? 'bg-purple-50 text-purple-700' :
-                          'bg-blue-50 text-[#0050C8]'
+                          'bg-blue-50 text-[#004BB5]'
                         }`}>{s.modalidad || 'Virtual'}</span>
                       </td>
                       <td className="px-6 py-4">
@@ -373,14 +386,14 @@ export default function SesionesPage() {
                         {s.modalidad === 'Presencial' 
                           ? <span className="text-xs font-medium text-slate-500 italic">Sesión presencial</span>
                           : s.url_video
-                            ? <a href={s.url_video} target="_blank" rel="noopener noreferrer" className="text-[#003087] hover:text-[#00AEEF] text-xs font-medium flex items-center gap-1">
+                            ? <a href={s.url_video} target="_blank" rel="noopener noreferrer" className="text-[#003087] hover:text-[#00C8FF] text-xs font-medium flex items-center gap-1">
                                 <span className="material-symbols-outlined text-[16px]">videocam</span> Ver
                               </a>
                             : <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-6 py-4">
                         {s.url_evidencias
-                          ? <a href={s.url_evidencias} target="_blank" rel="noopener noreferrer" className="text-[#003087] hover:text-[#00AEEF] text-xs font-medium flex items-center gap-1">
+                          ? <a href={s.url_evidencias} target="_blank" rel="noopener noreferrer" className="text-[#003087] hover:text-[#00C8FF] text-xs font-medium flex items-center gap-1">
                               <span className="material-symbols-outlined text-[16px]">attach_file</span> Ver
                             </a>
                           : <span className="text-slate-300">—</span>}

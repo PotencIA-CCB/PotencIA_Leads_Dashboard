@@ -26,9 +26,7 @@ export default function DashboardPage() {
   const [filterStatus, setFilterStatus] = useState('Todos')
   const [rol, setRol] = useState('')
 
-  useEffect(() => { fetchData() }, [])
-
-  async function fetchData() {
+  const fetchData = async () => {
     setLoading(true)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -52,6 +50,15 @@ export default function DashboardPage() {
     }
     setLoading(false)
   }
+
+  useEffect(() => {
+    let ignore = false
+    async function load() {
+      await fetchData()
+    }
+    if (!ignore) load()
+    return () => { ignore = true }
+  }, [])
 
   async function handleStatusChange(id: string, status: LeadStatus) {
     const supabase = createClient()
@@ -103,12 +110,18 @@ export default function DashboardPage() {
       <div className="mb-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <nav className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
-              <span>Analysis</span>
-              <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span className="text-[#00AEEF]">Leads</span>
+            <nav aria-label="Breadcrumb" className="mb-2">
+              <ol className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wider list-none p-0 m-0">
+                <li className="flex items-center">
+                  <span>Analysis</span>
+                  <span className="material-symbols-outlined text-[14px] mx-1" aria-hidden="true">chevron_right</span>
+                </li>
+                <li>
+                  <span className="text-[#00C8FF]" aria-current="page">Leads</span>
+                </li>
+              </ol>
             </nav>
-            <h2 className="text-4xl font-extrabold text-[#001d59] tracking-tight" style={{ fontFamily: 'Poppins, sans-serif' }}>
+            <h2 className="text-4xl font-extrabold text-[#001d59] tracking-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
               Leads Registrados
             </h2>
           </div>
@@ -121,9 +134,9 @@ export default function DashboardPage() {
       {/* Filter Bar */}
       <div className="bg-white rounded-xl shadow-sm p-5 mb-6 flex flex-wrap items-center gap-4">
         <div className="relative flex-1 min-w-[260px]">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[#00AEEF] text-[20px]">search</span>
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[#00C8FF] text-[20px]">search</span>
           <input
-            className="w-full pl-12 pr-4 py-3 bg-slate-50/50 border-none rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00AEEF]/20"
+            className="w-full pl-12 pr-4 py-3 bg-slate-50/50 border-none rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/20"
             placeholder="Buscar por nombre o email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -158,11 +171,11 @@ export default function DashboardPage() {
 
           {/* Empty state card */}
           {filtered.length === 0 && (
-            <div className="bg-[#F2F4F7]/40 border-2 border-dashed border-slate-200 rounded-[10px] p-6 flex flex-col items-center justify-center text-center">
+            <div className="bg-[#F4F6FA]/40 border-2 border-dashed border-slate-200 rounded-[10px] p-6 flex flex-col items-center justify-center text-center">
               <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-4">
                 <span className="material-symbols-outlined text-[32px]">search_off</span>
               </div>
-              <h3 className="text-lg font-bold text-slate-500" style={{ fontFamily: 'Poppins, sans-serif' }}>Sin resultados</h3>
+              <h3 className="text-lg font-bold text-slate-500" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Sin resultados</h3>
               <p className="text-sm text-slate-400 mt-2">No hay leads que coincidan con el filtro</p>
             </div>
           )}

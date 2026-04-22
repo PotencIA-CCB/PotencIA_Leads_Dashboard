@@ -39,7 +39,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="bg-[#F2F4F7] min-h-screen flex items-center justify-center px-4 py-8 sm:px-6" style={{ fontFamily: 'Poppins, sans-serif' }}>
+    <div className="bg-[#F2F4F7] min-h-screen flex items-center justify-center px-4 py-8 sm:px-6" style={{ fontFamily: 'Inter, sans-serif' }}>
       <main className="w-full max-w-[480px] sm:max-w-[520px]">
 
         {/* Card */}
@@ -127,7 +127,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-[#003087] hover:opacity-90 disabled:opacity-50 text-white font-bold py-3 sm:py-4 rounded-lg shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-sm sm:text-base"
+                  className="w-full bg-[#003087] hover:opacity-90 disabled:opacity-50 text-white font-bold py-3 sm:py-4 rounded-lg shadow-md transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2 text-sm sm:text-base"
                 >
                   <span>{loading ? 'Ingresando...' : 'INICIAR SESIÓN'}</span>
                   {!loading && <span className="material-symbols-outlined text-sm">arrow_forward</span>}

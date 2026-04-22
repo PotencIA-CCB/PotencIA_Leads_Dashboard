@@ -33,20 +33,26 @@ export default function LeadModal({ lead, onClose, onStatusChange, onAsignarCons
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 animate-fade-in" 
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-5"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-5 animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{lead.full_name}</h2>
+            <h2 id="modal-title" className="text-xl font-bold text-gray-900">{lead.full_name}</h2>
             <p className="text-sm text-gray-500">{lead.company_role_area} · {lead.company_role_level}</p>
           </div>
           <div className="flex items-center gap-2">
-            {saved && <span className="text-xs text-green-500 font-medium">✓ Guardado</span>}
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            {saved && <span className="text-xs text-green-500 font-medium" aria-live="polite">✓ Guardado</span>}
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none" aria-label="Cerrar modal">×</button>
           </div>
         </div>
 

@@ -7,7 +7,7 @@ import {
   PieChart, Pie, Cell
 } from 'recharts'
 
-const DONUT_COLORS = ['#003087', '#00AEEF', '#E8470A', '#0050C8']
+const DONUT_COLORS = ['#003087', '#00C8FF', '#E8470A', '#004BB5']
 
 export default function MetricasPage() {
   const { metricas, loading } = useMetricas()
@@ -52,7 +52,7 @@ export default function MetricasPage() {
 
   const resueltos = metricas.porEstado.find((e) => e.status === 'Resuelto')?.total || 0
   const enSeguimiento = metricas.porEstado.find((e) => e.status === 'En seguimiento')?.total || 0
-  const cancelados = metricas.porEstado.find((e) => e.status === 'Cancelado')?.total || 0
+  
 
   // Casos de uso con porcentaje
   const maxSolucion = Math.max(...metricas.porSolucion.map((s) => s.total), 1)
@@ -62,18 +62,24 @@ export default function MetricasPage() {
     barPct: Math.round((s.total / maxSolucion) * 100),
   }))
 
-  const barColors = ['#003087', '#00AEEF', '#0050C8', '#E8470A', '#5A6475', '#003087']
+  const barColors = ['#003087', '#00C8FF', '#004BB5', '#E8470A', '#5A6475', '#003087']
 
   return (
     <>
       {/* Section Header */}
       <div className="mb-8">
-        <nav className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
-          <span>Analysis</span>
-          <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-          <span className="text-[#00AEEF]">Métricas</span>
+        <nav aria-label="Breadcrumb" className="mb-2">
+          <ol className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wider list-none p-0 m-0">
+            <li className="flex items-center">
+              <span>Analysis</span>
+              <span className="material-symbols-outlined text-[14px] mx-1" aria-hidden="true">chevron_right</span>
+            </li>
+            <li>
+              <span className="text-[#00C8FF]" aria-current="page">Métricas</span>
+            </li>
+          </ol>
         </nav>
-        <h2 className="text-4xl font-extrabold text-[#001d59] tracking-tight" style={{ fontFamily: 'Poppins, sans-serif' }}>
+        <h2 className="text-4xl font-extrabold text-[#001d59] tracking-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
           Métricas Globales
         </h2>
       </div>
@@ -86,12 +92,12 @@ export default function MetricasPage() {
           { label: 'En Seguimiento', value: enSeguimiento, icon: 'monitoring', sub: 'Active pipeline' },
           { label: '% Conversión', value: `${metricas.tasaConversion}%`, icon: 'trending_up', sub: 'Leads → Resuelto' },
         ].map((kpi) => (
-          <div key={kpi.label} className="bg-white p-6 rounded-[10px] border-t-[3px] border-[#0050C8] border border-[#E5E7EB] shadow-sm hover:-translate-y-1 transition-transform duration-300">
+          <div key={kpi.label} className="bg-white p-6 rounded-[10px] border-t-[3px] border-[#004BB5] border border-[#E5E7EB] shadow-sm hover:-translate-y-1 transition-transform duration-300">
             <div className="flex justify-between items-start mb-4">
               <p className="text-[12px] text-[#5A6475] font-medium tracking-tight">{kpi.label}</p>
-              <span className="material-symbols-outlined text-[#00AEEF] text-xl">{kpi.icon}</span>
+              <span className="material-symbols-outlined text-[#00C8FF] text-xl">{kpi.icon}</span>
             </div>
-            <h3 className="text-[32px] font-bold text-[#003087] leading-none" style={{ fontFamily: 'Poppins, sans-serif' }}>{kpi.value}</h3>
+            <h3 className="text-[32px] font-bold text-[#003087] leading-none" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>{kpi.value}</h3>
             <p className="text-[10px] text-slate-400 mt-3">{kpi.sub}</p>
           </div>
         ))}
@@ -104,7 +110,7 @@ export default function MetricasPage() {
         <div className="col-span-12 lg:col-span-8 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-[400px] flex flex-col">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h4 className="text-lg font-bold text-[#003087]" style={{ fontFamily: 'Poppins, sans-serif' }}>Leads por semana</h4>
+              <h4 className="text-lg font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Leads por semana</h4>
               <p className="text-xs text-slate-400">Evolución histórica de captación de leads</p>
             </div>
           </div>
@@ -122,7 +128,7 @@ export default function MetricasPage() {
 
         {/* Bar Chart: Leads por ciudad */}
         <div className="col-span-12 lg:col-span-4 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-[400px] flex flex-col">
-          <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Poppins, sans-serif' }}>Leads por ciudad</h4>
+          <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Leads por ciudad</h4>
           <div className="flex-1 flex items-end justify-around gap-2 px-2 pb-6 border-b border-slate-100 relative">
             {metricas.porCiudad.map((c, i) => {
               const maxCity = Math.max(...metricas.porCiudad.map((x) => x.total), 1)
@@ -146,7 +152,7 @@ export default function MetricasPage() {
 
         {/* Donut: Estado consultorías */}
         <div className="col-span-12 lg:col-span-5 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-[380px] flex flex-col">
-          <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Poppins, sans-serif' }}>Estado consultorías</h4>
+          <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Estado consultorías</h4>
           <div className="flex-1 flex items-center justify-between gap-4">
             <div style={{ width: 200, height: 200, flexShrink: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -173,7 +179,7 @@ export default function MetricasPage() {
 
         {/* Horizontal bars: Casos de uso */}
         <div className="col-span-12 lg:col-span-7 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-[380px] flex flex-col">
-          <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Poppins, sans-serif' }}>Casos de uso más solicitados</h4>
+          <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Casos de uso más solicitados</h4>
           <div className="space-y-5 flex-1 overflow-hidden">
             {porSolucionPct.map((s, i) => (
               <div key={s.solution} className="space-y-1.5">
@@ -198,13 +204,13 @@ export default function MetricasPage() {
       <section className="bg-white rounded-[10px] shadow-sm border border-[#E5E7EB] overflow-hidden">
         <div className="px-8 py-6 flex justify-between items-center bg-slate-50/50">
           <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-[#00AEEF] text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
-            <h4 className="text-xl font-bold text-[#003087] tracking-tight" style={{ fontFamily: 'Poppins, sans-serif' }}>AI Strategic Insights</h4>
+            <span className="material-symbols-outlined text-[#00C8FF] text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
+            <h4 className="text-xl font-bold text-[#003087] tracking-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>AI Strategic Insights</h4>
           </div>
           <div className="flex items-center gap-3">
             <div className="px-4 py-1.5 bg-white border border-slate-200 rounded-full shadow-sm flex items-center gap-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Powered by</span>
-              <span className="text-xs font-extrabold text-[#0050C8]">DeepSeek</span>
+              <span className="text-xs font-extrabold text-[#004BB5]">DeepSeek</span>
             </div>
             <button
               onClick={generarInsights}
@@ -226,23 +232,23 @@ export default function MetricasPage() {
 
         {loadingInsights && (
           <div className="px-8 py-12 text-center">
-            <span className="material-symbols-outlined text-[48px] text-[#00AEEF] animate-spin">progress_activity</span>
+            <span className="material-symbols-outlined text-[48px] text-[#00C8FF] animate-spin">progress_activity</span>
             <p className="text-sm text-slate-400 mt-3">Analizando datos con DeepSeek...</p>
           </div>
         )}
 
         {insights && !loadingInsights && (
           <div className="grid grid-cols-1 md:grid-cols-3">
-            <div className="p-8 bg-[#F0F8FF] border-l-[6px] border-[#00AEEF]">
-              <h5 className="text-sm font-extrabold text-[#00AEEF] uppercase tracking-widest mb-6">Insights Clave</h5>
+            <div className="p-8 bg-[#F0F8FF] border-l-[6px] border-[#00C8FF]">
+              <h5 className="text-sm font-extrabold text-[#00C8FF] uppercase tracking-widest mb-6">Insights Clave</h5>
               <ul className="space-y-4">
                 {insights.insights.map((item, i) => (
                   <li key={i} className="flex gap-3"><span className="text-xl">💡</span><p className="text-sm text-slate-700 leading-relaxed">{item}</p></li>
                 ))}
               </ul>
             </div>
-            <div className="p-8 bg-[#EEF4FF] border-l-[6px] border-[#0050C8]">
-              <h5 className="text-sm font-extrabold text-[#0050C8] uppercase tracking-widest mb-6">Recomendaciones</h5>
+            <div className="p-8 bg-[#EEF4FF] border-l-[6px] border-[#004BB5]">
+              <h5 className="text-sm font-extrabold text-[#004BB5] uppercase tracking-widest mb-6">Recomendaciones</h5>
               <ul className="space-y-4">
                 {insights.recomendaciones.map((item, i) => (
                   <li key={i} className="flex gap-3"><span className="text-xl">🎯</span><p className="text-sm text-slate-700 leading-relaxed">{item}</p></li>

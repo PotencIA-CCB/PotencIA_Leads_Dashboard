@@ -1,30 +1,64 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
 @import "tailwindcss";
 
 :root {
   --color-azul-oscuro:     #003087;
-  --color-azul-medio:      #0050C8;
-  --color-azul-brillante:  #1A6EFF;
-  --color-cian-acento:     #00AEEF;
+  --color-azul-medio:      #004BB5;
+  --color-azul-brillante:  #00C8FF;
+  --color-cian-acento:     #00C8FF;
+  --color-azul-claro:     #E8EEFB;
   --color-naranja-cta:     #E8470A;
   --color-naranja-hover:   #C93D08;
   --color-blanco:          #FFFFFF;
-  --color-gris-fondo:      #F2F4F7;
+  --color-gris-fondo:      #F4F6FA;
   --color-texto-principal: #1E2A3A;
-  --color-texto-secundario:#5A6475;
-  --color-borde-input:     #C8CDD5;
+  --color-texto-suave:     #5A6070;
+  --color-texto-secundario:#5A6070;
+  --color-borde-input:     #DADEE7;
   --color-footer:          #002670;
-  --gradient-hero: linear-gradient(to right, #003087 0%, #0050C8 40%, #1A6EFF 75%, #2979FF 100%);
+  --gradient-hero: linear-gradient(135deg, #003087 0%, #004BB5 60%, #0066CC 100%);
 }
 
 * {
   box-sizing: border-box;
 }
 
+:root {
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
 body {
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-body), 'Inter', sans-serif;
   font-size: 16px;
   line-height: 1.6;
   color: #1E2A3A;
-  background: #F2F4F7;
+  background: #F4F6FA;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in {
+  animation: fade-in 200ms ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scale-in 200ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

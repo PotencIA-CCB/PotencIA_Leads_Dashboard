@@ -28,15 +28,26 @@ function timeAgo(dateStr: string): string {
 export default function LeadCard({ lead, onClick }: LeadCardProps) {
   const status = statusConfig[lead.status]
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onClick(lead)
+    }
+  }
+
   return (
-    <div
-      className="bg-[#EEF2F7] rounded-[10px] overflow-hidden shadow-md hover:-translate-y-1 transition-all duration-300 border-t-[3px] border-[#00AEEF] border border-[#C8CDD5] flex flex-col cursor-pointer"
+    <article
+      className="bg-[#E8EEFB] rounded-[10px] overflow-hidden shadow-md hover:-translate-y-1 transition-all duration-300 border-t-[3px] border-[#00C8FF] border border-[#DADEE7] flex flex-col cursor-pointer"
       onClick={() => onClick(lead)}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={`Ver detalles de ${lead.full_name}`}
     >
       <div className="p-6 flex-1">
         {/* Status row */}
         <div className="flex justify-between items-start mb-4">
-          <span className="px-3 py-1 bg-blue-50 text-[#00AEEF] text-[10px] font-bold rounded-full uppercase">
+          <span className="px-3 py-1 bg-blue-50 text-[#00C8FF] text-[10px] font-bold rounded-full uppercase">
             {lead.solution || 'Sin solución'}
           </span>
           <span className={`flex items-center gap-1 text-[10px] font-bold uppercase ${status.color}`}>
@@ -46,7 +57,7 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
         </div>
 
         {/* Name */}
-        <h3 className="text-xl font-bold text-[#001d59] mb-1" style={{ fontFamily: 'Poppins, sans-serif' }}>
+        <h3 className="text-xl font-bold text-[#001d59] mb-1" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
           {lead.full_name}
         </h3>
         <p className="text-xs text-slate-400 mb-6 font-medium">{lead.email}</p>
@@ -55,19 +66,19 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
         <div className="space-y-3 mb-6">
           {lead.city && (
             <div className="flex items-center gap-3 text-slate-600">
-              <span className="material-symbols-outlined text-[18px] text-[#00AEEF]">location_on</span>
+              <span className="material-symbols-outlined text-[18px] text-[#00C8FF]">location_on</span>
               <span className="text-sm">{lead.city}</span>
             </div>
           )}
           {lead.company_role_level && (
             <div className="flex items-center gap-3 text-slate-600">
-              <span className="material-symbols-outlined text-[18px] text-[#00AEEF]">badge</span>
+              <span className="material-symbols-outlined text-[18px] text-[#00C8FF]">badge</span>
               <span className="text-sm">{lead.company_role_level}</span>
             </div>
           )}
           {lead.company_role_area && (
             <div className="flex items-center gap-3 text-slate-600">
-              <span className="material-symbols-outlined text-[18px] text-[#00AEEF]">factory</span>
+              <span className="material-symbols-outlined text-[18px] text-[#00C8FF]">factory</span>
               <span className="text-sm">{lead.company_role_area}</span>
             </div>
           )}
@@ -87,11 +98,11 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
           <span className="material-symbols-outlined text-[14px]">schedule</span>
           {timeAgo(lead.created_at)}
         </span>
-        <span className="text-sm font-bold text-[#003087] hover:text-[#00AEEF] transition-colors flex items-center gap-1">
+        <span className="text-sm font-bold text-[#003087] hover:text-[#00C8FF] transition-colors flex items-center gap-1">
           Ver detalle
           <span className="material-symbols-outlined text-[18px]">arrow_right_alt</span>
         </span>
       </div>
-    </div>
+    </article>
   )
 }
