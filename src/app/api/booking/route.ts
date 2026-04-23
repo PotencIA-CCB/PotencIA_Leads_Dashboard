@@ -1,32 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = 'force-dynamic'
 
-/**
- * POST /api/booking
- * Recibe reservas desde Power Automate (Microsoft Bookings)
- *
- * Headers requeridos:
- *   x-webhook-secret: <BOOKING_WEBHOOK_SECRET>
- *
- * Body esperado desde Power Automate:
- * {
- *   "full_name": "Juan Pérez",
- *   "email": "juan@empresa.com",
- *   "phone": "3001234567",          // opcional
- *   "city": "Barranquilla",         // opcional
- *   "fecha_sesion": "2025-08-10",   // YYYY-MM-DD
- *   "hora_inicio": "09:00",         // HH:mm
- *   "hora_fin": "10:00",            // HH:mm  opcional
- *   "modalidad": "Virtual",         // opcional, default Virtual
- *   "service_name": "Consultoría IA" // nombre del servicio en Bookings
- * }
- */
 export async function POST(req: NextRequest) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   // Verificar secret
   const secret = req.headers.get('x-webhook-secret')
   if (secret !== process.env.BOOKING_WEBHOOK_SECRET) {
