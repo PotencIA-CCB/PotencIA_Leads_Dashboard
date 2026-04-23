@@ -11,7 +11,15 @@ const statusConfig: Record<LeadStatus, { label: string; color: string; dot: stri
 }
 
 interface LeadCardProps {
-  lead: Lead
+  lead: Lead & {
+    sesion?: {
+      fecha_sesion: string
+      hora_inicio: string | null
+      hora_fin: string | null
+      modalidad: string | null
+      created_at: string
+    } | null
+  }
   onClick: (lead: Lead) => void
 }
 
@@ -25,8 +33,16 @@ function timeAgo(dateStr: string): string {
   return `Hace ${days} días`
 }
 
+function sessionLabel(sesion: NonNullable<LeadCardProps['lead']['sesion']>) {
+  const date = new Date(`${sesion.fecha_sesion}T00:00:00`)
+  const fecha = date.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+  const hora = sesion.hora_inicio ? sesion.hora_inicio : ''
+  return hora ? `${fecha} · ${hora}` : fecha
+}
+
 export default function LeadCard({ lead, onClick }: LeadCardProps) {
   const status = statusConfig[lead.status]
+  const modalidad = lead.sesion?.modalidad || null
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -47,9 +63,16 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
       <div className="p-6 flex-1">
         {/* Status row */}
         <div className="flex justify-between items-start mb-4">
-          <span className="px-3 py-1 bg-blue-50 text-[#00C8FF] text-[10px] font-bold rounded-full uppercase">
-            {lead.solution || 'Sin solución'}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 bg-blue-50 text-[#00C8FF] text-[10px] font-bold rounded-full uppercase">
+              {lead.solution || 'Sin solución'}
+            </span>
+            {modalidad && (
+              <span className="px-3 py-1 bg-white/70 border border-slate-200 text-slate-600 text-[10px] font-bold rounded-full uppercase">
+                {modalidad}
+              </span>
+            )}
+          </div>
           <span className={`flex items-center gap-1 text-[10px] font-bold uppercase ${status.color}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
             {status.label}
@@ -96,7 +119,7 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
       <div className="px-6 py-4 bg-slate-50/50 flex justify-between items-center mt-auto">
         <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
           <span className="material-symbols-outlined text-[14px]">schedule</span>
-          {timeAgo(lead.created_at)}
+          {lead.sesion ? sessionLabel(lead.sesion) : timeAgo(lead.created_at)}
         </span>
         <span className="text-sm font-bold text-[#003087] hover:text-[#00C8FF] transition-colors flex items-center gap-1">
           Ver detalle

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Lead, LeadStatus, Consultor } from '@/types'
+import { Lead, LeadStatus, Consultor, Sesion } from '@/types'
 import LeadCard from '@/components/LeadCard'
 import LeadModal from '@/components/LeadModal'
 
@@ -18,10 +18,13 @@ const statusChipStyle: Record<string, string> = {
 }
 
 export default function DashboardPage() {
-  const [leads, setLeads] = useState<Lead[]>([])
+  type SesionResumen = Pick<Sesion, 'id_lead' | 'fecha_sesion' | 'hora_inicio' | 'hora_fin' | 'modalidad' | 'created_at'>
+  type LeadWithSesion = Lead & { sesion?: SesionResumen | null }
+
+  const [leads, setLeads] = useState<LeadWithSesion[]>([])
   const [consultores, setConsultores] = useState<Consultor[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [selectedLead, setSelectedLead] = useState<LeadWithSesion | null>(null)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('Todos')
   const [rol, setRol] = useState('')
@@ -42,7 +45,27 @@ export default function DashboardPage() {
     if (consultor.rol === 'consultor') query.eq('id_consultor_asignado', consultor.id)
 
     const { data: leadsData } = await query
-    if (leadsData) setLeads(leadsData as Lead[])
+    const baseLeads = (leadsData as Lead[]) || []
+
+    // Cargar última sesión por lead (para mostrar fecha/hora/modalidad en cards)
+    const leadIds = baseLeads.map((l) => l.id)
+    const sesionByLead: Record<string, SesionResumen> = {}
+
+    if (leadIds.length > 0) {
+      const { data: sesionesData } = await supabase
+        .from('sesiones')
+        .select('id_lead,fecha_sesion,hora_inicio,hora_fin,modalidad,created_at')
+        .in('id_lead', leadIds)
+        .order('created_at', { ascending: false })
+
+      if (sesionesData) {
+        for (const ses of sesionesData as SesionResumen[]) {
+          if (!sesionByLead[ses.id_lead]) sesionByLead[ses.id_lead] = ses
+        }
+      }
+    }
+
+    setLeads(baseLeads.map((l) => ({ ...l, sesion: sesionByLead[l.id] ?? null })))
 
     if (consultor.rol === 'admin') {
       const { data: consData } = await supabase.from('consultores').select('*')

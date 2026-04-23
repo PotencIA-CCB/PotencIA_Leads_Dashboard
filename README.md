@@ -25,6 +25,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<tu_anon_key>
 SUPABASE_SERVICE_ROLE_KEY=<tu_service_role_key>
 DEEPSEEK_API_KEY=<tu_deepseek_api_key>
 BOOKING_WEBHOOK_SECRET=<tu_webhook_secret>
+INSIGHTS_MIN_NEW_RECORDS=20
 ```
 
 ---
@@ -89,12 +90,17 @@ x-webhook-secret: <BOOKING_WEBHOOK_SECRET>
   "full_name": "Juan Pérez",
   "email": "juan@empresa.com",
   "phone": "3001234567",
+  "city": "Barranquilla",
   "fecha_sesion": "04/28/2026 09:00:00",
   "hora_fin": "04/28/2026 09:30:00",
   "service_name": "Soporte informático",
-  "staff_email": "iaconsultor1@camarabaq.org.co"
+  "staff_email": "iaconsultor1@camarabaq.org.co",
+  "staff_name": "Nombre del consultor (opcional)",
+  "modalidad": "Virtual"
 }
 ```
+`fecha_sesion` y `hora_fin` también aceptan formatos ISO (`2026-04-28T09:00:00-05:00`).
+`modalidad` acepta `Virtual` o `Presencial` (si llega vacío, se usa `Virtual`).
 
 ### `POST /api/insights`
 Genera análisis estratégico con DeepSeek basado en las métricas actuales.
@@ -138,6 +144,28 @@ src/
 2. Acción: **Delay** — 2 minutos
 3. Acción: **HTTP POST** a `<URL>/api/booking` con header `x-webhook-secret`
 
+### Body recomendado (Power Automate → HTTP)
+
+Este ejemplo asume que el trigger de Bookings expone `StaffMembers` (es lo más confiable para obtener el consultor asignado). Ajusta los nombres si tu conector los muestra distinto.
+
+```json
+{
+  "full_name": "@{triggerBody()?['CustomerName']}",
+  "email": "@{triggerBody()?['CustomerEmail']}",
+  "phone": "@{triggerBody()?['CustomerPhone']}",
+  "city": "@{triggerBody()?['City']}",
+  "fecha_sesion": "@{coalesce(triggerBody()?['StartTime'], triggerBody()?['StartDateTime'])}",
+  "hora_fin": "@{coalesce(triggerBody()?['EndTime'], triggerBody()?['EndDateTime'])}",
+  "service_name": "@{triggerBody()?['ServiceName']}",
+  "staff_email": "@{triggerBody()?['StaffMembers'][0]?['EmailAddress']}",
+  "modalidad": "@{triggerBody()?['Selecciona la Modalidad de tu sesión']}"
+}
+```
+
+Notas:
+- Si `staff_email` llega vacío, el dashboard no podrá asignar consultor automáticamente. En ese caso revisa el payload del trigger para ubicar el campo correcto (o usa `staff_name` como fallback).
+- Para que el match funcione, `consultores.email` en Supabase debe coincidir con el email del staff en Bookings.
+
 ---
 
 ## Base de datos (Supabase)
@@ -147,3 +175,15 @@ Tablas principales:
 - `consultores` — equipo interno con `auth_id` vinculado a Supabase Auth
 - `sesiones` — sesiones de consultoría con horarios y entregables
 - `insights` — análisis generados por IA guardados históricamente
+
+### Acceso al dashboard (auth_id)
+
+El login valida acceso por `consultores.auth_id` (UUID del usuario en Supabase Auth). Para habilitar un consultor:
+1. Crear usuario en **Auth → Users**
+2. Copiar su `User UID`
+3. Actualizar la fila en `consultores`:
+```sql
+update consultores
+set auth_id = '<USER_UID>'
+where email = 'consultor@dominio.com';
+```

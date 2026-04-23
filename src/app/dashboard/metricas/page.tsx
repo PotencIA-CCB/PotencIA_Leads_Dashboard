@@ -29,7 +29,7 @@ export default function MetricasPage() {
       const res = await fetch('/api/insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ metricas }),
+        body: JSON.stringify({}),
       })
       const data = await res.json()
       setInsights(data)
@@ -115,7 +115,7 @@ export default function MetricasPage() {
             </div>
           </div>
           <div className="flex-1">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <LineChart data={metricas.porSemana}>
                 <XAxis dataKey="semana" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
@@ -155,7 +155,7 @@ export default function MetricasPage() {
           <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Estado consultorías</h4>
           <div className="flex-1 flex items-center justify-between gap-4">
             <div style={{ width: 200, height: 200, flexShrink: 0 }}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <PieChart>
                   <Pie data={metricas.porEstado} dataKey="total" nameKey="status" cx="50%" cy="50%" innerRadius={55} outerRadius={80}>
                     {metricas.porEstado.map((_, i) => (

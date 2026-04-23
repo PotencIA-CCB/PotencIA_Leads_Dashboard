@@ -6,7 +6,14 @@ import { Lead, LeadStatus, Consultor } from '@/types'
 const statusOptions: LeadStatus[] = ['Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
 
 interface LeadModalProps {
-  lead: Lead
+  lead: Lead & {
+    sesion?: {
+      fecha_sesion: string
+      hora_inicio: string | null
+      hora_fin: string | null
+      modalidad: string | null
+    } | null
+  }
   onClose: () => void
   onStatusChange: (id: string, status: LeadStatus) => void
   onAsignarConsultor?: (id: string, id_consultor: string) => void
@@ -93,6 +100,22 @@ export default function LeadModal({ lead, onClose, onStatusChange, onAsignarCons
           <Row label="ID / Cédula" value={lead.id_num} />
           <Row label="NIT" value={lead.nit} />
         </div>
+
+        {/* Sesión (Bookings) */}
+        {lead.sesion && (
+          <div className="grid grid-cols-2 gap-4 border-t pt-4">
+            <Row
+              label="Fecha de sesión"
+              value={new Date(lead.sesion.fecha_sesion + 'T00:00:00').toLocaleDateString('es-CO', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+              })}
+            />
+            <Row label="Horario" value={lead.sesion.hora_inicio ? `${lead.sesion.hora_inicio}${lead.sesion.hora_fin ? ` - ${lead.sesion.hora_fin}` : ''}` : null} />
+            <Row label="Modalidad" value={lead.sesion.modalidad} />
+          </div>
+        )}
 
         {/* Perfil */}
         <div className="grid grid-cols-2 gap-4 border-t pt-4">
