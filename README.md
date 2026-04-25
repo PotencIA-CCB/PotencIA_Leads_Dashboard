@@ -166,6 +166,14 @@ Notas:
 - Si `staff_email` llega vacío, el dashboard no podrá asignar consultor automáticamente. En ese caso revisa el payload del trigger para ubicar el campo correcto (o usa `staff_name` como fallback).
 - Para que el match funcione, `consultores.email` en Supabase debe coincidir con el email del staff en Bookings.
 
+### Importante (deduplicación y estabilidad)
+
+- Este proyecto usa un RPC en Supabase para *merge-or-create* del lead de forma atómica: `merge_or_create_lead`.
+  - Ejecuta el SQL: `supabase/migrations/20260425_merge_or_create_lead.sql` en el editor SQL de Supabase antes de usar `/api/booking` en un ambiente nuevo.
+- No comitees exports de Power Automate (por ejemplo `definition.json`): suelen contener el header `x-webhook-secret`.
+  - Este repo los ignora por defecto en `.gitignore`.
+  - Si sospechas que el secret se filtró, rota `BOOKING_WEBHOOK_SECRET` y actualiza el flow.
+
 ---
 
 ## Base de datos (Supabase)

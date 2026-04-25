@@ -20,6 +20,9 @@ export interface Lead {
   id_consultor_asignado: string | null
   status: LeadStatus
   notas_consultor: string | null
+  booking_email: string | null
+  booking_customer_id: string | null
+  phone_normalized: string | null
 }
 
 export interface Consultor {

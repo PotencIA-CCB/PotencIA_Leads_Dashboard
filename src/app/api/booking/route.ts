@@ -142,47 +142,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Buscar si ya existe un lead con ese email
-    const { data: leadExistente } = await supabase
-      .from('leads')
-      .select('id')
-      .eq('email', email)
-      .single()
-
-    let leadId: string
-
-    if (leadExistente) {
-      leadId = leadExistente.id
-      await supabase
-        .from('leads')
-        .update({
-          status: 'Agendado',
-          phone: phone ?? undefined,
-          city: city ?? undefined,
-          ...(consultorId && { id_consultor_asignado: consultorId }),
-        })
-        .eq('id', leadId)
-    } else {
-      const { data: nuevoLead, error: leadError } = await supabase
-        .from('leads')
-        .insert({
-          full_name,
-          email,
-          phone,
-          city,
-          status: 'Agendado',
-          solution: service_name,
-          id_consultor_asignado: consultorId,
-        })
-        .select('id')
-        .single()
-
-      if (leadError || !nuevoLead) {
-        console.error('Error creando lead:', leadError)
-        return NextResponse.json({ error: 'Error creando lead' }, { status: 500 })
+    // 2. Atomic merge-or-create (reemplaza read-then-write para evitar race conditions)
+    const { data: mergeResult, error: mergeError } = await supabase.rpc(
+      'merge_or_create_lead',
+      {
+        p_booking_email: email,
+        p_full_name: full_name,
+        p_phone: phone,
+        p_city: city,
+        p_solution: service_name,
+        p_consultor_id: consultorId ?? null,
+        p_booking_customer_id: body.customer_id ?? null,
+        p_phone_window_hours: 72,
       }
-      leadId = nuevoLead.id
+    )
+
+    if (mergeError || !mergeResult?.length) {
+      console.error('Error en merge_or_create_lead:', mergeError)
+      return NextResponse.json({ error: 'Error procesando lead' }, { status: 500 })
     }
+
+    const leadId: string = mergeResult[0].lead_id
+    const leadMatchedBy: string = mergeResult[0].matched_by
+
+    console.log(`Lead procesado — id: ${leadId}, matched_by: ${leadMatchedBy}`)
 
     // 3. Crear o actualizar la sesión asociada (idempotente por lead + fecha + hora)
     const { data: sesionExistente } = await supabase
@@ -226,7 +209,13 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { ok: true, lead_id: leadId, consultor_id: consultorId, consultor_matched_by: consultorMatchedBy },
+      {
+        ok: true,
+        lead_id: leadId,
+        consultor_id: consultorId,
+        consultor_matched_by: consultorMatchedBy,
+        lead_matched_by: leadMatchedBy,
+      },
       { status: 201 }
     )
   } catch (err) {

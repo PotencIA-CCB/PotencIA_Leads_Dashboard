@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# power automate / flow exports (may contain secrets)
+definition.json
+definition.*.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
