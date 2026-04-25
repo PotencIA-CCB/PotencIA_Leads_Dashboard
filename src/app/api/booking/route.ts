@@ -36,6 +36,8 @@ export async function POST(req: NextRequest) {
       phone = null,
       city = null,
       service_name = null,
+      id_num = null,
+      nit = null,
     } = body
 
     // Normalizar modalidad (evitar '' que rompe el constraint en la tabla `sesiones`)
@@ -166,6 +168,24 @@ export async function POST(req: NextRequest) {
     const leadMatchedBy: string = mergeResult[0].matched_by
 
     console.log(`Lead procesado — id: ${leadId}, matched_by: ${leadMatchedBy}`)
+
+    // 2.1 Guardar datos adicionales (si vienen) sin cambiar el algoritmo de dedup.
+    // En el modelo "Bookings como fuente de verdad", estos campos deben venir del formulario de Bookings (Power Automate).
+    const idNumClean = typeof id_num === 'string' ? id_num.trim() : ''
+    const nitClean = typeof nit === 'string' ? nit.trim() : ''
+    if (idNumClean || nitClean) {
+      const { error: extraError } = await supabase
+        .from('leads')
+        .update({
+          ...(idNumClean && { id_num: idNumClean }),
+          ...(nitClean && { nit: nitClean }),
+        })
+        .eq('id', leadId)
+
+      if (extraError) {
+        console.error('Error actualizando id_num/nit:', extraError)
+      }
+    }
 
     // 3. Crear o actualizar la sesión asociada (idempotente por lead + fecha + hora)
     const { data: sesionExistente } = await supabase
