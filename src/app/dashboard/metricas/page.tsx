@@ -213,72 +213,59 @@ export default function MetricasPage() {
         </div>
       </section>
 
-      {/* AI Insights Panel */}
-      <section className="bg-white rounded-[10px] shadow-sm border border-[#E5E7EB] overflow-hidden">
-        <div className="px-8 py-6 flex justify-between items-center bg-slate-50/50">
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-[#00C8FF] text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
-            <h4 className="text-xl font-bold text-[#003087] tracking-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>AI Strategic Insights</h4>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="px-4 py-1.5 bg-white border border-slate-200 rounded-full shadow-sm flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Powered by</span>
-              <span className="text-xs font-extrabold text-[#004BB5]">DeepSeek</span>
-            </div>
-            <button
-              onClick={generarInsights}
-              disabled={loadingInsights}
-              className="px-5 py-2 bg-[#003087] disabled:opacity-50 text-white text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
-            >
-              <span className="material-symbols-outlined text-[16px]">{loadingInsights ? 'hourglass_empty' : 'refresh'}</span>
-              {loadingInsights ? 'Generando...' : 'Actualizar insights'}
-            </button>
-          </div>
+      {/* AI Insights — minimalista */}
+      <section className="bg-white rounded-[10px] border border-[#E5E7EB] shadow-sm">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h4 className="text-sm font-bold text-[#003087] uppercase tracking-widest" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+            Insights con IA
+          </h4>
+          <button
+            onClick={generarInsights}
+            disabled={loadingInsights}
+            className="text-xs font-semibold text-[#003087] disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+          >
+            <span className="material-symbols-outlined text-[16px]">{loadingInsights ? 'hourglass_empty' : 'refresh'}</span>
+            {loadingInsights ? 'Generando' : 'Actualizar'}
+          </button>
         </div>
 
         {!insights && !loadingInsights && (
-          <div className="px-8 py-12 text-center">
-            <span className="material-symbols-outlined text-[48px] text-slate-200">psychology</span>
-            <p className="text-sm text-slate-400 mt-3">Haz clic en <strong>Actualizar insights</strong> para generar análisis con IA basado en los datos actuales.</p>
+          <div className="px-6 py-10 text-center">
+            <p className="text-sm text-slate-400">Haz clic en <strong className="text-slate-600">Actualizar</strong> para generar análisis basado en los datos actuales.</p>
           </div>
         )}
 
         {loadingInsights && (
-          <div className="px-8 py-12 text-center">
-            <span className="material-symbols-outlined text-[48px] text-[#00C8FF] animate-spin">progress_activity</span>
-            <p className="text-sm text-slate-400 mt-3">Analizando datos con DeepSeek...</p>
+          <div className="px-6 py-10 text-center">
+            <p className="text-sm text-slate-400">Analizando datos…</p>
           </div>
         )}
 
         {insights && !loadingInsights && (
-          <div className="grid grid-cols-1 md:grid-cols-3">
-            <div className="p-8 bg-[#F0F8FF] border-l-[6px] border-[#00C8FF]">
-              <h5 className="text-sm font-extrabold text-[#00C8FF] uppercase tracking-widest mb-6">Insights Clave</h5>
-              <ul className="space-y-4">
-                {insights.insights.map((item, i) => (
-                  <li key={i} className="flex gap-3"><span className="text-xl">💡</span><p className="text-sm text-slate-700 leading-relaxed">{item}</p></li>
-                ))}
-              </ul>
-            </div>
-            <div className="p-8 bg-[#EEF4FF] border-l-[6px] border-[#004BB5]">
-              <h5 className="text-sm font-extrabold text-[#004BB5] uppercase tracking-widest mb-6">Recomendaciones</h5>
-              <ul className="space-y-4">
-                {insights.recomendaciones.map((item, i) => (
-                  <li key={i} className="flex gap-3"><span className="text-xl">🎯</span><p className="text-sm text-slate-700 leading-relaxed">{item}</p></li>
-                ))}
-              </ul>
-            </div>
-            <div className="p-8 bg-[#FFF3EE] border-l-[6px] border-[#E8470A]">
-              <h5 className="text-sm font-extrabold text-[#E8470A] uppercase tracking-widest mb-6">Puntos de Atención</h5>
-              <ul className="space-y-4">
-                {insights.alertas.map((item, i) => (
-                  <li key={i} className="flex gap-3"><span className="text-xl">⚠️</span><p className="text-sm text-slate-700 leading-relaxed">{item}</p></li>
-                ))}
-              </ul>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+            <InsightColumn title="Insights" items={insights.insights} />
+            <InsightColumn title="Recomendaciones" items={insights.recomendaciones} />
+            <InsightColumn title="Atención" items={insights.alertas} />
           </div>
         )}
       </section>
     </>
+  )
+}
+
+function InsightColumn({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="px-6 py-5">
+      <h5 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">{title}</h5>
+      {items.length === 0 ? (
+        <p className="text-xs text-slate-400 italic">Sin datos</p>
+      ) : (
+        <ul className="space-y-2.5">
+          {items.map((item, i) => (
+            <li key={i} className="text-xs text-slate-600 leading-relaxed">{item}</li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }

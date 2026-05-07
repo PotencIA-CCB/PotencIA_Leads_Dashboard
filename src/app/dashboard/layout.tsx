@@ -108,17 +108,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="ml-[260px] pt-20 pb-12 px-8 min-h-screen">
         {children}
       </main>
-
-      {/* IA Insight FAB */}
-      <div className="fixed bottom-8 right-8 pointer-events-none">
-        <div className="bg-[#003087] text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 pointer-events-auto">
-          <span className="material-symbols-outlined text-[#00C8FF]">psychology</span>
-          <div className="text-xs">
-            <p className="font-bold">IA Insight</p>
-            <p className="text-white/70">Dashboard activo</p>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
