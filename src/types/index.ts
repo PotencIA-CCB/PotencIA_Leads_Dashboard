@@ -1,5 +1,7 @@
 export type LeadStatus = 'Pendiente' | 'Agendado' | 'En seguimiento' | 'Resuelto' | 'Cancelado'
 
+export type LeadSource = 'landing' | 'booking' | 'manual'
+
 export interface Lead {
   id: string
   created_at: string
@@ -23,12 +25,14 @@ export interface Lead {
   booking_email: string | null
   booking_customer_id: string | null
   phone_normalized: string | null
+  source: LeadSource | null
 }
 
 export interface Consultor {
   id: string
   nombre: string
   email: string
+  rol?: 'admin' | 'consultor'
   created_at: string
 }
 

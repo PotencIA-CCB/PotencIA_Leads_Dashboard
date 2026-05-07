@@ -1,62 +1,59 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase-browser'
+import { useEffect, useMemo, useState } from 'react'
+import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
 import { Lead, LeadStatus, Consultor, Sesion } from '@/types'
-import LeadCard from '@/components/LeadCard'
+import LeadCard, { LeadWithMeta } from '@/components/LeadCard'
 import LeadModal from '@/components/LeadModal'
 
-const statuses = ['Todos', 'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
+type SesionResumen = Pick<Sesion, 'id_lead' | 'fecha_sesion' | 'hora_inicio' | 'hora_fin' | 'modalidad' | 'created_at'>
 
-const statusChipStyle: Record<string, string> = {
-  Todos:            'bg-[#003087] text-white shadow-md',
-  Pendiente:        'bg-white text-orange-600 border border-orange-100 hover:bg-orange-50',
-  Agendado:         'bg-white text-blue-500 border border-blue-100 hover:bg-blue-50',
-  'En seguimiento': 'bg-white text-blue-500 border border-blue-100 hover:bg-blue-50',
-  Resuelto:         'bg-white text-emerald-600 border border-emerald-100 hover:bg-emerald-50',
-  Cancelado:        'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50',
+const statusOptions: Array<'Todos' | LeadStatus> = ['Todos', 'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
+
+// active e idle deben tener el mismo grosor de border para evitar shift en click
+const statusChip: Record<string, { active: string; idle: string }> = {
+  Todos:            { active: 'bg-[#003087] text-white border border-[#003087]',     idle: 'bg-white text-slate-600 border border-slate-200' },
+  Pendiente:        { active: 'bg-amber-500 text-white border border-amber-500',     idle: 'bg-white text-amber-700 border border-amber-200' },
+  Agendado:         { active: 'bg-sky-600 text-white border border-sky-600',         idle: 'bg-white text-sky-700 border border-sky-200' },
+  'En seguimiento': { active: 'bg-indigo-600 text-white border border-indigo-600',   idle: 'bg-white text-indigo-700 border border-indigo-200' },
+  Resuelto:         { active: 'bg-emerald-600 text-white border border-emerald-600', idle: 'bg-white text-emerald-700 border border-emerald-200' },
+  Cancelado:        { active: 'bg-slate-600 text-white border border-slate-600',     idle: 'bg-white text-slate-600 border border-slate-200' },
 }
 
 export default function DashboardPage() {
-  type SesionResumen = Pick<Sesion, 'id_lead' | 'fecha_sesion' | 'hora_inicio' | 'hora_fin' | 'modalidad' | 'created_at'>
-  type LeadWithSesion = Lead & { sesion?: SesionResumen | null }
-
-  const [leads, setLeads] = useState<LeadWithSesion[]>([])
+  const [leads, setLeads] = useState<LeadWithMeta[]>([])
   const [consultores, setConsultores] = useState<Consultor[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedLead, setSelectedLead] = useState<LeadWithSesion | null>(null)
+  const [selectedLead, setSelectedLead] = useState<LeadWithMeta | null>(null)
   const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('Todos')
+  const [filterStatus, setFilterStatus] = useState<'Todos' | LeadStatus>('Todos')
   const [rol, setRol] = useState('')
 
   const fetchData = async () => {
     setLoading(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data: consultor } = await supabase
-      .from('consultores').select('id, rol').eq('auth_id', user.id).single()
-    if (!consultor) return
-
+    const consultor = await getCurrentConsultor()
+    if (!consultor) {
+      setLoading(false)
+      return
+    }
     setRol(consultor.rol)
 
+    const supabase = createClient()
     const query = supabase.from('leads').select('*').order('created_at', { ascending: false })
     if (consultor.rol === 'consultor') query.eq('id_consultor_asignado', consultor.id)
 
     const { data: leadsData } = await query
     const baseLeads = (leadsData as Lead[]) || []
 
-    // Cargar última sesión por lead (para mostrar fecha/hora/modalidad en cards)
     const leadIds = baseLeads.map((l) => l.id)
     const sesionByLead: Record<string, SesionResumen> = {}
-
     if (leadIds.length > 0) {
       const { data: sesionesData } = await supabase
         .from('sesiones')
         .select('id_lead,fecha_sesion,hora_inicio,hora_fin,modalidad,created_at')
         .in('id_lead', leadIds)
-        .order('created_at', { ascending: false })
+        .order('fecha_sesion', { ascending: false })
+        .order('hora_inicio', { ascending: false })
 
       if (sesionesData) {
         for (const ses of sesionesData as SesionResumen[]) {
@@ -65,20 +62,26 @@ export default function DashboardPage() {
       }
     }
 
-    setLeads(baseLeads.map((l) => ({ ...l, sesion: sesionByLead[l.id] ?? null })))
+    const { data: consData } = await supabase.from('consultores').select('id, nombre, email, rol, created_at')
+    const allConsultores = (consData as Consultor[]) || []
+    if (consultor.rol === 'admin') setConsultores(allConsultores)
+    const consultorById: Record<string, string> = {}
+    for (const c of allConsultores) consultorById[c.id] = c.nombre
 
-    if (consultor.rol === 'admin') {
-      const { data: consData } = await supabase.from('consultores').select('*')
-      if (consData) setConsultores(consData as Consultor[])
-    }
+    setLeads(
+      baseLeads.map((l) => ({
+        ...l,
+        sesion: sesionByLead[l.id] ?? null,
+        consultor_nombre: l.id_consultor_asignado ? consultorById[l.id_consultor_asignado] ?? null : null,
+      }))
+    )
+
     setLoading(false)
   }
 
   useEffect(() => {
     let ignore = false
-    async function load() {
-      await fetchData()
-    }
+    async function load() { await fetchData() }
     if (!ignore) load()
     return () => { ignore = true }
   }, [])
@@ -93,115 +96,147 @@ export default function DashboardPage() {
   async function handleAsignarConsultor(id: string, id_consultor_asignado: string) {
     const supabase = createClient()
     await supabase.from('leads').update({ id_consultor_asignado }).eq('id', id)
-    setLeads((prev) => prev.map((l) => l.id === id ? { ...l, id_consultor_asignado } : l))
-    if (selectedLead?.id === id) setSelectedLead((prev) => prev ? { ...prev, id_consultor_asignado } : prev)
+    const nombre = consultores.find((c) => c.id === id_consultor_asignado)?.nombre ?? null
+    setLeads((prev) => prev.map((l) =>
+      l.id === id ? { ...l, id_consultor_asignado, consultor_nombre: nombre } : l
+    ))
+    if (selectedLead?.id === id) {
+      setSelectedLead((prev) => prev ? { ...prev, id_consultor_asignado, consultor_nombre: nombre } : prev)
+    }
   }
 
-  const sinAsignar = rol === 'admin'
-    ? leads.filter((l) => l.status === 'Agendado' && !l.id_consultor_asignado)
-    : []
+  const isAdmin = rol === 'admin'
 
-  const filtered = leads.filter((l) => {
-    const matchSearch = l.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      l.email.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = filterStatus === 'Todos' || l.status === filterStatus
-    return matchSearch && matchStatus
-  })
+  const sinAsignar = useMemo(
+    () => isAdmin ? leads.filter((l) => l.status === 'Agendado' && !l.id_consultor_asignado) : [],
+    [leads, isAdmin]
+  )
+
+  const stats = useMemo(() => {
+    // Total excluye cancelados (no son leads activos)
+    const total = leads.filter((l) => l.status !== 'Cancelado').length
+    const pendientes = leads.filter((l) => l.status === 'Pendiente').length
+    const agendados = leads.filter((l) => l.status === 'Agendado').length
+    const enSeguimiento = leads.filter((l) => l.status === 'En seguimiento').length
+    const resueltos = leads.filter((l) => l.status === 'Resuelto').length
+    return { total, pendientes, agendados, enSeguimiento, resueltos }
+  }, [leads])
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return leads.filter((l) => {
+      const matchSearch = !q
+        || l.full_name.toLowerCase().includes(q)
+        || l.email.toLowerCase().includes(q)
+        || (l.phone ?? '').toLowerCase().includes(q)
+        || (l.id_num ?? '').toLowerCase().includes(q)
+      const matchStatus = filterStatus === 'Todos' || l.status === filterStatus
+      return matchSearch && matchStatus
+    })
+  }, [leads, search, filterStatus])
+
+  function clearFilters() {
+    setFilterStatus('Todos')
+    setSearch('')
+  }
 
   return (
     <>
-      {/* Banner: leads agendados sin consultor — solo admin */}
-      {sinAsignar.length > 0 && (
-        <div
-          className="mb-6 flex items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-xl px-6 py-4 cursor-pointer hover:bg-amber-100 transition-colors"
+      {/* Banner sin asignar — admin */}
+      {sinAsignar.length > 0 && filterStatus !== 'Agendado' && (
+        <button
           onClick={() => setFilterStatus('Agendado')}
+          className="w-full mb-6 flex items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-left cursor-pointer"
         >
           <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-amber-500 text-[22px]">notification_important</span>
+            <span className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">notification_important</span>
+            </span>
             <div>
-              <p className="text-sm font-bold text-amber-800">
-                {sinAsignar.length} lead{sinAsignar.length > 1 ? 's' : ''} agendado{sinAsignar.length > 1 ? 's' : ''} sin consultor asignado
+              <p className="text-sm font-bold text-amber-900">
+                {sinAsignar.length} agendamiento{sinAsignar.length > 1 ? 's' : ''} sin consultor asignado
               </p>
-              <p className="text-xs text-amber-600">Llegaron desde Microsoft Bookings. Haz clic para verlos.</p>
+              <p className="text-xs text-amber-700">Llegaron desde Microsoft Bookings. Haz clic para revisarlos.</p>
             </div>
           </div>
-          <span className="material-symbols-outlined text-amber-400 text-[20px]">arrow_forward</span>
-        </div>
+          <span className="material-symbols-outlined text-amber-500 text-[20px]" aria-hidden="true">arrow_forward</span>
+        </button>
       )}
 
       {/* Section Header */}
-      <div className="mb-10">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <div className="mb-8">
+        <nav aria-label="Breadcrumb" className="mb-2">
+          <ol className="flex items-center gap-2 text-[11px] font-medium text-slate-400 uppercase tracking-wider list-none p-0 m-0">
+            <li className="flex items-center">
+              <span>Analysis</span>
+              <span className="material-symbols-outlined text-[14px] mx-1" aria-hidden="true">chevron_right</span>
+            </li>
+            <li>
+              <span className="text-[#00C8FF]" aria-current="page">Leads</span>
+            </li>
+          </ol>
+        </nav>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <nav aria-label="Breadcrumb" className="mb-2">
-              <ol className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wider list-none p-0 m-0">
-                <li className="flex items-center">
-                  <span>Analysis</span>
-                  <span className="material-symbols-outlined text-[14px] mx-1" aria-hidden="true">chevron_right</span>
-                </li>
-                <li>
-                  <span className="text-[#00C8FF]" aria-current="page">Leads</span>
-                </li>
-              </ol>
-            </nav>
-            <h2 className="text-4xl font-extrabold text-[#001d59] tracking-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-              Leads Registrados
+            <h2 className="text-[34px] font-extrabold text-[#001d59] tracking-tight leading-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+              Leads
             </h2>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-400">{leads.length} leads en total</span>
+            <p className="text-sm text-slate-500 mt-1">
+              Vista unificada — Form PotencIA, Microsoft Bookings y registros manuales en una sola card por persona.
+            </p>
           </div>
         </div>
       </div>
 
+      {/* Stats — funnel activo (excluye cancelados del total) */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <StatCard label="Total activos" value={stats.total} accent="text-[#003087]" />
+        <StatCard label="Pendientes" value={stats.pendientes} accent="text-amber-600" />
+        <StatCard label="Agendados" value={stats.agendados} accent="text-sky-600" />
+        <StatCard label="En seguimiento" value={stats.enSeguimiento} accent="text-indigo-600" />
+        <StatCard label="Resueltos" value={stats.resueltos} accent="text-emerald-600" />
+      </div>
+
       {/* Filter Bar */}
-      <div className="bg-white rounded-xl shadow-sm p-5 mb-6 flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[260px]">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[#00C8FF] text-[20px]">search</span>
+      <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-4 mb-6">
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px]" aria-hidden="true">search</span>
           <input
-            className="w-full pl-12 pr-4 py-3 bg-slate-50/50 border-none rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/20"
-            placeholder="Buscar por nombre o email..."
+            className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 transition-colors"
+            placeholder="Buscar por nombre, email, teléfono o cédula..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-      </div>
 
-      {/* Chips */}
-      <div className="flex flex-wrap items-center gap-2 mb-8">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mr-2">Filtrar por:</span>
-        {statuses.map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilterStatus(s)}
-            className={`px-5 py-2 rounded-full text-xs font-bold transition-all ${
-              filterStatus === s ? statusChipStyle[s] || 'bg-[#003087] text-white' : statusChipStyle[s] || 'bg-white text-slate-500 border border-slate-200'
-            }`}
-          >
-            {s}
-          </button>
-        ))}
+        <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1">Estado</span>
+          {statusOptions.map((s) => {
+            const active = filterStatus === s
+            const styles = statusChip[s]
+            return (
+              <button
+                key={s}
+                onClick={() => setFilterStatus(s)}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer ${active ? styles.active : styles.idle}`}
+              >
+                {s}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Grid */}
       {loading ? (
-        <p className="text-sm text-slate-400">Cargando leads...</p>
+        <SkeletonGrid />
+      ) : filtered.length === 0 ? (
+        <EmptyState onClear={clearFilters} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map((lead) => (
             <LeadCard key={lead.id} lead={lead} onClick={setSelectedLead} />
           ))}
-
-          {/* Empty state card */}
-          {filtered.length === 0 && (
-            <div className="bg-[#F4F6FA]/40 border-2 border-dashed border-slate-200 rounded-[10px] p-6 flex flex-col items-center justify-center text-center">
-              <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-4">
-                <span className="material-symbols-outlined text-[32px]">search_off</span>
-              </div>
-              <h3 className="text-lg font-bold text-slate-500" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Sin resultados</h3>
-              <p className="text-sm text-slate-400 mt-2">No hay leads que coincidan con el filtro</p>
-            </div>
-          )}
         </div>
       )}
 
@@ -211,10 +246,62 @@ export default function DashboardPage() {
           lead={selectedLead}
           onClose={() => setSelectedLead(null)}
           onStatusChange={handleStatusChange}
-          onAsignarConsultor={rol === 'admin' ? handleAsignarConsultor : undefined}
-          consultores={rol === 'admin' ? consultores : []}
+          onAsignarConsultor={isAdmin ? handleAsignarConsultor : undefined}
+          consultores={isAdmin ? consultores : []}
         />
       )}
     </>
+  )
+}
+
+function StatCard({ label, value, accent }: { label: string; value: number; accent: string }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] px-5 py-4">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
+      <p className={`text-3xl font-extrabold ${accent} mt-1`} style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function SkeletonGrid() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 border border-slate-300 rounded-2xl overflow-hidden">
+          <div className="p-5 space-y-3 animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-slate-200" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 bg-slate-200 rounded w-2/3" />
+                <div className="h-2.5 bg-slate-200 rounded w-1/2" />
+              </div>
+            </div>
+            <div className="h-16 bg-white/60 rounded-xl border border-slate-200" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function EmptyState({ onClear }: { onClear: () => void }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-12 flex flex-col items-center text-center">
+      <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-4">
+        <span className="material-symbols-outlined text-[28px]" aria-hidden="true">search_off</span>
+      </div>
+      <h3 className="text-base font-bold text-slate-700" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+        Sin resultados
+      </h3>
+      <p className="text-sm text-slate-500 mt-1">No hay leads que coincidan con tus filtros.</p>
+      <button
+        onClick={onClear}
+        className="mt-5 px-4 py-2 rounded-lg bg-[#003087] text-white text-xs font-semibold cursor-pointer"
+      >
+        Limpiar filtros
+      </button>
+    </div>
   )
 }
