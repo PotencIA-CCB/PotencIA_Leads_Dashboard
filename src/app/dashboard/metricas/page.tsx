@@ -1,6 +1,7 @@
 'use client'
 
 import { useMetricas } from '@/hooks/useMetricas'
+import { formatUseCase } from '@/lib/format'
 import { useState, useEffect } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -54,12 +55,13 @@ export default function MetricasPage() {
   const enSeguimiento = metricas.porEstado.find((e) => e.status === 'En seguimiento')?.total || 0
   
 
-  // Casos de uso con porcentaje
-  const maxSolucion = Math.max(...metricas.porSolucion.map((s) => s.total), 1)
-  const porSolucionPct = metricas.porSolucion.map((s) => ({
-    ...s,
-    pct: Math.round((s.total / metricas.totalLeads) * 100),
-    barPct: Math.round((s.total / maxSolucion) * 100),
+  // Casos de uso (use_case del Form PotencIA) con porcentaje
+  const maxCaso = Math.max(...metricas.porCasoUso.map((c) => c.total), 1)
+  const totalConCaso = metricas.porCasoUso.reduce((sum, c) => sum + c.total, 0)
+  const porCasoUsoPct = metricas.porCasoUso.map((c) => ({
+    ...c,
+    pct: totalConCaso > 0 ? Math.round((c.total / totalConCaso) * 100) : 0,
+    barPct: Math.round((c.total / maxCaso) * 100),
   }))
 
   const barColors = ['#003087', '#00C8FF', '#004BB5', '#E8470A', '#5A6475', '#003087']
@@ -92,7 +94,7 @@ export default function MetricasPage() {
           { label: 'En Seguimiento', value: enSeguimiento, icon: 'monitoring', sub: 'Active pipeline' },
           { label: '% Conversión', value: `${metricas.tasaConversion}%`, icon: 'trending_up', sub: 'Leads → Resuelto' },
         ].map((kpi) => (
-          <div key={kpi.label} className="bg-white p-6 rounded-[10px] border-t-[3px] border-[#004BB5] border border-[#E5E7EB] shadow-sm hover:-translate-y-1 transition-transform duration-300">
+          <div key={kpi.label} className="bg-white p-6 rounded-[10px] border-t-[3px] border-[#004BB5] border border-[#E5E7EB] shadow-sm">
             <div className="flex justify-between items-start mb-4">
               <p className="text-[12px] text-[#5A6475] font-medium tracking-tight">{kpi.label}</p>
               <span className="material-symbols-outlined text-[#00C8FF] text-xl">{kpi.icon}</span>
@@ -107,39 +109,43 @@ export default function MetricasPage() {
       <section className="grid grid-cols-12 gap-6 mb-8">
 
         {/* Line Chart: Leads por semana */}
-        <div className="col-span-12 lg:col-span-8 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-[400px] flex flex-col">
+        <div className="col-span-12 lg:col-span-8 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h4 className="text-lg font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Leads por semana</h4>
               <p className="text-xs text-slate-400">Evolución histórica de captación de leads</p>
             </div>
           </div>
-          <div className="flex-1">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <LineChart data={metricas.porSemana}>
-                <XAxis dataKey="semana" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                <Tooltip />
-                <Line type="monotone" dataKey="total" stroke="#003087" strokeWidth={3} dot={{ fill: '#003087', r: 5, stroke: 'white', strokeWidth: 2 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <ResponsiveContainer width="100%" height={300} minWidth={0}>
+            <LineChart data={metricas.porSemana}>
+              <XAxis dataKey="semana" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+              <Tooltip />
+              <Line type="monotone" dataKey="total" stroke="#003087" strokeWidth={3} dot={{ fill: '#003087', r: 5, stroke: 'white', strokeWidth: 2 }} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
 
         {/* Bar Chart: Leads por ciudad */}
-        <div className="col-span-12 lg:col-span-4 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-[400px] flex flex-col">
+        <div className="col-span-12 lg:col-span-4 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-100 flex flex-col">
           <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Leads por ciudad</h4>
           <div className="flex-1 flex items-end justify-around gap-2 px-2 pb-6 border-b border-slate-100 relative">
             {metricas.porCiudad.map((c, i) => {
               const maxCity = Math.max(...metricas.porCiudad.map((x) => x.total), 1)
               const heightPct = Math.round((c.total / maxCity) * 100)
               return (
-                <div key={c.city} className="w-full flex flex-col items-center group">
+                <div key={c.city} className="w-full flex flex-col items-center min-w-0">
+                  <span className="text-xs font-bold text-slate-700 mb-1 tabular-nums">{c.total}</span>
                   <div
-                    className="w-8 rounded-t-sm transition-all group-hover:opacity-80"
+                    className="w-8 rounded-t-sm"
                     style={{ height: `${heightPct}%`, background: barColors[i % barColors.length], minHeight: '8px' }}
                   />
-                  <p className="text-[10px] text-slate-500 mt-2 text-center">{c.city.slice(0, 5)}</p>
+                  <p
+                    className="text-[10px] text-slate-500 mt-2 text-center wrap-break-word leading-tight w-full"
+                    title={c.city}
+                  >
+                    {c.city}
+                  </p>
                 </div>
               )
             })}
@@ -151,20 +157,18 @@ export default function MetricasPage() {
       <section className="grid grid-cols-12 gap-6 mb-8">
 
         {/* Donut: Estado consultorías */}
-        <div className="col-span-12 lg:col-span-5 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-[380px] flex flex-col">
+        <div className="col-span-12 lg:col-span-5 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-95 flex flex-col">
           <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Estado consultorías</h4>
           <div className="flex-1 flex items-center justify-between gap-4">
-            <div style={{ width: 200, height: 200, flexShrink: 0 }}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                <PieChart>
-                  <Pie data={metricas.porEstado} dataKey="total" nameKey="status" cx="50%" cy="50%" innerRadius={55} outerRadius={80}>
-                    {metricas.porEstado.map((_, i) => (
-                      <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="shrink-0">
+              <PieChart width={200} height={200}>
+                <Pie data={metricas.porEstado} dataKey="total" nameKey="status" cx="50%" cy="50%" innerRadius={55} outerRadius={80}>
+                  {metricas.porEstado.map((_, i) => (
+                    <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
             </div>
             <div className="flex flex-col gap-3">
               {metricas.porEstado.map((e, i) => (
@@ -177,25 +181,34 @@ export default function MetricasPage() {
           </div>
         </div>
 
-        {/* Horizontal bars: Casos de uso */}
-        <div className="col-span-12 lg:col-span-7 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-[380px] flex flex-col">
-          <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Casos de uso más solicitados</h4>
-          <div className="space-y-5 flex-1 overflow-hidden">
-            {porSolucionPct.map((s, i) => (
-              <div key={s.solution} className="space-y-1.5">
-                <div className="flex justify-between text-xs font-bold text-slate-600">
-                  <span>{s.solution}</span>
-                  <span>{s.pct}%</span>
+        {/* Horizontal bars: Casos de uso (use_case del Form PotencIA) */}
+        <div className="col-span-12 lg:col-span-7 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-95 flex flex-col">
+          <h4 className="text-lg font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Casos de uso más solicitados</h4>
+          <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+            {porCasoUsoPct.map((c, i) => {
+              const display = formatUseCase(c.caso)
+              return (
+                <div key={c.caso} className="space-y-1.5">
+                  <div className="flex justify-between gap-3 text-xs font-medium text-slate-700">
+                    <span className="truncate" title={display}>{display}</span>
+                    <span className="font-bold text-slate-600 tabular-nums shrink-0">{c.pct}% · {c.total}</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${c.barPct}%`, background: barColors[i % barColors.length] }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${s.barPct}%`, background: barColors[i % barColors.length] }}
-                  />
-                </div>
+              )
+            })}
+            {porCasoUsoPct.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <span className="material-symbols-outlined text-[32px] text-slate-300 mb-2" aria-hidden="true">format_quote</span>
+                <p className="text-sm text-slate-400">Aún no hay leads con caso de uso registrado.</p>
+                <p className="text-[11px] text-slate-400 mt-1">Los casos vienen del Form PotencIA.</p>
               </div>
-            ))}
-            {porSolucionPct.length === 0 && <p className="text-sm text-slate-400">Sin datos</p>}
+            )}
           </div>
         </div>
       </section>
@@ -215,7 +228,7 @@ export default function MetricasPage() {
             <button
               onClick={generarInsights}
               disabled={loadingInsights}
-              className="px-5 py-2 bg-[#003087] hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all"
+              className="px-5 py-2 bg-[#003087] disabled:opacity-50 text-white text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-[16px]">{loadingInsights ? 'hourglass_empty' : 'refresh'}</span>
               {loadingInsights ? 'Generando...' : 'Actualizar insights'}

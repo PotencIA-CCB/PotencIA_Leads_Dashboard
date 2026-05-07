@@ -5,6 +5,7 @@ export interface MetricasGlobales {
   porEstado: { status: string; total: number }[]
   tasaConversion: number
   porSolucion: { solution: string; total: number }[]
+  porCasoUso: { caso: string; total: number }[]
   porCiudad: { city: string; total: number }[]
   porCargo: { cargo: string; total: number }[]
   porSemana: { semana: string; total: number }[]
@@ -12,7 +13,7 @@ export interface MetricasGlobales {
 
 export type LeadForMetricas = Pick<
   Lead,
-  'created_at' | 'status' | 'solution' | 'city' | 'company_role_level'
+  'created_at' | 'status' | 'solution' | 'use_case' | 'city' | 'company_role_level'
 >
 
 function normalizeKey(value: string) {
@@ -54,6 +55,7 @@ export function computeMetricasFromLeads(leads: LeadForMetricas[]): MetricasGlob
 
   const estadoMap: Record<string, number> = {}
   const solucionMap: Record<string, { label: string; total: number }> = {}
+  const casoUsoMap: Record<string, { label: string; total: number }> = {}
   const ciudadMap: Record<string, { label: string; total: number }> = {}
   const cargoMap: Record<string, { label: string; total: number }> = {}
   const semanaMap: Record<string, number> = {}
@@ -68,6 +70,13 @@ export function computeMetricasFromLeads(leads: LeadForMetricas[]): MetricasGlob
       if (isBetterLabel(lead.solution, bucket.label)) bucket.label = lead.solution.trim()
       bucket.total += 1
       solucionMap[key] = bucket
+    }
+    if (lead.use_case) {
+      const key = normalizeKey(lead.use_case)
+      const bucket = casoUsoMap[key] ?? { label: lead.use_case.trim(), total: 0 }
+      if (isBetterLabel(lead.use_case, bucket.label)) bucket.label = lead.use_case.trim()
+      bucket.total += 1
+      casoUsoMap[key] = bucket
     }
     if (lead.city) {
       const key = normalizeKey(lead.city)
@@ -99,6 +108,11 @@ export function computeMetricasFromLeads(leads: LeadForMetricas[]): MetricasGlob
     .sort((a, b) => b.total - a.total)
     .slice(0, 6)
 
+  const porCasoUso = Object.values(casoUsoMap)
+    .map(({ label, total }) => ({ caso: label, total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6)
+
   const porCiudad = Object.values(ciudadMap)
     .map(({ label, total }) => ({ city: label, total }))
     .sort((a, b) => b.total - a.total)
@@ -111,5 +125,5 @@ export function computeMetricasFromLeads(leads: LeadForMetricas[]): MetricasGlob
 
   const porSemana = Object.entries(semanaMap).map(([semana, total]) => ({ semana, total }))
 
-  return { totalLeads, porEstado, tasaConversion, porSolucion, porCiudad, porCargo, porSemana }
+  return { totalLeads, porEstado, tasaConversion, porSolucion, porCasoUso, porCiudad, porCargo, porSemana }
 }
