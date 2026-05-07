@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase-browser'
+import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
 import { Lead, Consultor } from '@/types'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
@@ -36,19 +36,19 @@ export default function ConsultoresPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     async function fetchData() {
+      const me = await getCurrentConsultor()
+      if (cancelled) return
+      if (!me) { router.replace('/login'); return }
+      if (me.rol !== 'admin') { router.replace('/dashboard'); return }
+
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.replace('/login'); return }
-
-      const { data: me } = await supabase
-        .from('consultores').select('rol').eq('auth_id', user.id).single()
-      if (!me || me.rol !== 'admin') { router.replace('/dashboard'); return }
-
       const [{ data: cons }, { data: lds }] = await Promise.all([
         supabase.from('consultores').select('*'),
         supabase.from('leads').select('*'),
       ])
+      if (cancelled) return
       if (cons) {
         setConsultores(cons as Consultor[])
         setSelectedId(cons[0]?.id || '')
@@ -57,7 +57,8 @@ export default function ConsultoresPage() {
       setLoading(false)
     }
     fetchData()
-  }, [])
+    return () => { cancelled = true }
+  }, [router])
 
   const leadsConsultor = leads.filter((l) => l.id_consultor_asignado === selectedId)
 

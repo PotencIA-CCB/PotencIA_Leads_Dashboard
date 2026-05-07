@@ -4,12 +4,11 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase-browser'
+import { createClient, getCurrentConsultor, invalidateAuthCache } from '@/lib/supabase-browser'
 
 const navItems = [
   { label: 'Leads', href: '/dashboard', icon: 'analytics' },
   { label: 'Métricas', href: '/dashboard/metricas', icon: 'assessment' },
-  { label: 'Sesiones', href: '/dashboard/sesiones', icon: 'event_note' },
   { label: 'Consultores', href: '/dashboard/consultores', icon: 'psychology', adminOnly: true },
 ]
 
@@ -20,26 +19,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [rol, setRol] = useState('')
 
   useEffect(() => {
-    async function fetchUser() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase
-        .from('consultores')
-        .select('nombre, rol')
-        .eq('auth_id', user.id)
-        .single()
-      if (data) {
-        setNombre(data.nombre)
-        setRol(data.rol)
-      }
-    }
-    fetchUser()
+    let cancelled = false
+    getCurrentConsultor().then((c) => {
+      if (cancelled || !c) return
+      setNombre(c.nombre)
+      setRol(c.rol)
+    })
+    return () => { cancelled = true }
   }, [])
 
   async function handleLogout() {
     const supabase = createClient()
     await supabase.auth.signOut()
+    invalidateAuthCache()
     router.push('/login')
     router.refresh()
   }
@@ -68,10 +60,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all duration-200 ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm border-l-4 cursor-pointer ${
                   pathname === item.href
-                    ? 'bg-white/10 text-[#00C8FF] border-l-4 border-[#00C8FF] font-semibold'
-                    : 'text-white/70 hover:text-white hover:bg-white/5'
+                    ? 'bg-white/10 text-[#00C8FF] border-[#00C8FF] font-semibold'
+                    : 'text-white/70 border-transparent'
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]" aria-hidden="true">{item.icon}</span>
@@ -97,7 +89,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/70 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[20px]">logout</span>
             <span className="text-sm tracking-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Cerrar sesión</span>
