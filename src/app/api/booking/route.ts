@@ -113,9 +113,6 @@ export async function POST(req: NextRequest) {
     const staffNameRaw = body.staff_name ?? body.staff_display_name ?? null
     const staffName = typeof staffNameRaw === 'string' ? staffNameRaw.trim() : null
 
-    console.log('staff_email recibido:', staffEmail)
-    console.log('staff_name recibido:', staffName)
-    console.log('body completo:', JSON.stringify(body))
     let consultorId: string | null = null
     let consultorMatchedBy: 'email' | 'name' | null = null
 
@@ -144,7 +141,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Atomic merge-or-create (reemplaza read-then-write para evitar race conditions)
+    // 2. Atomic merge-or-create (reemplaza read-then-write para evitar race conditions).
+    // p_id_num habilita match cross-canal: misma cédula, distinto email landing vs booking.
+    const idNumClean = typeof id_num === 'string' ? id_num.trim() : ''
+    const nitClean = typeof nit === 'string' ? nit.trim() : ''
+
     const { data: mergeResult, error: mergeError } = await supabase.rpc(
       'merge_or_create_lead',
       {
@@ -155,6 +156,8 @@ export async function POST(req: NextRequest) {
         p_solution: service_name,
         p_consultor_id: consultorId ?? null,
         p_booking_customer_id: body.customer_id ?? null,
+        p_id_num: idNumClean || null,
+        p_nit: nitClean || null,
         p_phone_window_hours: 72,
       }
     )
@@ -166,26 +169,6 @@ export async function POST(req: NextRequest) {
 
     const leadId: string = mergeResult[0].lead_id
     const leadMatchedBy: string = mergeResult[0].matched_by
-
-    console.log(`Lead procesado — id: ${leadId}, matched_by: ${leadMatchedBy}`)
-
-    // 2.1 Guardar datos adicionales (si vienen) sin cambiar el algoritmo de dedup.
-    // En el modelo "Bookings como fuente de verdad", estos campos deben venir del formulario de Bookings (Power Automate).
-    const idNumClean = typeof id_num === 'string' ? id_num.trim() : ''
-    const nitClean = typeof nit === 'string' ? nit.trim() : ''
-    if (idNumClean || nitClean) {
-      const { error: extraError } = await supabase
-        .from('leads')
-        .update({
-          ...(idNumClean && { id_num: idNumClean }),
-          ...(nitClean && { nit: nitClean }),
-        })
-        .eq('id', leadId)
-
-      if (extraError) {
-        console.error('Error actualizando id_num/nit:', extraError)
-      }
-    }
 
     // 3. Crear o actualizar la sesión asociada (idempotente por lead + fecha + hora)
     const { data: sesionExistente } = await supabase
