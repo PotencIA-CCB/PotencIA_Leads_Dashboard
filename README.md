@@ -52,7 +52,7 @@ cloudflared tunnel --url http://localhost:3000
 | Rol | Acceso |
 |-----|--------|
 | `admin` | Todos los leads, métricas globales, asignación de consultores, sección Consultores |
-| `consultor` | Solo sus leads asignados, sus sesiones y métricas propias |
+| `consultor` | Solo sus leads asignados y métricas propias |
 
 ---
 
@@ -121,17 +121,20 @@ src/
 │   ├── dashboard/
 │   │   ├── consultores/ # Vista admin — métricas por consultor
 │   │   ├── metricas/    # KPIs globales y gráficas
-│   │   ├── sesiones/    # Registro y historial de sesiones
-│   │   └── page.tsx     # Lista de leads
-│   └── login/
+│   │   ├── layout.tsx   # Sidebar + auth gate
+│   │   └── page.tsx     # Lista unificada de leads
+│   ├── login/
+│   ├── icon.png         # Favicon (logo CamaraBAQ)
+│   └── layout.tsx       # Root layout + metadata
 ├── components/
 │   ├── LeadCard.tsx
 │   └── LeadModal.tsx
 ├── hooks/
 │   └── useMetricas.ts
 ├── lib/
-│   ├── supabase-browser.ts
+│   ├── supabase-browser.ts  # Client + helpers memoizados
 │   └── supabase-server.ts
+├── proxy.ts             # Auth gate (Next.js 16, antes middleware.ts)
 └── types/
     └── index.ts
 ```
@@ -179,10 +182,15 @@ Notas:
 ## Base de datos (Supabase)
 
 Tablas principales:
-- `leads` — clientes registrados desde la landing o Bookings
+- `preleads` — sumisiones del Form PotencIA (intake bruto)
+- `leads` — clientes unificados (Form PotencIA + Microsoft Bookings, una fila por persona)
 - `consultores` — equipo interno con `auth_id` vinculado a Supabase Auth
-- `sesiones` — sesiones de consultoría con horarios y entregables
+- `sesiones` — sesiones de consultoría creadas automáticamente desde Bookings
 - `insights` — análisis generados por IA guardados históricamente
+
+### Migraciones
+
+Las migraciones SQL en `supabase/migrations/` deben aplicarse en orden cronológico (nombre de archivo). Cada una es transaccional. Aplicar vía SQL Editor de Supabase.
 
 ### Acceso al dashboard (auth_id)
 

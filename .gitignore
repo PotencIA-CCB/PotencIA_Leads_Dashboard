@@ -44,3 +44,11 @@ definition.*.json
 *.tsbuildinfo
 next-env.d.ts
 open-next.config.ts
+
+# cloudflare wrangler
+.wrangler/
+.dev.vars
+
+# manual reference data (not part of codebase)
+/consulores/
+/consultor/
