@@ -124,6 +124,53 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
         </div>
       </div>
 
+      {/* Lead contact & profile info */}
+      <div className="px-5 pb-3 flex flex-col gap-1">
+        {(lead.email || lead.phone) && (
+          <div className="flex items-center gap-3 text-xs text-slate-500 min-w-0">
+            {lead.email && (
+              <span className="inline-flex items-center gap-1 min-w-0 truncate" title={lead.email}>
+                <span className="material-symbols-outlined text-[13px] shrink-0" aria-hidden="true">mail</span>
+                <span className="truncate">{lead.email}</span>
+              </span>
+            )}
+            {lead.email && lead.phone && (
+              <span className="text-slate-300 shrink-0" aria-hidden="true">·</span>
+            )}
+            {lead.phone && (
+              <span className="inline-flex items-center gap-1 shrink-0" title={lead.phone}>
+                <span className="material-symbols-outlined text-[13px]" aria-hidden="true">phone</span>
+                {lead.phone}
+              </span>
+            )}
+          </div>
+        )}
+        {(lead.city || lead.empresa || lead.company_role_area) && (
+          <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
+            {lead.city && (
+              <span className="inline-flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px]" aria-hidden="true">location_on</span>
+                {lead.city}
+              </span>
+            )}
+            {lead.city && (lead.empresa || lead.company_role_area) && (
+              <span className="text-slate-300" aria-hidden="true">·</span>
+            )}
+            {lead.empresa && (
+              <span className="truncate max-w-[120px]" title={lead.empresa}>{lead.empresa}</span>
+            )}
+            {lead.empresa && lead.company_role_area && (
+              <span className="text-slate-300" aria-hidden="true">·</span>
+            )}
+            {lead.company_role_area && (
+              <span className="truncate capitalize" title={lead.company_role_area}>
+                {lead.company_role_area.replace(/-/g, ' ')}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Descripción — texto plano del formulario o caso de uso */}
       {descripcion && (
         <div className="px-5 pb-4">

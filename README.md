@@ -181,25 +181,54 @@ Notas:
 
 ## Base de datos (Supabase)
 
-Tablas principales:
-- `preleads` — sumisiones del Form PotencIA (intake bruto)
-- `leads` — clientes unificados (Form PotencIA + Microsoft Bookings, una fila por persona)
-- `consultores` — equipo interno con `auth_id` vinculado a Supabase Auth
-- `sesiones` — sesiones de consultoría creadas automáticamente desde Bookings
-- `insights` — análisis generados por IA guardados históricamente
+| Tabla | Rol |
+|---|---|
+| `leads` | Entidad central — una fila por persona unificada (landing + bookings + sesiones) |
+| `formularios_landing` | Registros del Form PotencIA (necesidad, UTM, consentimiento) |
+| `consultores` | Equipo interno con `auth_id` vinculado a Supabase Auth (Google OAuth) |
+| `bookings_entrante` | Staging — datos crudos de Microsoft Bookings (.tsv) procesados por trigger |
+| `consultorias` | Sesiones de consultoría (agenda, servicio, status) |
+| `registro_sesion` | Diagnóstico y resultados post-consulta (1:1 con consultorias) |
+| `novedades` | Publicaciones de consultores (casos de uso, mejoras, logros) |
+| `insights` | Análisis generados por IA (DeepSeek) |
+
+### Relaciones
+
+```
+formularios_landing.id_lead ──→ leads.id
+consultorias.id_lead         ──→ leads.id
+consultorias.id_consultor    ──→ consultores.id
+registro_sesion.id_consultoria → consultorias.id (UNIQUE)
+registro_sesion.id_lead      ──→ leads.id
+novedades.id_consultor       ──→ consultores.id
+novedades.id_lead            ──→ leads.id (nullable)
+novedades.id_consultoria     ──→ consultorias.id (nullable)
+```
+
+### Triggers (Supabase)
+
+| Trigger | Dispara en | Acción |
+|---|---|---|
+| `trg_bookings_after_insert` | `bookings_entrante` | match_or_create_lead → INSERT consultorias |
+| `trg_formularios_after_insert` | `formularios_landing` | Actualiza `leads.updated_at` |
+| `trg_registro_sesion_after_insert` | `registro_sesion` | Actualiza `consultorias.status` + `leads.origen` |
+
+### RPC: `match_or_create_lead`
+
+Dedup cross-canal por 4 criterios: booking_customer_id → id_num → email → phone_normalized → INSERT.
 
 ### Migraciones
 
-Las migraciones SQL en `supabase/migrations/` deben aplicarse en orden cronológico (nombre de archivo). Cada una es transaccional. Aplicar vía SQL Editor de Supabase.
+Las migraciones SQL en `supabase/migrations/` deben aplicarse en orden cronológico. Cada una es transaccional.
 
 ### Acceso al dashboard (auth_id)
 
 El login valida acceso por `consultores.auth_id` (UUID del usuario en Supabase Auth). Para habilitar un consultor:
-1. Crear usuario en **Auth → Users**
+1. Crear usuario en **Auth → Users** (o usar Google OAuth)
 2. Copiar su `User UID`
 3. Actualizar la fila en `consultores`:
 ```sql
 update consultores
 set auth_id = '<USER_UID>'
-where email = 'consultor@dominio.com';
+where email_institucional = 'consultor@camarabaq.org.co';
 ```
