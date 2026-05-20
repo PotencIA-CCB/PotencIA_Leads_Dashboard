@@ -199,7 +199,7 @@ export default function LeadModal({ lead, onClose, onStatusChange, onAsignarCons
                   : null}
               />
               <Row label="Modalidad" value={con.modalidad} />
-              <Row label="Servicio" value={con.servicio} />
+              <Row label="Servicio" value={form?.tema ?? con.servicio} />
               <Row label="Consultor Bookings" value={con.staff_name} />
               <Row label="Email staff" value={con.staff_email} />
               {typeof con.duracion_minutos === 'number' && con.duracion_minutos > 0 && (
