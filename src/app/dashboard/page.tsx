@@ -24,6 +24,9 @@ export default function DashboardPage() {
   const [selectedLead, setSelectedLead] = useState<LeadWithMeta | null>(null)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | ConsultoriaStatus>('Todos')
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterDateTo, setFilterDateTo] = useState('')
+  const [pendientesMas5, setPendientesMas5] = useState(false)
   const [rol, setRol] = useState('')
 
   const fetchData = async () => {
@@ -171,6 +174,10 @@ export default function DashboardPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
+    const hace5 = new Date(Date.now() - 5 * 86400000)
+    const fromTs = filterDateFrom ? new Date(filterDateFrom + 'T00:00:00') : null
+    const toTs = filterDateTo ? new Date(filterDateTo + 'T23:59:59') : null
+
     return leads.filter((l) => {
       const matchSearch = !q
         || leadFullName(l).toLowerCase().includes(q)
@@ -179,13 +186,23 @@ export default function DashboardPage() {
         || (l.id_num ?? '').toLowerCase().includes(q)
       const eff = effectiveStatus(l)
       const matchStatus = filterStatus === 'Todos' || eff === filterStatus
-      return matchSearch && matchStatus
+
+      const regRaw = l.formulario?.fecha_registro ?? l.created_at
+      const regTs = regRaw ? new Date(regRaw) : null
+      const matchDateFrom = !fromTs || (regTs !== null && regTs >= fromTs)
+      const matchDateTo = !toTs || (regTs !== null && regTs <= toTs)
+      const matchPendientes5 = !pendientesMas5 || (eff === 'Pendiente' && regTs !== null && regTs <= hace5)
+
+      return matchSearch && matchStatus && matchDateFrom && matchDateTo && matchPendientes5
     })
-  }, [leads, search, filterStatus])
+  }, [leads, search, filterStatus, filterDateFrom, filterDateTo, pendientesMas5])
 
   function clearFilters() {
     setFilterStatus('Todos')
     setSearch('')
+    setFilterDateFrom('')
+    setFilterDateTo('')
+    setPendientesMas5(false)
   }
 
   return (
@@ -272,6 +289,48 @@ export default function DashboardPage() {
               </button>
             )
           })}
+          <div className="w-px h-4 bg-slate-200 mx-1" aria-hidden="true" />
+          <button
+            onClick={() => setPendientesMas5((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+              pendientesMas5
+                ? 'bg-amber-500 text-white border border-amber-500'
+                : 'bg-white text-amber-700 border border-amber-200'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[13px]" aria-hidden="true">schedule</span>
+            Pendientes +5 días
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-slate-100">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registro</span>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-slate-500 shrink-0">Desde</label>
+            <input
+              type="date"
+              value={filterDateFrom}
+              onChange={(e) => setFilterDateFrom(e.target.value)}
+              className="text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 text-slate-700"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-slate-500 shrink-0">Hasta</label>
+            <input
+              type="date"
+              value={filterDateTo}
+              onChange={(e) => setFilterDateTo(e.target.value)}
+              className="text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 text-slate-700"
+            />
+          </div>
+          {(filterDateFrom || filterDateTo) && (
+            <button
+              onClick={() => { setFilterDateFrom(''); setFilterDateTo('') }}
+              className="text-[11px] text-slate-400 hover:text-slate-600 underline cursor-pointer"
+            >
+              Limpiar fechas
+            </button>
+          )}
         </div>
       </div>
 
