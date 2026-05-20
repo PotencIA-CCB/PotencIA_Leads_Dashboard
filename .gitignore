@@ -43,7 +43,6 @@ definition.*.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-open-next.config.ts
 
 # cloudflare wrangler
 .wrangler/
