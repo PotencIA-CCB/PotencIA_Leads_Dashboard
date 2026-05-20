@@ -52,3 +52,13 @@ open-next.config.ts
 # manual reference data (not part of codebase)
 /consulores/
 /consultor/
+
+# OpenNext
+.open-next
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+
+!.env.example
