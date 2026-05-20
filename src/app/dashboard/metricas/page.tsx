@@ -26,7 +26,18 @@ export default function MetricasPage() {
     async function cargarUltimoInsight() {
       const res = await fetch('/api/insights')
       const data = await res.json()
-      if (data) setInsights(data)
+      if (!Array.isArray(data) || data.length === 0) return
+      setInsights({
+        insights: data
+          .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'insight')
+          .map((r: { tipo: string; valor_texto: string }) => r.valor_texto),
+        recomendaciones: data
+          .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'recomendacion')
+          .map((r: { tipo: string; valor_texto: string }) => r.valor_texto),
+        alertas: data
+          .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'alerta')
+          .map((r: { tipo: string; valor_texto: string }) => r.valor_texto),
+      })
     }
     if (!loading && metricas) cargarUltimoInsight()
   }, [loading, metricas])
@@ -245,7 +256,7 @@ export default function MetricasPage() {
                       {new Date(p.semana_inicio + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="py-2.5 pr-4 font-bold text-[#003087]">{p.total}</td>
-                    <td className="py-2.5 pr-4 text-slate-600">{p.personas_atendidas}</td>
+                    <td className="py-2.5 pr-4 text-slate-600">{(p as unknown as Record<string, number>)['leads_atendidos']}</td>
                     <td className="py-2.5 pr-4 text-emerald-600 font-medium">{p.resueltas}</td>
                     <td className="py-2.5 pr-6 text-indigo-600 font-medium">{p.en_seguimiento}</td>
                   </tr>
@@ -296,11 +307,11 @@ export default function MetricasPage() {
   )
 }
 
-function InsightColumn({ title, items }: { title: string; items: string[] }) {
+function InsightColumn({ title, items }: { title: string; items: string[] | undefined }) {
   return (
     <div className="px-6 py-5">
       <h5 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">{title}</h5>
-      {items.length === 0 ? (
+      {!items || items.length === 0 ? (
         <p className="text-xs text-slate-400 italic">Sin datos</p>
       ) : (
         <ul className="space-y-2.5">

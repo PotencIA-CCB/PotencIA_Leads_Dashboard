@@ -171,15 +171,23 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
         )}
       </div>
 
-      {/* Descripción — texto plano del formulario o caso de uso */}
-      {descripcion && (
-        <div className="px-5 pb-4">
-          <p
-            className="text-[13px] text-slate-600 italic leading-snug line-clamp-2 border-l-2 border-slate-300 pl-3"
-            title={descripcion}
-          >
-            &ldquo;{descripcion}&rdquo;
-          </p>
+      {/* Tema + Descripción — use_case y texto del formulario o caso de uso */}
+      {(form?.tema || descripcion) && (
+        <div className="px-5 pb-4 flex flex-col gap-2">
+          {form?.tema && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-2.5 py-0.5 w-fit max-w-full">
+              <span className="material-symbols-outlined text-[12px] shrink-0" aria-hidden="true">label</span>
+              <span className="truncate" title={form.tema}>{form.tema}</span>
+            </span>
+          )}
+          {descripcion && (
+            <p
+              className="text-[13px] text-slate-600 italic leading-snug line-clamp-2 border-l-2 border-slate-300 pl-3"
+              title={descripcion}
+            >
+              &ldquo;{descripcion}&rdquo;
+            </p>
+          )}
         </div>
       )}
 
