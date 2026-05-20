@@ -60,7 +60,7 @@ export default function DashboardPage() {
       .from('formularios_landing')
       .select('id_lead, tema, descripcion, fecha_registro')
       .in('id_lead', leadIds)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
 
     const formularioByLead: Record<string, LeadCardFormulario> = {}
     if (formulariosData) {
