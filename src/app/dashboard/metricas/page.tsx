@@ -1,8 +1,8 @@
 'use client'
 
 import { useMetricas } from '@/hooks/useMetricas'
-import { formatUseCase } from '@/lib/format'
 import { useState, useEffect } from 'react'
+import { getCurrentConsultor } from '@/lib/supabase-browser'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -14,6 +14,13 @@ export default function MetricasPage() {
   const { metricas, loading } = useMetricas()
   const [insights, setInsights] = useState<{ insights: string[]; recomendaciones: string[]; alertas: string[] } | null>(null)
   const [loadingInsights, setLoadingInsights] = useState(false)
+  const [picosSemanales, setPicosSemanales] = useState<Array<{
+    semana_inicio: string
+    total: number
+    personas_atendidas: number
+    resueltas: number
+    en_seguimiento: number
+  }> | null>(null)
 
   useEffect(() => {
     async function cargarUltimoInsight() {
@@ -24,13 +31,30 @@ export default function MetricasPage() {
     if (!loading && metricas) cargarUltimoInsight()
   }, [loading, metricas])
 
+  useEffect(() => {
+    async function cargarPicos() {
+      try {
+        const { createClient } = await import('@/lib/supabase-browser')
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('consultas_por_semana')
+          .select('*')
+          .order('semana_inicio', { ascending: false })
+          .limit(12)
+        if (data) setPicosSemanales(data)
+      } catch { /* vista no disponible aún */ }
+    }
+    cargarPicos()
+  }, [])
+
   async function generarInsights() {
     setLoadingInsights(true)
     try {
+      const consultor = await getCurrentConsultor()
       const res = await fetch('/api/insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ id_consultor: consultor?.id ?? null }),
       })
       const data = await res.json()
       setInsights(data)
@@ -53,22 +77,17 @@ export default function MetricasPage() {
 
   const resueltos = metricas.porEstado.find((e) => e.status === 'Resuelto')?.total || 0
   const enSeguimiento = metricas.porEstado.find((e) => e.status === 'En seguimiento')?.total || 0
-  
 
-  // Casos de uso (use_case del Form PotencIA) con porcentaje
-  const maxCaso = Math.max(...metricas.porCasoUso.map((c) => c.total), 1)
-  const totalConCaso = metricas.porCasoUso.reduce((sum, c) => sum + c.total, 0)
-  const porCasoUsoPct = metricas.porCasoUso.map((c) => ({
+  const maxServicio = Math.max(...metricas.porServicio.map((c) => c.total), 1)
+  const porServicioPct = metricas.porServicio.map((c) => ({
     ...c,
-    pct: totalConCaso > 0 ? Math.round((c.total / totalConCaso) * 100) : 0,
-    barPct: Math.round((c.total / maxCaso) * 100),
+    pct: Math.round((c.total / maxServicio) * 100),
   }))
 
   const barColors = ['#003087', '#00C8FF', '#004BB5', '#E8470A', '#5A6475', '#003087']
 
   return (
     <>
-      {/* Section Header */}
       <div className="mb-8">
         <nav aria-label="Breadcrumb" className="mb-2">
           <ol className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wider list-none p-0 m-0">
@@ -89,10 +108,10 @@ export default function MetricasPage() {
       {/* KPI Cards */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {[
-          { label: 'Total Leads', value: metricas.totalLeads, icon: 'person_search', sub: 'Registrados' },
-          { label: 'Sesiones Completadas', value: resueltos, icon: 'task_alt', sub: 'Estado Resuelto' },
+          { label: 'Total Consultorías', value: metricas.totalConsultorias, icon: 'event', sub: 'Sesiones registradas' },
+          { label: 'Resueltas', value: resueltos, icon: 'task_alt', sub: 'Estado Resuelto' },
           { label: 'En Seguimiento', value: enSeguimiento, icon: 'monitoring', sub: 'Active pipeline' },
-          { label: '% Conversión', value: `${metricas.tasaConversion}%`, icon: 'trending_up', sub: 'Leads → Resuelto' },
+          { label: '% Conversión', value: `${metricas.tasaConversion}%`, icon: 'trending_up', sub: 'Consultorías → Resuelto' },
         ].map((kpi) => (
           <div key={kpi.label} className="bg-white p-6 rounded-[10px] border-t-[3px] border-[#004BB5] border border-[#E5E7EB] shadow-sm">
             <div className="flex justify-between items-start mb-4">
@@ -107,13 +126,11 @@ export default function MetricasPage() {
 
       {/* Charts Row 1 */}
       <section className="grid grid-cols-12 gap-6 mb-8">
-
-        {/* Line Chart: Leads por semana */}
         <div className="col-span-12 lg:col-span-8 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h4 className="text-lg font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Leads por semana</h4>
-              <p className="text-xs text-slate-400">Evolución histórica de captación de leads</p>
+              <h4 className="text-lg font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Consultorías por semana</h4>
+              <p className="text-xs text-slate-400">Evolución histórica de sesiones</p>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={300} minWidth={0}>
@@ -126,9 +143,8 @@ export default function MetricasPage() {
           </ResponsiveContainer>
         </div>
 
-        {/* Bar Chart: Leads por ciudad */}
         <div className="col-span-12 lg:col-span-4 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-100 flex flex-col">
-          <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Leads por ciudad</h4>
+          <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Consultorías por ciudad</h4>
           <div className="flex-1 flex items-end justify-around gap-2 px-2 pb-6 border-b border-slate-100 relative">
             {metricas.porCiudad.map((c, i) => {
               const maxCity = Math.max(...metricas.porCiudad.map((x) => x.total), 1)
@@ -140,10 +156,7 @@ export default function MetricasPage() {
                     className="w-8 rounded-t-sm"
                     style={{ height: `${heightPct}%`, background: barColors[i % barColors.length], minHeight: '8px' }}
                   />
-                  <p
-                    className="text-[10px] text-slate-500 mt-2 text-center wrap-break-word leading-tight w-full"
-                    title={c.city}
-                  >
+                  <p className="text-[10px] text-slate-500 mt-2 text-center leading-tight w-full" title={c.city}>
                     {c.city}
                   </p>
                 </div>
@@ -155,8 +168,6 @@ export default function MetricasPage() {
 
       {/* Charts Row 2 */}
       <section className="grid grid-cols-12 gap-6 mb-8">
-
-        {/* Donut: Estado consultorías */}
         <div className="col-span-12 lg:col-span-5 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-95 flex flex-col">
           <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Estado consultorías</h4>
           <div className="flex-1 flex items-center justify-between gap-4">
@@ -181,39 +192,71 @@ export default function MetricasPage() {
           </div>
         </div>
 
-        {/* Horizontal bars: Casos de uso (use_case del Form PotencIA) */}
         <div className="col-span-12 lg:col-span-7 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-95 flex flex-col">
-          <h4 className="text-lg font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Casos de uso más solicitados</h4>
+          <h4 className="text-lg font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Servicios más solicitados</h4>
           <div className="space-y-4 flex-1 overflow-y-auto pr-1">
-            {porCasoUsoPct.map((c, i) => {
-              const display = formatUseCase(c.caso)
-              return (
-                <div key={c.caso} className="space-y-1.5">
-                  <div className="flex justify-between gap-3 text-xs font-medium text-slate-700">
-                    <span className="truncate" title={display}>{display}</span>
-                    <span className="font-bold text-slate-600 tabular-nums shrink-0">{c.pct}% · {c.total}</span>
-                  </div>
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${c.barPct}%`, background: barColors[i % barColors.length] }}
-                    />
-                  </div>
+            {porServicioPct.map((c, i) => (
+              <div key={c.servicio} className="space-y-1.5">
+                <div className="flex justify-between gap-3 text-xs font-medium text-slate-700">
+                  <span className="truncate" title={c.servicio}>{c.servicio}</span>
+                  <span className="font-bold text-slate-600 tabular-nums shrink-0">{c.total}</span>
                 </div>
-              )
-            })}
-            {porCasoUsoPct.length === 0 && (
+                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${c.pct}%`, background: barColors[i % barColors.length] }}
+                  />
+                </div>
+              </div>
+            ))}
+            {porServicioPct.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <span className="material-symbols-outlined text-[32px] text-slate-300 mb-2" aria-hidden="true">format_quote</span>
-                <p className="text-sm text-slate-400">Aún no hay leads con caso de uso registrado.</p>
-                <p className="text-[11px] text-slate-400 mt-1">Los casos vienen del Form PotencIA.</p>
+                <p className="text-sm text-slate-400">Aún no hay consultorías registradas.</p>
               </div>
             )}
           </div>
         </div>
       </section>
 
-      {/* AI Insights — minimalista */}
+      {/* Picos semanales */}
+      {picosSemanales && picosSemanales.length > 0 && (
+        <section className="bg-white rounded-[10px] border border-[#E5E7EB] shadow-sm mb-8">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h4 className="text-sm font-bold text-[#003087] uppercase tracking-widest" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+              Picos semanales
+            </h4>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-400 border-b">
+                  <th className="pb-2 pl-6 pr-4">Semana inicio</th>
+                  <th className="pb-2 pr-4">Total</th>
+                  <th className="pb-2 pr-4">Personas</th>
+                  <th className="pb-2 pr-4">Resueltas</th>
+                  <th className="pb-2 pr-6">En seguimiento</th>
+                </tr>
+              </thead>
+              <tbody>
+                {picosSemanales.map((p) => (
+                  <tr key={p.semana_inicio} className="border-b last:border-0 hover:bg-slate-50">
+                    <td className="py-2.5 pl-6 pr-4 font-medium text-slate-700">
+                      {new Date(p.semana_inicio + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="py-2.5 pr-4 font-bold text-[#003087]">{p.total}</td>
+                    <td className="py-2.5 pr-4 text-slate-600">{p.personas_atendidas}</td>
+                    <td className="py-2.5 pr-4 text-emerald-600 font-medium">{p.resueltas}</td>
+                    <td className="py-2.5 pr-6 text-indigo-600 font-medium">{p.en_seguimiento}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* AI Insights */}
       <section className="bg-white rounded-[10px] border border-[#E5E7EB] shadow-sm">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <h4 className="text-sm font-bold text-[#003087] uppercase tracking-widest" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>

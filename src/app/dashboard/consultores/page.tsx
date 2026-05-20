@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
-import { Lead, Consultor } from '@/types'
+import { Consultor, Consultoria, Lead, leadFullName } from '@/types'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts'
@@ -31,6 +31,7 @@ function KPICard({ label, value, sub }: { label: string; value: string | number;
 export default function ConsultoresPage() {
   const router = useRouter()
   const [consultores, setConsultores] = useState<Consultor[]>([])
+  const [consultorias, setConsultorias] = useState<Consultoria[]>([])
   const [leads, setLeads] = useState<Lead[]>([])
   const [selectedId, setSelectedId] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -54,34 +55,42 @@ export default function ConsultoresPage() {
         setSelectedId(cons[0]?.id || '')
       }
       if (lds) setLeads(lds as Lead[])
+
+      // Fetch todas las consultorias (no es ideal para escala pero funciona para equipos chicos)
+      const { data: consor } = await supabase.from('consultorias').select('*')
+      if (consor) setConsultorias(consor as Consultoria[])
       setLoading(false)
     }
     fetchData()
     return () => { cancelled = true }
   }, [router])
 
-  const leadsConsultor = leads.filter((l) => l.id_consultor_asignado === selectedId)
+  const conConsultor = consultorias.filter((c) => c.id_consultor === selectedId)
 
   // KPIs
-  const total = leadsConsultor.length
-  const resueltos = leadsConsultor.filter((l) => l.status === 'Resuelto').length
-  const cancelados = leadsConsultor.filter((l) => l.status === 'Cancelado').length
+  const total = conConsultor.length
+  const resueltos = conConsultor.filter((c) => c.status === 'Resuelto').length
+  const cancelados = conConsultor.filter((c) => c.status === 'Cancelado').length
   const tasaCancelacion = total > 0 ? Math.round((cancelados / total) * 100) : 0
   const tasaConversion = total > 0 ? Math.round((resueltos / total) * 100) : 0
 
-  // Soluciones trabajadas
-  const solucionMap: Record<string, number> = {}
-  leadsConsultor.forEach((l) => {
-    if (l.solution) solucionMap[l.solution] = (solucionMap[l.solution] || 0) + 1
+  // Servicios trabajados
+  const servicioMap: Record<string, number> = {}
+  conConsultor.forEach((c) => {
+    if (c.servicio) servicioMap[c.servicio] = (servicioMap[c.servicio] || 0) + 1
   })
-  const porSolucion = Object.entries(solucionMap).map(([solution, total]) => ({ solution, total }))
+  const porServicio = Object.entries(servicioMap).map(([servicio, total]) => ({ servicio, total }))
 
   // Por estado
   const estadoMap: Record<string, number> = {}
-  leadsConsultor.forEach((l) => {
-    estadoMap[l.status] = (estadoMap[l.status] || 0) + 1
+  conConsultor.forEach((c) => {
+    estadoMap[c.status] = (estadoMap[c.status] || 0) + 1
   })
   const porEstado = Object.entries(estadoMap).map(([status, total]) => ({ status, total }))
+
+  // Leads del consultor (para el historial)
+  const leadIds = conConsultor.map((c) => c.id_lead)
+  const leadsConsultor = leads.filter((l) => leadIds.includes(l.id))
 
   if (loading) return <div className="p-6 text-sm text-gray-400">Cargando...</div>
 
@@ -92,7 +101,6 @@ export default function ConsultoresPage() {
         <p className="text-sm text-gray-500 mt-1">Desempeño individual de cada miembro del equipo</p>
       </div>
 
-      {/* Selector de consultor */}
       <div className="flex gap-2 flex-wrap">
         {consultores.map((c) => (
           <button
@@ -109,37 +117,32 @@ export default function ConsultoresPage() {
         ))}
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <KPICard label="Leads atendidos" value={total} />
+        <KPICard label="Consultorías" value={total} />
         <KPICard label="Resueltos" value={resueltos} />
         <KPICard label="Tasa de conversión" value={`${tasaConversion}%`} />
         <KPICard label="Tasa de cancelación" value={`${tasaCancelacion}%`} />
       </div>
 
-      {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Soluciones trabajadas */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">Soluciones trabajadas</h2>
-          {porSolucion.length === 0 ? (
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Servicios trabajados</h2>
+          {porServicio.length === 0 ? (
             <p className="text-sm text-gray-400">Sin datos</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={porSolucion} layout="vertical">
+              <BarChart data={porServicio} layout="vertical">
                 <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                <YAxis dataKey="solution" type="category" tick={{ fontSize: 11 }} width={150} />
+                <YAxis dataKey="servicio" type="category" tick={{ fontSize: 11 }} width={150} />
                 <Tooltip />
                 <Bar dataKey="total" radius={[0, 4, 4, 0]}>
-                  {porSolucion.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  {porServicio.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        {/* Distribución por estado */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Distribución por estado</h2>
           {porEstado.length === 0 ? (
@@ -159,7 +162,6 @@ export default function ConsultoresPage() {
         </div>
       </div>
 
-      {/* Historial de leads */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Historial de leads</h2>
         {leadsConsultor.length === 0 ? (
@@ -171,20 +173,20 @@ export default function ConsultoresPage() {
                 <tr className="text-left text-xs text-gray-400 border-b">
                   <th className="pb-2 pr-4">Nombre</th>
                   <th className="pb-2 pr-4">Email</th>
-                  <th className="pb-2 pr-4">Solución</th>
-                  <th className="pb-2 pr-4">Estado</th>
+                  <th className="pb-2 pr-4">Empresa</th>
+                  <th className="pb-2 pr-4">Origen</th>
                   <th className="pb-2">Fecha</th>
                 </tr>
               </thead>
               <tbody>
                 {leadsConsultor.map((l) => (
                   <tr key={l.id} className="border-b last:border-0 hover:bg-gray-50">
-                    <td className="py-2 pr-4 font-medium text-gray-800">{l.full_name}</td>
+                    <td className="py-2 pr-4 font-medium text-gray-800">{leadFullName(l)}</td>
                     <td className="py-2 pr-4 text-gray-500">{l.email}</td>
-                    <td className="py-2 pr-4 text-gray-500">{l.solution || '—'}</td>
+                    <td className="py-2 pr-4 text-gray-500">{l.empresa || '—'}</td>
                     <td className="py-2 pr-4">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[l.status]}`}>
-                        {l.status}
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                        {l.origen}
                       </span>
                     </td>
                     <td className="py-2 text-gray-400 text-xs">

@@ -23,9 +23,10 @@ export function createClient() {
 export type ConsultorAuth = {
   id: string
   nombre: string
-  email: string
+  email_institucional: string
+  email: string | null
   rol: 'admin' | 'consultor'
-  auth_id: string
+  auth_id: string | null
   created_at: string
 }
 
@@ -63,7 +64,7 @@ export function getCurrentConsultor(): Promise<ConsultorAuth | null> {
       if (!user) return null
       const { data, error } = await createClient()
         .from('consultores')
-        .select('id, nombre, email, rol, auth_id, created_at')
+        .select('id, nombre, email_institucional, email, rol, auth_id, created_at')
         .eq('auth_id', user.id)
         .single()
       if (error) return null

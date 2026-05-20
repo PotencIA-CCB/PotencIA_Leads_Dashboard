@@ -8,7 +8,6 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
-  // Verificar secret
   const secret = req.headers.get('x-webhook-secret')
   if (secret !== process.env.BOOKING_WEBHOOK_SECRET) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -31,7 +30,6 @@ export async function POST(req: NextRequest) {
     }
 
     const {
-      full_name,
       email,
       phone = null,
       city = null,
@@ -40,7 +38,14 @@ export async function POST(req: NextRequest) {
       nit = null,
     } = body
 
-    // Normalizar modalidad (evitar '' que rompe el constraint en la tabla `sesiones`)
+    const rawName: string = body.full_name ?? body.nombre ?? ''
+    const nameParts = rawName.trim().split(/\s+/)
+    const nombre = nameParts[0] ?? null
+    const apellidos = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null
+
+    const durationRaw = body.duration ?? null
+    const duration = typeof durationRaw === 'number' ? durationRaw : (typeof durationRaw === 'string' ? parseInt(durationRaw, 10) || null : null)
+
     const modalidadRaw = body.modalidad
     const modalidad = (() => {
       if (typeof modalidadRaw !== 'string') return 'Virtual'
@@ -52,16 +57,9 @@ export async function POST(req: NextRequest) {
       return cleaned
     })()
 
-    // Acepta formatos típicos:
-    // - "04/10/2026 15:00:00" (MM/DD/YYYY HH:mm:ss)
-    // - "2026-04-10 15:00:00" (YYYY-MM-DD HH:mm:ss)
-    // - ISO: "2026-04-10T15:00:00Z" / "2026-04-10T15:00:00-05:00"
     function parseBookingDate(dt: string): { fecha: string; hora: string } {
       if (!dt) return { fecha: '', hora: '' }
-
       const trimmed = String(dt).trim()
-
-      // ISO / Date-parsable
       if (trimmed.includes('T')) {
         const d = new Date(trimmed)
         if (!Number.isNaN(d.getTime())) {
@@ -73,23 +71,17 @@ export async function POST(req: NextRequest) {
           return { fecha: `${yyyy}-${mm}-${dd}`, hora: `${hh}:${min}` }
         }
       }
-
       const [datePart, timePart] = trimmed.split(' ')
       const hora = timePart ? timePart.slice(0, 5) : ''
-
-      // YYYY-MM-DD
       if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
         return { fecha: datePart, hora }
       }
-
-      // MM/DD/YYYY
       if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(datePart)) {
         const [month, day, year] = datePart.split('/')
         const mm = String(month).padStart(2, '0')
         const dd = String(day).padStart(2, '0')
         return { fecha: `${year}-${mm}-${dd}`, hora }
       }
-
       return { fecha: '', hora }
     }
 
@@ -100,14 +92,14 @@ export async function POST(req: NextRequest) {
     const hora_inicio = start.hora
     const hora_fin = end.hora || null
 
-    if (!full_name || !email || !fecha_sesion || !hora_inicio) {
+    if (!nombre || !email || !fecha_sesion || !hora_inicio) {
       return NextResponse.json(
-        { error: 'Faltan campos requeridos: full_name, email, fecha_sesion, hora_inicio' },
+        { error: 'Faltan campos requeridos: nombre (o full_name), email, fecha_sesion, hora_inicio' },
         { status: 400 }
       )
     }
 
-    // 1. Buscar consultor por email (ideal) o nombre (fallback) del StaffMember
+    // 1. Buscar consultor por email institucional o alternativo
     const staffEmailRaw = body.staff_email || null
     const staffEmail = typeof staffEmailRaw === 'string' ? staffEmailRaw.trim().toLowerCase() : null
     const staffNameRaw = body.staff_name ?? body.staff_display_name ?? null
@@ -120,7 +112,8 @@ export async function POST(req: NextRequest) {
       const { data: consultor } = await supabase
         .from('consultores')
         .select('id')
-        .ilike('email', staffEmail)
+        .or(`email_institucional.ilike.${staffEmail},email.ilike.${staffEmail}`)
+        .limit(1)
         .single()
       if (consultor) {
         consultorId = consultor.id
@@ -128,87 +121,93 @@ export async function POST(req: NextRequest) {
       }
     }
     if (!consultorId && staffName) {
-      // Fallback: algunos triggers no entregan el email del staff en "Created" y solo traen el nombre.
       const { data: consultor } = await supabase
         .from('consultores')
         .select('id')
         .ilike('nombre', staffName)
+        .limit(1)
         .maybeSingle()
-
       if (consultor) {
         consultorId = consultor.id
         consultorMatchedBy = 'name'
       }
     }
 
-    // 2. Atomic merge-or-create (reemplaza read-then-write para evitar race conditions).
-    // p_id_num habilita match cross-canal: misma cédula, distinto email landing vs booking.
+    // 2. Match o create lead
     const idNumClean = typeof id_num === 'string' ? id_num.trim() : ''
     const nitClean = typeof nit === 'string' ? nit.trim() : ''
 
     const { data: mergeResult, error: mergeError } = await supabase.rpc(
-      'merge_or_create_lead',
+      'match_or_create_lead',
       {
-        p_booking_email: email,
-        p_full_name: full_name,
+        p_email: email,
+        p_nombre: nombre,
+        p_apellidos: apellidos,
         p_phone: phone,
         p_city: city,
-        p_solution: service_name,
-        p_consultor_id: consultorId ?? null,
         p_booking_customer_id: body.customer_id ?? null,
         p_id_num: idNumClean || null,
         p_nit: nitClean || null,
-        p_phone_window_hours: 72,
+        p_sector: body.sector ?? null,
+        p_empresa: body.empresa ?? null,
+        p_origen: 'booking',
       }
     )
 
     if (mergeError || !mergeResult?.length) {
-      console.error('Error en merge_or_create_lead:', mergeError)
+      console.error('Error en match_or_create_lead:', mergeError)
       return NextResponse.json({ error: 'Error procesando lead' }, { status: 500 })
     }
 
     const leadId: string = mergeResult[0].lead_id
     const leadMatchedBy: string = mergeResult[0].matched_by
 
-    // 3. Crear o actualizar la sesión asociada (idempotente por lead + fecha + hora)
-    const { data: sesionExistente } = await supabase
-      .from('sesiones')
-      .select('id_sesion')
+    // 3. Crear o actualizar consultoría (idempotente por lead + fecha + hora)
+    const { data: conExistente } = await supabase
+      .from('consultorias')
+      .select('id')
       .eq('id_lead', leadId)
-      .eq('fecha_sesion', fecha_sesion)
+      .eq('fecha', fecha_sesion)
       .eq('hora_inicio', hora_inicio)
       .maybeSingle()
 
-    let sesionError: unknown = null
+    let consultoriaError: unknown = null
 
-    if (sesionExistente?.id_sesion) {
+    if (conExistente?.id) {
       const { error } = await supabase
-        .from('sesiones')
+        .from('consultorias')
         .update({
-          ...(consultorId && { id_consultor: consultorId }),
+          staff_name: staffName,
+          staff_email: staffEmail,
+          servicio: service_name,
+          duracion_minutos: duration,
           hora_fin,
           modalidad,
-          caso_de_uso: service_name,
+          updated_at: new Date().toISOString(),
         })
-        .eq('id_sesion', sesionExistente.id_sesion)
-      sesionError = error
+        .eq('id', conExistente.id)
+      consultoriaError = error
     } else {
-      const { error } = await supabase.from('sesiones').insert({
+      const { error } = await supabase.from('consultorias').insert({
         id_lead: leadId,
-        id_consultor: consultorId,
-        fecha_sesion,
+        id_consultor: consultorId ?? null,
+        fecha: fecha_sesion,
         hora_inicio,
         hora_fin,
+        duracion_minutos: duration,
         modalidad,
-        caso_de_uso: service_name,
-        status: 'En seguimiento',
+        servicio: service_name,
+        staff_name: staffName,
+        staff_email: staffEmail,
+        booking_id: body.booking_id ?? body.customer_id ?? null,
+        status: 'Agendado',
       })
-      sesionError = error
+      consultoriaError = error
     }
 
-    if (sesionError) {
-      console.error('Error creando sesión:', sesionError)
-      return NextResponse.json({ error: 'Error creando sesión' }, { status: 500 })
+    if (consultoriaError) {
+      console.error('Error creando consultoría:', consultoriaError)
+      return NextResponse.json({ error: 'Error creando consultoría' }, { status: 500 })
     }
 
     return NextResponse.json(

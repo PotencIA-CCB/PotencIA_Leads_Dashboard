@@ -1,20 +1,25 @@
-import type { Lead } from '@/types'
-
 export interface MetricasGlobales {
-  totalLeads: number
+  totalConsultorias: number
   porEstado: { status: string; total: number }[]
   tasaConversion: number
-  porSolucion: { solution: string; total: number }[]
-  porCasoUso: { caso: string; total: number }[]
+  porServicio: { servicio: string; total: number }[]
   porCiudad: { city: string; total: number }[]
   porCargo: { cargo: string; total: number }[]
   porSemana: { semana: string; total: number }[]
 }
 
-export type LeadForMetricas = Pick<
-  Lead,
-  'created_at' | 'status' | 'solution' | 'use_case' | 'city' | 'company_role_level'
->
+export interface ConsultoriaForMetricas {
+  fecha: string
+  status: string
+  servicio: string | null
+  duracion_minutos: number | null
+  id_consultor: string | null
+  id_lead: string
+  leads: {
+    city: string | null
+    company_role_level: string | null
+  } | null
+}
 
 function normalizeKey(value: string) {
   return value
@@ -23,21 +28,6 @@ function normalizeKey(value: string) {
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .replace(/\s+/g, ' ')
-}
-
-function isBetterLabel(next: string, prev: string) {
-  const nextTrim = next.trim()
-  const prevTrim = prev.trim()
-
-  const nextHasDiacritics = nextTrim.normalize('NFD') !== nextTrim
-  const prevHasDiacritics = prevTrim.normalize('NFD') !== prevTrim
-  if (nextHasDiacritics && !prevHasDiacritics) return true
-
-  const nextHasUpper = /[A-ZÁÉÍÓÚÑ]/.test(nextTrim)
-  const prevHasUpper = /[A-ZÁÉÍÓÚÑ]/.test(prevTrim)
-  if (nextHasUpper && !prevHasUpper) return true
-
-  return nextTrim.length > prevTrim.length
 }
 
 function canonicalStatus(status: string) {
@@ -50,50 +40,35 @@ function canonicalStatus(status: string) {
   return status.trim()
 }
 
-export function computeMetricasFromLeads(leads: LeadForMetricas[]): MetricasGlobales {
-  const totalLeads = leads.length
+export function computeMetricasFromConsultorias(consultorias: ConsultoriaForMetricas[]): MetricasGlobales {
+  const totalConsultorias = consultorias.length
 
   const estadoMap: Record<string, number> = {}
-  const solucionMap: Record<string, { label: string; total: number }> = {}
-  const casoUsoMap: Record<string, { label: string; total: number }> = {}
-  const ciudadMap: Record<string, { label: string; total: number }> = {}
-  const cargoMap: Record<string, { label: string; total: number }> = {}
+  const servicioMap: Record<string, number> = {}
+  const ciudadMap: Record<string, number> = {}
+  const cargoMap: Record<string, number> = {}
   const semanaMap: Record<string, number> = {}
 
-  for (const lead of leads) {
-    const status = canonicalStatus(lead.status)
+  for (const con of consultorias) {
+    const status = canonicalStatus(con.status)
     estadoMap[status] = (estadoMap[status] || 0) + 1
 
-    if (lead.solution) {
-      const key = normalizeKey(lead.solution)
-      const bucket = solucionMap[key] ?? { label: lead.solution.trim(), total: 0 }
-      if (isBetterLabel(lead.solution, bucket.label)) bucket.label = lead.solution.trim()
-      bucket.total += 1
-      solucionMap[key] = bucket
-    }
-    if (lead.use_case) {
-      const key = normalizeKey(lead.use_case)
-      const bucket = casoUsoMap[key] ?? { label: lead.use_case.trim(), total: 0 }
-      if (isBetterLabel(lead.use_case, bucket.label)) bucket.label = lead.use_case.trim()
-      bucket.total += 1
-      casoUsoMap[key] = bucket
-    }
-    if (lead.city) {
-      const key = normalizeKey(lead.city)
-      const bucket = ciudadMap[key] ?? { label: lead.city.trim(), total: 0 }
-      if (isBetterLabel(lead.city, bucket.label)) bucket.label = lead.city.trim()
-      bucket.total += 1
-      ciudadMap[key] = bucket
-    }
-    if (lead.company_role_level) {
-      const key = normalizeKey(lead.company_role_level)
-      const bucket = cargoMap[key] ?? { label: lead.company_role_level.trim(), total: 0 }
-      if (isBetterLabel(lead.company_role_level, bucket.label)) bucket.label = lead.company_role_level.trim()
-      bucket.total += 1
-      cargoMap[key] = bucket
+    if (con.servicio) {
+      const key = normalizeKey(con.servicio)
+      servicioMap[key] = (servicioMap[key] || 0) + 1
     }
 
-    const date = new Date(lead.created_at)
+    if (con.leads?.city) {
+      const key = normalizeKey(con.leads.city)
+      ciudadMap[key] = (ciudadMap[key] || 0) + 1
+    }
+
+    if (con.leads?.company_role_level) {
+      const key = normalizeKey(con.leads.company_role_level)
+      cargoMap[key] = (cargoMap[key] || 0) + 1
+    }
+
+    const date = new Date(con.fecha + 'T00:00:00')
     const semana = `${date.getFullYear()}-S${Math.ceil(date.getDate() / 7)}-${date.toLocaleString('es-CO', { month: 'short' })}`
     semanaMap[semana] = (semanaMap[semana] || 0) + 1
   }
@@ -101,29 +76,24 @@ export function computeMetricasFromLeads(leads: LeadForMetricas[]): MetricasGlob
   const porEstado = Object.entries(estadoMap).map(([status, total]) => ({ status, total }))
 
   const resueltos = estadoMap['Resuelto'] || 0
-  const tasaConversion = totalLeads > 0 ? Math.round((resueltos / totalLeads) * 100) : 0
+  const tasaConversion = totalConsultorias > 0 ? Math.round((resueltos / totalConsultorias) * 100) : 0
 
-  const porSolucion = Object.values(solucionMap)
-    .map(({ label, total }) => ({ solution: label, total }))
+  const porServicio = Object.entries(servicioMap)
+    .map(([servicio, total]) => ({ servicio, total }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 6)
 
-  const porCasoUso = Object.values(casoUsoMap)
-    .map(({ label, total }) => ({ caso: label, total }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 6)
-
-  const porCiudad = Object.values(ciudadMap)
-    .map(({ label, total }) => ({ city: label, total }))
+  const porCiudad = Object.entries(ciudadMap)
+    .map(([city, total]) => ({ city, total }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 5)
 
-  const porCargo = Object.values(cargoMap)
-    .map(({ label, total }) => ({ cargo: label, total }))
+  const porCargo = Object.entries(cargoMap)
+    .map(([cargo, total]) => ({ cargo, total }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 5)
 
   const porSemana = Object.entries(semanaMap).map(([semana, total]) => ({ semana, total }))
 
-  return { totalLeads, porEstado, tasaConversion, porSolucion, porCasoUso, porCiudad, porCargo, porSemana }
+  return { totalConsultorias, porEstado, tasaConversion, porServicio, porCiudad, porCargo, porSemana }
 }

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { computeMetricasFromLeads, type LeadForMetricas, type MetricasGlobales } from '@/lib/metricas'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,119 +16,116 @@ export async function GET() {
     .from('insights')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
+    .limit(50)
 
-  if (error || !data) return NextResponse.json(null)
-  return NextResponse.json(data.contenido)
+  if (error) return NextResponse.json(null)
+  return NextResponse.json(data ?? [])
 }
 
 export async function POST(req: NextRequest) {
   const supabase = getSupabase()
   try {
-    let metricas: MetricasGlobales | null = null
-    let force = false
     let minNew = Number(process.env.INSIGHTS_MIN_NEW_RECORDS ?? '20')
+    let idConsultor: string | null = null
+    let periodoInicio: string | null = null
+    let periodoFin: string | null = null
 
     try {
       const body = await req.json()
-      if (body?.metricas) metricas = body.metricas
-      if (typeof body?.force === 'boolean') force = body.force
       if (typeof body?.minNew === 'number') minNew = body.minNew
-    } catch {
-      // Sin body o body inválido: generamos métricas desde Supabase
-    }
+      if (typeof body?.id_consultor === 'string') idConsultor = body.id_consultor
+      if (typeof body?.periodo_inicio === 'string') periodoInicio = body.periodo_inicio
+      if (typeof body?.periodo_fin === 'string') periodoFin = body.periodo_fin
+    } catch { /* no body */ }
 
     if (!Number.isFinite(minNew) || minNew < 1) minNew = 20
     if (minNew > 1000) minNew = 1000
 
-    const { data: lastInsight, error: lastInsightError } = await supabase
+    // Check threshold: skip if not enough new consultorias since last insight
+    const { data: lastInsight } = await supabase
       .from('insights')
-      .select('created_at,contenido')
+      .select('created_at')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
-    if (!force && lastInsight && !lastInsightError) {
-      const { count: newSesiones, error: sesionesCountError } = await supabase
-        .from('sesiones')
-        .select('id_sesion', { count: 'exact', head: true })
+    if (lastInsight) {
+      const { count: newConsultorias } = await supabase
+        .from('consultorias')
+        .select('id', { count: 'exact', head: true })
         .gt('created_at', lastInsight.created_at)
 
-      if (!sesionesCountError && typeof newSesiones === 'number' && newSesiones < minNew) {
+      if (typeof newConsultorias === 'number' && newConsultorias < minNew) {
         return NextResponse.json({
-          ...(lastInsight.contenido as object),
           _meta: {
             skipped: true,
             reason: 'threshold',
             threshold: minNew,
-            new_records: newSesiones,
+            new_records: newConsultorias,
             since: lastInsight.created_at,
           },
         })
       }
-
-      if (sesionesCountError) {
-        const { count: newLeads } = await supabase
-          .from('leads')
-          .select('id', { count: 'exact', head: true })
-          .gt('created_at', lastInsight.created_at)
-
-        if (typeof newLeads === 'number' && newLeads < minNew) {
-          return NextResponse.json({
-            ...(lastInsight.contenido as object),
-            _meta: {
-              skipped: true,
-              reason: 'threshold',
-              threshold: minNew,
-              new_records: newLeads,
-              since: lastInsight.created_at,
-            },
-          })
-        }
-      }
     }
 
-    const { data: leads, error } = await supabase
-      .from('leads')
-      .select('created_at,status,solution,city,company_role_level')
-    if (error || !leads) {
-      console.error('Error leyendo leads para insights:', error)
-      return NextResponse.json({ error: 'Error leyendo datos' }, { status: 500 })
+    // Fetch consultorias for context
+    const { data: consultorias, error: conError } = await supabase
+      .from('consultorias')
+      .select('fecha, status, servicio, duracion_minutos, categoria_caso, categoria_caso_uso')
+
+    if (conError || !consultorias) {
+      return NextResponse.json({ error: 'Error leyendo consultorías' }, { status: 500 })
     }
 
-    // Fuente de verdad: Supabase. (Si llega `metricas` en el body la dejamos como fallback.)
-    metricas = metricas ?? computeMetricasFromLeads(leads as LeadForMetricas[])
+    // Fetch novedades for qualitative context
+    const { data: novedades } = await supabase
+      .from('novedades')
+      .select('tipo, titulo, contenido')
+      .order('created_at', { ascending: false })
+      .limit(20)
 
-    // Contexto adicional para que la IA genere recomendaciones más accionables (sin pedir más datos).
+    // Compute stats
+    const estadoMap: Record<string, number> = {}
+    const servicioMap: Record<string, number> = {}
+    for (const c of consultorias) {
+      estadoMap[c.status] = (estadoMap[c.status] || 0) + 1
+      if (c.servicio) servicioMap[c.servicio] = (servicioMap[c.servicio] || 0) + 1
+    }
+
+    const total = consultorias.length
+    const resueltos = estadoMap['Resuelto'] || 0
+    const tasaConversion = total > 0 ? Math.round((resueltos / total) * 100) : 0
+
     const now = Date.now()
     const dayMs = 24 * 60 * 60 * 1000
     const last7Start = now - 7 * dayMs
     const prev7Start = now - 14 * dayMs
-    const leadsLast7 = (leads as LeadForMetricas[]).filter((l) => new Date(l.created_at).getTime() >= last7Start).length
-    const leadsPrev7 = (leads as LeadForMetricas[]).filter((l) => {
-      const t = new Date(l.created_at).getTime()
+    const conLast7 = consultorias.filter((c) => new Date(c.fecha + 'T00:00:00').getTime() >= last7Start).length
+    const conPrev7 = consultorias.filter((c) => {
+      const t = new Date(c.fecha + 'T00:00:00').getTime()
       return t >= prev7Start && t < last7Start
     }).length
-    const growth7dPct =
-      leadsPrev7 > 0 ? Math.round(((leadsLast7 - leadsPrev7) / leadsPrev7) * 100) : null
+    const growth7dPct = conPrev7 > 0 ? Math.round(((conLast7 - conPrev7) / conPrev7) * 100) : null
+
+    const novedadesCtx = (novedades || []).slice(0, 10).map((n) => `[${n.tipo}] ${n.titulo}: ${n.contenido?.slice(0, 150)}`).join('\n')
 
     const prompt = `Eres un analista de negocios experto de la Cámara de Comercio de Barranquilla.
-Analiza los siguientes KPIs del dashboard de consultoría PotencIA y genera insights accionables en español, usando un tono ejecutivo.
+Analiza los siguientes datos del dashboard de consultoría PotencIA y genera insights accionables en español, usando un tono ejecutivo.
 
 REGLAS:
-- Cada insight debe citar al menos 1 número o distribución (ej: % conversión, conteos por estado, top solución).
-- Cada recomendación debe ser accionable (qué hacer + por qué + en cuánto tiempo) y enfocada en impacto rápido.
-- Si faltan datos para una conclusión, dilo como hipótesis y sugiere cómo validarla.
+- Cada insight debe citar al menos 1 número o distribución.
+- Cada recomendación debe ser accionable (qué hacer + por qué + en cuánto tiempo).
+- Incluye indicadores cualitativos basados en las novedades de consultores si están disponibles.
 
-DATOS ACTUALES:
-- Total de leads: ${metricas.totalLeads}
-- Tasa de conversión: ${metricas.tasaConversion}%
-- Leads por estado: ${JSON.stringify(metricas.porEstado)}
-- Soluciones más solicitadas: ${JSON.stringify(metricas.porSolucion)}
-- Leads por ciudad: ${JSON.stringify(metricas.porCiudad)}
-- Leads por cargo: ${JSON.stringify(metricas.porCargo)}
-- Captación últimos 7 días: ${leadsLast7} leads${growth7dPct === null ? '' : ` (vs semana anterior: ${growth7dPct >= 0 ? '+' : ''}${growth7dPct}%)`}
+DATOS:
+- Total de consultorías: ${total}
+- Tasa de conversión: ${tasaConversion}%
+- Consultorías por estado: ${JSON.stringify(estadoMap)}
+- Servicios más solicitados: ${JSON.stringify(servicioMap)}
+- Consultorías últimos 7 días: ${conLast7}${growth7dPct === null ? '' : ` (vs semana anterior: ${growth7dPct >= 0 ? '+' : ''}${growth7dPct}%)`}
+
+NOVEDADES DE CONSULTORES:
+${novedadesCtx || 'Sin novedades registradas.'}
 
 Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional:
 {
@@ -169,24 +165,50 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
 
     if (!response.ok) throw new Error(`DeepSeek API error: ${response.status}`)
 
-    const data = await response.json()
-    const content = data.choices[0].message.content
+    const aiData = await response.json()
+    const content = aiData.choices[0].message.content
     const clean = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    const parsed = JSON.parse(clean)
+    const parsed: { insights?: string[]; recomendaciones?: string[]; alertas?: string[] } = JSON.parse(clean)
 
-    // Guardar en Supabase
-    await supabase.from('insights').insert({
-      contenido: parsed,
-      contexto_kpis: metricas,
-      generado_por: 'DeepSeek',
-    })
+    // Derive period bounds: use provided values or fall back to current week
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const weekAgoStr = new Date(Date.now() - 7 * dayMs).toISOString().slice(0, 10)
+    const pInicio = periodoInicio ?? weekAgoStr
+    const pFin = periodoFin ?? todayStr
+
+    // Persist each generated item as a separate row using the normalized schema
+    const rows: Array<{
+      tipo: string
+      metrica: string
+      valor_texto: string
+      descripcion: string
+      fuente: string
+      periodo_inicio: string
+      periodo_fin: string
+      id_consultor: string | null
+    }> = []
+
+    for (const item of parsed.insights ?? []) {
+      rows.push({ tipo: 'insight', metrica: 'insight_text', valor_texto: item, descripcion: item, fuente: 'DeepSeek', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+    }
+    for (const item of parsed.recomendaciones ?? []) {
+      rows.push({ tipo: 'recomendacion', metrica: 'recomendacion_text', valor_texto: item, descripcion: item, fuente: 'DeepSeek', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+    }
+    for (const item of parsed.alertas ?? []) {
+      rows.push({ tipo: 'alerta', metrica: 'alerta_text', valor_texto: item, descripcion: item, fuente: 'DeepSeek', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+    }
+
+    // Also store aggregate KPI metrics
+    rows.push({ tipo: 'kpi', metrica: 'tasa_conversion', valor_texto: `${tasaConversion}%`, descripcion: `Tasa de conversión: ${tasaConversion}%`, fuente: 'computed', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+    rows.push({ tipo: 'kpi', metrica: 'consultorias_last7d', valor_texto: String(conLast7), descripcion: `Consultorías últimos 7 días: ${conLast7}`, fuente: 'computed', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+
+    if (rows.length > 0) {
+      await supabase.from('insights').insert(rows)
+    }
 
     return NextResponse.json({
       ...parsed,
-      _meta: {
-        skipped: false,
-        threshold: minNew,
-      },
+      _meta: { skipped: false, threshold: minNew },
     })
   } catch (error) {
     console.error('Error generando insights:', error)

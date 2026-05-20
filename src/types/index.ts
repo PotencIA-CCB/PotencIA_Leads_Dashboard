@@ -1,59 +1,138 @@
-export type LeadStatus = 'Pendiente' | 'Agendado' | 'En seguimiento' | 'Resuelto' | 'Cancelado'
-
-export type LeadSource = 'landing' | 'booking' | 'manual'
+export type LeadOrigen = 'landing' | 'booking' | 'sesion' | 'ambos'
 
 export interface Lead {
   id: string
   created_at: string
-  full_name: string
+  updated_at: string
+  nombre: string | null
+  apellidos: string | null
   id_num: string | null
   nit: string | null
   email: string
   phone: string | null
   city: string | null
+  cargo: string | null
   company_role_level: string | null
   company_role_area: string | null
-  solution: string | null
-  use_case: string | null
-  comments: string | null
-  perfil_personal: boolean | null
-  perfil_empresa: boolean | null
-  autorizo_datos: boolean | null
-  id_consultor_asignado: string | null
-  status: LeadStatus
-  notas_consultor: string | null
-  booking_email: string | null
+  sector: string | null
+  empresa: string | null
+  sexo: string | null
   booking_customer_id: string | null
   phone_normalized: string | null
-  source: LeadSource | null
+  origen: LeadOrigen
+}
+
+export function leadFullName(lead: Pick<Lead, 'nombre' | 'apellidos'>): string {
+  return [lead.nombre, lead.apellidos].filter(Boolean).join(' ') || 'Sin nombre'
+}
+
+export interface FormularioLanding {
+  id: string
+  created_at: string
+  id_lead: string
+  tema: string | null
+  descripcion: string | null
+  perfil: string | null
+  tratamiento_datos: boolean | null
+  aceptacion: boolean | null
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  utm_content: string | null
+  fecha_registro: string | null
 }
 
 export interface Consultor {
   id: string
-  nombre: string
-  email: string
-  rol?: 'admin' | 'consultor'
   created_at: string
+  nombre: string
+  identificacion: string | null
+  email: string | null
+  email_institucional: string | null
+  rol: 'admin' | 'consultor'
+  auth_id: string | null
+  activo: boolean
 }
 
-export type SesionStatus = 'Resuelto' | 'En seguimiento' | 'Cancelado'
+export type ConsultoriaStatus = 'Pendiente' | 'Agendado' | 'En seguimiento' | 'Resuelto' | 'Cancelado'
 
-export interface Sesion {
-  id_sesion: string
+export interface Consultoria {
+  id: string
+  created_at: string
+  updated_at: string
   id_lead: string
-  id_consultor: string
-  fecha_sesion: string
+  id_consultor: string | null
+  booking_id: string | null
+  id_externo: string | null
+  fecha: string
   hora_inicio: string | null
   hora_fin: string | null
-  caso_de_uso: string | null
-  modalidad: string | null
-  descripcion_sesion: string | null
-  resultados_obtenidos: string | null
-  entregable: string | null
-  url_video: string | null
-  url_evidencias: string | null
-  datos_adicionales_cliente: object | null
-  status: SesionStatus
-  notas_privadas: string | null
+  duracion_minutos: number | null
+  modalidad: 'Virtual' | 'Presencial' | null
+  servicio: string | null
+  ubicacion: string | null
+  staff_name: string | null
+  staff_email: string | null
+  nivel_potencia: string | null
+  categoria_caso: string | null
+  categoria_caso_uso: string | null
+  status: ConsultoriaStatus
+}
+
+export interface Insight {
+  id: string
   created_at: string
+  tipo: string
+  periodo_inicio: string | null
+  periodo_fin: string | null
+  metrica: string | null
+  valor_numerico: number | null
+  valor_texto: string | null
+  descripcion: string | null
+  fuente: string | null
+  id_consultor: string | null
+}
+
+export interface RegistroSesion {
+  id: string
+  created_at: string
+  id_consultoria: string
+  pregunta: string | null
+  motivo_consulta: string | null
+  estado_inicial: string | null
+  acciones_realizadas: string | null
+  resultado_final: string | null
+  estimacion_impacto: string | null
+  entregables: string | null
+  resultado: string | null
+  cantidad_productos: number
+  sesion_grabada: boolean
+  enlace_grabacion: string | null
+  adjuntar_evidencia: string | null
+  confirmo_no_automatizacion: boolean | null
+}
+
+export type NovedadTipo = 'caso_de_uso' | 'mejora' | 'incidencia' | 'logro' | 'sugerencia' | 'otro'
+
+export interface Novedad {
+  id: string
+  created_at: string
+  updated_at: string
+  id_consultor: string
+  id_lead: string | null
+  id_consultoria: string | null
+  titulo: string
+  contenido: string
+  tipo: NovedadTipo
+  indicadores: Record<string, unknown>
+}
+
+export interface ErrorLog {
+  id: string
+  created_at: string
+  workflow: string
+  severity: string
+  error_msg: string | null
+  raw_row: Record<string, unknown> | null
+  metadata: Record<string, unknown> | null
 }

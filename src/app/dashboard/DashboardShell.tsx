@@ -14,6 +14,7 @@ interface DashboardShellProps {
 const navItems = [
   { label: 'Leads', href: '/dashboard', icon: 'analytics' },
   { label: 'Métricas', href: '/dashboard/metricas', icon: 'assessment' },
+  { label: 'Novedades', href: '/dashboard/novedades', icon: 'campaign' },
   { label: 'Consultores', href: '/dashboard/consultores', icon: 'psychology', adminOnly: true },
 ]
 

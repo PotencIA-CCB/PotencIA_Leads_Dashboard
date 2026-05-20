@@ -2,15 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
-import { Lead, LeadStatus, Consultor, Sesion } from '@/types'
-import LeadCard, { LeadWithMeta } from '@/components/LeadCard'
+import { Lead, ConsultoriaStatus, Consultor, leadFullName } from '@/types'
+import LeadCard, { effectiveStatus, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
 import LeadModal from '@/components/LeadModal'
 
-type SesionResumen = Pick<Sesion, 'id_lead' | 'fecha_sesion' | 'hora_inicio' | 'hora_fin' | 'modalidad' | 'created_at'>
+const statusOptions: Array<'Todos' | ConsultoriaStatus> = ['Todos', 'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
 
-const statusOptions: Array<'Todos' | LeadStatus> = ['Todos', 'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
-
-// active e idle deben tener el mismo grosor de border para evitar shift en click
 const statusChip: Record<string, { active: string; idle: string }> = {
   Todos:            { active: 'bg-[#003087] text-white border border-[#003087]',     idle: 'bg-white text-slate-600 border border-slate-200' },
   Pendiente:        { active: 'bg-amber-500 text-white border border-amber-500',     idle: 'bg-white text-amber-700 border border-amber-200' },
@@ -26,7 +23,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<LeadWithMeta | null>(null)
   const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'Todos' | LeadStatus>('Todos')
+  const [filterStatus, setFilterStatus] = useState<'Todos' | ConsultoriaStatus>('Todos')
   const [rol, setRol] = useState('')
 
   const fetchData = async () => {
@@ -39,43 +36,79 @@ export default function DashboardPage() {
     setRol(consultor.rol)
 
     const supabase = createClient()
-    const query = supabase.from('leads').select('*').order('created_at', { ascending: false })
-    if (consultor.rol === 'consultor') query.eq('id_consultor_asignado', consultor.id)
 
-    const { data: leadsData } = await query
+    // 1) Fetch all leads ordered by updated_at desc
+    const { data: leadsData } = await supabase
+      .from('leads')
+      .select('*')
+      .order('updated_at', { ascending: false })
+
     const baseLeads = (leadsData as Lead[]) || []
+    if (baseLeads.length === 0) {
+      setLeads([])
+      setLoading(false)
+      return
+    }
 
     const leadIds = baseLeads.map((l) => l.id)
-    const sesionByLead: Record<string, SesionResumen> = {}
-    if (leadIds.length > 0) {
-      const { data: sesionesData } = await supabase
-        .from('sesiones')
-        .select('id_lead,fecha_sesion,hora_inicio,hora_fin,modalidad,created_at')
-        .in('id_lead', leadIds)
-        .order('fecha_sesion', { ascending: false })
-        .order('hora_inicio', { ascending: false })
 
-      if (sesionesData) {
-        for (const ses of sesionesData as SesionResumen[]) {
-          if (!sesionByLead[ses.id_lead]) sesionByLead[ses.id_lead] = ses
+    // 2) Fetch latest formulario_landing per lead
+    const { data: formulariosData } = await supabase
+      .from('formularios_landing')
+      .select('id_lead, tema, descripcion')
+      .in('id_lead', leadIds)
+      .order('created_at', { ascending: false })
+
+    const formularioByLead: Record<string, LeadCardFormulario> = {}
+    if (formulariosData) {
+      for (const f of formulariosData) {
+        if (!formularioByLead[f.id_lead]) {
+          formularioByLead[f.id_lead] = { tema: f.tema, descripcion: f.descripcion }
         }
       }
     }
 
+    // 3) Fetch all consultorias for these leads
+    const { data: consultoriasData } = await supabase
+      .from('consultorias')
+      .select('id, id_lead, id_consultor, fecha, hora_inicio, hora_fin, modalidad, duracion_minutos, servicio, staff_name, staff_email, categoria_caso_uso, status')
+      .in('id_lead', leadIds)
+      .order('fecha', { ascending: false })
+      .order('hora_inicio', { ascending: false })
+
+    const consultoriaByLead: Record<string, LeadCardConsultoria> = {}
+    const allConsultorIds: string[] = []
+    if (consultoriasData) {
+      for (const c of consultoriasData) {
+        if (!consultoriaByLead[c.id_lead]) consultoriaByLead[c.id_lead] = c as LeadCardConsultoria
+        if (c.id_consultor) allConsultorIds.push(c.id_consultor)
+      }
+    }
+
+    // 4) Fetch consultores
     const { data: consData } = await supabase.from('consultores').select('id, nombre, email, rol, created_at')
     const allConsultores = (consData as Consultor[]) || []
     if (consultor.rol === 'admin') setConsultores(allConsultores)
     const consultorById: Record<string, string> = {}
     for (const c of allConsultores) consultorById[c.id] = c.nombre
 
-    setLeads(
-      baseLeads.map((l) => ({
+    // 5) Build LeadWithMeta list
+    let merged: LeadWithMeta[] = baseLeads.map((l) => {
+      const con = consultoriaByLead[l.id] ?? null
+      return {
         ...l,
-        sesion: sesionByLead[l.id] ?? null,
-        consultor_nombre: l.id_consultor_asignado ? consultorById[l.id_consultor_asignado] ?? null : null,
-      }))
-    )
+        formulario: formularioByLead[l.id] ?? null,
+        consultoria: con,
+        consultor_nombre: con?.id_consultor ? (consultorById[con.id_consultor] ?? null) : null,
+      }
+    })
 
+    // 6) Role-based filtering: consultor only sees leads where they're assigned
+    if (consultor.rol === 'consultor') {
+      merged = merged.filter((l) => l.consultoria?.id_consultor === consultor.id)
+    }
+
+    setLeads(merged)
     setLoading(false)
   }
 
@@ -86,39 +119,53 @@ export default function DashboardPage() {
     return () => { ignore = true }
   }, [])
 
-  async function handleStatusChange(id: string, status: LeadStatus) {
+  async function handleStatusChange(_leadId: string, consultoriaId: string, status: ConsultoriaStatus) {
     const supabase = createClient()
-    await supabase.from('leads').update({ status }).eq('id', id)
-    setLeads((prev) => prev.map((l) => l.id === id ? { ...l, status } : l))
-    if (selectedLead?.id === id) setSelectedLead((prev) => prev ? { ...prev, status } : prev)
+    await supabase.from('consultorias').update({ status }).eq('id', consultoriaId)
+    setLeads((prev) => prev.map((l) =>
+      l.consultoria?.id === consultoriaId
+        ? { ...l, consultoria: { ...l.consultoria!, status } }
+        : l
+    ))
+    if (selectedLead?.consultoria?.id === consultoriaId) {
+      setSelectedLead((prev) => prev ? {
+        ...prev,
+        consultoria: { ...prev.consultoria!, status },
+      } : prev)
+    }
   }
 
-  async function handleAsignarConsultor(id: string, id_consultor_asignado: string) {
+  async function handleAsignarConsultor(consultoriaId: string, id_consultor: string) {
     const supabase = createClient()
-    await supabase.from('leads').update({ id_consultor_asignado }).eq('id', id)
-    const nombre = consultores.find((c) => c.id === id_consultor_asignado)?.nombre ?? null
+    await supabase.from('consultorias').update({ id_consultor: id_consultor || null }).eq('id', consultoriaId)
+    const nombre = id_consultor ? (consultores.find((c) => c.id === id_consultor)?.nombre ?? null) : null
     setLeads((prev) => prev.map((l) =>
-      l.id === id ? { ...l, id_consultor_asignado, consultor_nombre: nombre } : l
+      l.consultoria?.id === consultoriaId
+        ? { ...l, consultoria: { ...l.consultoria!, id_consultor: id_consultor || null }, consultor_nombre: nombre }
+        : l
     ))
-    if (selectedLead?.id === id) {
-      setSelectedLead((prev) => prev ? { ...prev, id_consultor_asignado, consultor_nombre: nombre } : prev)
+    if (selectedLead?.consultoria?.id === consultoriaId) {
+      setSelectedLead((prev) => prev ? {
+        ...prev,
+        consultoria: { ...prev.consultoria!, id_consultor: id_consultor || null },
+        consultor_nombre: nombre,
+      } : prev)
     }
   }
 
   const isAdmin = rol === 'admin'
 
   const sinAsignar = useMemo(
-    () => isAdmin ? leads.filter((l) => l.status === 'Agendado' && !l.id_consultor_asignado) : [],
+    () => isAdmin ? leads.filter((l) => l.consultoria?.status === 'Agendado' && !l.consultoria?.id_consultor) : [],
     [leads, isAdmin]
   )
 
   const stats = useMemo(() => {
-    // Total excluye cancelados (no son leads activos)
-    const total = leads.filter((l) => l.status !== 'Cancelado').length
-    const pendientes = leads.filter((l) => l.status === 'Pendiente').length
-    const agendados = leads.filter((l) => l.status === 'Agendado').length
-    const enSeguimiento = leads.filter((l) => l.status === 'En seguimiento').length
-    const resueltos = leads.filter((l) => l.status === 'Resuelto').length
+    const total = leads.filter((l) => effectiveStatus(l) !== 'Cancelado').length
+    const pendientes = leads.filter((l) => effectiveStatus(l) === 'Pendiente').length
+    const agendados = leads.filter((l) => effectiveStatus(l) === 'Agendado').length
+    const enSeguimiento = leads.filter((l) => effectiveStatus(l) === 'En seguimiento').length
+    const resueltos = leads.filter((l) => effectiveStatus(l) === 'Resuelto').length
     return { total, pendientes, agendados, enSeguimiento, resueltos }
   }, [leads])
 
@@ -126,11 +173,12 @@ export default function DashboardPage() {
     const q = search.trim().toLowerCase()
     return leads.filter((l) => {
       const matchSearch = !q
-        || l.full_name.toLowerCase().includes(q)
+        || leadFullName(l).toLowerCase().includes(q)
         || l.email.toLowerCase().includes(q)
         || (l.phone ?? '').toLowerCase().includes(q)
         || (l.id_num ?? '').toLowerCase().includes(q)
-      const matchStatus = filterStatus === 'Todos' || l.status === filterStatus
+      const eff = effectiveStatus(l)
+      const matchStatus = filterStatus === 'Todos' || eff === filterStatus
       return matchSearch && matchStatus
     })
   }, [leads, search, filterStatus])
@@ -182,13 +230,13 @@ export default function DashboardPage() {
               Leads
             </h2>
             <p className="text-sm text-slate-500 mt-1">
-              Vista unificada — Form PotencIA, Microsoft Bookings y registros manuales en una sola card por persona.
+              Vista unificada — Form PotencIA, Microsoft Bookings y registros de sesión en una sola card por persona.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Stats — funnel activo (excluye cancelados del total) */}
+      {/* Stats — funnel activo */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <StatCard label="Total activos" value={stats.total} accent="text-[#003087]" />
         <StatCard label="Pendientes" value={stats.pendientes} accent="text-amber-600" />

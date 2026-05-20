@@ -1,18 +1,30 @@
 'use client'
 
-import { Lead, LeadStatus } from '@/types'
-import { formatUseCase } from '@/lib/format'
+import { Lead, ConsultoriaStatus, leadFullName } from '@/types'
 
-export type LeadCardSesion = {
-  fecha_sesion: string
+export type LeadCardConsultoria = {
+  id: string
+  fecha: string
   hora_inicio: string | null
   hora_fin: string | null
   modalidad: string | null
-  created_at: string
+  duracion_minutos: number | null
+  servicio: string | null
+  staff_name: string | null
+  staff_email: string | null
+  categoria_caso_uso: string | null
+  id_consultor: string | null
+  status: ConsultoriaStatus
+}
+
+export type LeadCardFormulario = {
+  tema: string | null
+  descripcion: string | null
 }
 
 export type LeadWithMeta = Lead & {
-  sesion?: LeadCardSesion | null
+  formulario?: LeadCardFormulario | null
+  consultoria?: LeadCardConsultoria | null
   consultor_nombre?: string | null
 }
 
@@ -21,7 +33,7 @@ interface LeadCardProps {
   onClick: (lead: LeadWithMeta) => void
 }
 
-const statusStyle: Record<LeadStatus, { dot: string; label: string; text: string }> = {
+const statusStyle: Record<string, { dot: string; label: string; text: string }> = {
   Pendiente:        { dot: 'bg-amber-500',    label: 'Pendiente',      text: 'text-amber-700' },
   Agendado:         { dot: 'bg-sky-500',      label: 'Agendado',       text: 'text-sky-700' },
   'En seguimiento': { dot: 'bg-indigo-500',   label: 'En seguimiento', text: 'text-indigo-700' },
@@ -59,10 +71,19 @@ function timeAgo(iso: string): string {
   return months === 1 ? 'Hace 1 mes' : `Hace ${months} meses`
 }
 
+export function effectiveStatus(lead: LeadWithMeta): string {
+  return lead.consultoria?.status ?? 'Pendiente'
+}
+
 export default function LeadCard({ lead, onClick }: LeadCardProps) {
-  const status = statusStyle[lead.status]
-  const sesion = lead.sesion
-  const initials = getInitials(lead.full_name)
+  const effStatus = effectiveStatus(lead)
+  const status = statusStyle[effStatus] ?? statusStyle['Pendiente']
+  const con = lead.consultoria
+  const form = lead.formulario
+  const fullName = leadFullName(lead)
+  const initials = getInitials(fullName)
+
+  const descripcion = form?.descripcion ?? con?.categoria_caso_uso ?? null
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -77,7 +98,7 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex={0}
-      aria-label={`Ver detalles de ${lead.full_name}`}
+      aria-label={`Ver detalles de ${fullName}`}
       className="relative bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 border border-slate-300 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.04),inset_0_1px_0_rgba(255,255,255,0.7)] cursor-pointer overflow-hidden flex flex-col"
     >
       {/* Header */}
@@ -92,9 +113,9 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
           <h3
             className="text-[15px] font-semibold text-slate-800 truncate leading-tight"
             style={{ fontFamily: 'Space Grotesk, sans-serif' }}
-            title={lead.full_name}
+            title={fullName}
           >
-            {lead.full_name}
+            {fullName}
           </h3>
           <span className={`inline-flex items-center gap-1.5 mt-1 text-[10px] font-semibold uppercase tracking-wider ${status.text}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
@@ -103,20 +124,20 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
         </div>
       </div>
 
-      {/* Caso de uso — texto plano, jerarquía baja */}
-      {lead.use_case && (
+      {/* Descripción — texto plano del formulario o caso de uso */}
+      {descripcion && (
         <div className="px-5 pb-4">
           <p
             className="text-[13px] text-slate-600 italic leading-snug line-clamp-2 border-l-2 border-slate-300 pl-3"
-            title={formatUseCase(lead.use_case)}
+            title={descripcion}
           >
-            “{formatUseCase(lead.use_case)}”
+            &ldquo;{descripcion}&rdquo;
           </p>
         </div>
       )}
 
-      {/* Agendamiento callout — only if has session */}
-      {sesion ? (
+      {/* Agendamiento callout — solo si hay consultoría */}
+      {con ? (
         <div className="mx-5 mb-5 rounded-xl bg-white/70 backdrop-blur-sm border border-slate-200 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
           <div className="flex items-center gap-1.5 mb-1.5">
             <span className="material-symbols-outlined text-[14px] text-slate-500" aria-hidden="true">
@@ -128,23 +149,23 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
           </div>
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-base font-bold text-slate-900" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-              {formatSessionDate(sesion.fecha_sesion)}
+              {formatSessionDate(con.fecha)}
             </span>
-            {sesion.hora_inicio && (
+            {con.hora_inicio && (
               <span className="text-sm text-slate-600 font-medium">
-                {sesion.hora_inicio}
-                {sesion.hora_fin ? ` – ${sesion.hora_fin}` : ''}
+                {con.hora_inicio}
+                {con.hora_fin ? ` – ${con.hora_fin}` : ''}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
-            {sesion.modalidad && (
+            {con.modalidad && (
               <span className="inline-flex items-center gap-1">
                 <span className="material-symbols-outlined text-[13px]" aria-hidden="true">videocam</span>
-                {sesion.modalidad}
+                {con.modalidad}
               </span>
             )}
-            {sesion.modalidad && (lead.consultor_nombre || lead.status === 'Agendado') && (
+            {con.modalidad && (lead.consultor_nombre || con.status === 'Agendado') && (
               <span className="text-slate-300" aria-hidden="true">·</span>
             )}
             {lead.consultor_nombre ? (
@@ -152,13 +173,41 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
                 <span className="material-symbols-outlined text-[13px]" aria-hidden="true">person</span>
                 <span className="truncate">{lead.consultor_nombre}</span>
               </span>
-            ) : lead.status === 'Agendado' ? (
+            ) : con.status === 'Agendado' ? (
               <span className="inline-flex items-center gap-1 text-amber-600 font-medium">
                 <span className="material-symbols-outlined text-[13px]" aria-hidden="true">person_off</span>
                 Sin consultor
               </span>
             ) : null}
           </div>
+          {(con.servicio || con.staff_name || (con.duracion_minutos && con.duracion_minutos > 0)) && (
+            <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap mt-2 pt-2 border-t border-slate-100">
+              {con.servicio && (
+                <span className="inline-flex items-center gap-1" title={con.servicio}>
+                  <span className="material-symbols-outlined text-[13px]" aria-hidden="true">category</span>
+                  {con.servicio}
+                </span>
+              )}
+              {con.staff_name && (
+                <>
+                  {con.servicio && <span className="text-slate-300" aria-hidden="true">·</span>}
+                  <span className="inline-flex items-center gap-1 truncate" title={con.staff_name}>
+                    <span className="material-symbols-outlined text-[13px]" aria-hidden="true">support_agent</span>
+                    <span className="truncate">{con.staff_name}</span>
+                  </span>
+                </>
+              )}
+              {typeof con.duracion_minutos === 'number' && con.duracion_minutos > 0 && (
+                <>
+                  {(con.servicio || con.staff_name) && <span className="text-slate-300" aria-hidden="true">·</span>}
+                  <span className="inline-flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px]" aria-hidden="true">timer</span>
+                    {con.duracion_minutos}m
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="mx-5 mb-5 px-4 py-3 rounded-xl bg-slate-200/40 border border-dashed border-slate-300 text-center">
