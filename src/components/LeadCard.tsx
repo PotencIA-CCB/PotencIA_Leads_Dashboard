@@ -58,15 +58,12 @@ function formatSessionDate(date: string): string {
   return formatted.replace(/\./g, '').replace(/^\w/, (c) => c.toUpperCase())
 }
 
-function timeAgo(iso: string): string {
+function daysAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
-  const minutes = Math.floor(diffMs / 60000)
-  const hours = Math.floor(diffMs / 3600000)
   const days = Math.floor(diffMs / 86400000)
-  if (minutes < 60) return `Hace ${Math.max(minutes, 1)}m`
-  if (hours < 24) return `Hace ${hours}h`
-  if (days === 1) return 'Ayer'
-  if (days < 30) return `Hace ${days}d`
+  if (days === 0) return 'Hoy'
+  if (days === 1) return 'Hace 1 día'
+  if (days < 30) return `Hace ${days} días`
   const months = Math.floor(days / 30)
   return months === 1 ? 'Hace 1 mes' : `Hace ${months} meses`
 }
@@ -124,52 +121,6 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
         </div>
       </div>
 
-      {/* Lead contact & profile info */}
-      <div className="px-5 pb-3 flex flex-col gap-1">
-        {(lead.email || lead.phone) && (
-          <div className="flex items-center gap-3 text-xs text-slate-500 min-w-0">
-            {lead.email && (
-              <span className="inline-flex items-center gap-1 min-w-0 truncate" title={lead.email}>
-                <span className="material-symbols-outlined text-[13px] shrink-0" aria-hidden="true">mail</span>
-                <span className="truncate">{lead.email}</span>
-              </span>
-            )}
-            {lead.email && lead.phone && (
-              <span className="text-slate-300 shrink-0" aria-hidden="true">·</span>
-            )}
-            {lead.phone && (
-              <span className="inline-flex items-center gap-1 shrink-0" title={lead.phone}>
-                <span className="material-symbols-outlined text-[13px]" aria-hidden="true">phone</span>
-                {lead.phone}
-              </span>
-            )}
-          </div>
-        )}
-        {(lead.city || lead.empresa || lead.company_role_area) && (
-          <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
-            {lead.city && (
-              <span className="inline-flex items-center gap-1">
-                <span className="material-symbols-outlined text-[13px]" aria-hidden="true">location_on</span>
-                {lead.city}
-              </span>
-            )}
-            {lead.city && (lead.empresa || lead.company_role_area) && (
-              <span className="text-slate-300" aria-hidden="true">·</span>
-            )}
-            {lead.empresa && (
-              <span className="truncate max-w-[120px]" title={lead.empresa}>{lead.empresa}</span>
-            )}
-            {lead.empresa && lead.company_role_area && (
-              <span className="text-slate-300" aria-hidden="true">·</span>
-            )}
-            {lead.company_role_area && (
-              <span className="truncate capitalize" title={lead.company_role_area}>
-                {lead.company_role_area.replace(/-/g, ' ')}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Tema + Descripción — use_case y texto del formulario o caso de uso */}
       {(form?.tema || descripcion) && (
@@ -235,17 +186,17 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
               </span>
             ) : null}
           </div>
-          {(con.servicio || con.staff_name || (con.duracion_minutos && con.duracion_minutos > 0)) && (
+          {(form?.tema || con.staff_name || (con.duracion_minutos && con.duracion_minutos > 0)) && (
             <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap mt-2 pt-2 border-t border-slate-100">
-              {con.servicio && (
-                <span className="inline-flex items-center gap-1" title={con.servicio}>
+              {form?.tema && (
+                <span className="inline-flex items-center gap-1 truncate" title={form.tema}>
                   <span className="material-symbols-outlined text-[13px]" aria-hidden="true">category</span>
-                  {con.servicio}
+                  <span className="truncate">{form.tema}</span>
                 </span>
               )}
               {con.staff_name && (
                 <>
-                  {con.servicio && <span className="text-slate-300" aria-hidden="true">·</span>}
+                  {form?.tema && <span className="text-slate-300" aria-hidden="true">·</span>}
                   <span className="inline-flex items-center gap-1 truncate" title={con.staff_name}>
                     <span className="material-symbols-outlined text-[13px]" aria-hidden="true">support_agent</span>
                     <span className="truncate">{con.staff_name}</span>
@@ -254,7 +205,7 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
               )}
               {typeof con.duracion_minutos === 'number' && con.duracion_minutos > 0 && (
                 <>
-                  {(con.servicio || con.staff_name) && <span className="text-slate-300" aria-hidden="true">·</span>}
+                  {(form?.tema || con.staff_name) && <span className="text-slate-300" aria-hidden="true">·</span>}
                   <span className="inline-flex items-center gap-1">
                     <span className="material-symbols-outlined text-[13px]" aria-hidden="true">timer</span>
                     {con.duracion_minutos}m
@@ -274,7 +225,7 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
 
       {/* Footer */}
       <div className="px-5 py-3 border-t border-slate-300/60 bg-slate-200/30 flex items-center justify-between">
-        <span className="text-[11px] text-slate-500 font-medium">{timeAgo(lead.created_at)}</span>
+        <span className="text-[11px] text-slate-500 font-medium">{daysAgo(lead.created_at)}</span>
         <span className="text-xs font-semibold text-slate-700 inline-flex items-center gap-1">
           Ver detalle
           <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
