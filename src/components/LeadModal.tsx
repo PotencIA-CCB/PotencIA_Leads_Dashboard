@@ -254,7 +254,7 @@ function Row({ label, value, fullWidth }: { label: string; value: string | null 
 }
 
 function ChannelPill({ kind }: { kind: string }) {
-  const c = channelMeta[kind] ?? channelMeta['landing']
+  const c = channelMeta[kind as keyof typeof channelMeta] ?? channelMeta['landing']
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold ${c.pill}`}>
       <span className="material-symbols-outlined text-[13px]" aria-hidden="true">{c.icon}</span>
