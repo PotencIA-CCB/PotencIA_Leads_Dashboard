@@ -55,7 +55,7 @@ export default function DashboardPage() {
     // 2) Fetch latest formulario_landing per lead
     const { data: formulariosData } = await supabase
       .from('formularios_landing')
-      .select('id_lead, tema, descripcion')
+      .select('id_lead, tema, descripcion, fecha_registro')
       .in('id_lead', leadIds)
       .order('created_at', { ascending: false })
 
@@ -63,7 +63,7 @@ export default function DashboardPage() {
     if (formulariosData) {
       for (const f of formulariosData) {
         if (!formularioByLead[f.id_lead]) {
-          formularioByLead[f.id_lead] = { tema: f.tema, descripcion: f.descripcion }
+          formularioByLead[f.id_lead] = { tema: f.tema, descripcion: f.descripcion, fecha_registro: f.fecha_registro }
         }
       }
     }

@@ -20,6 +20,7 @@ export type LeadCardConsultoria = {
 export type LeadCardFormulario = {
   tema: string | null
   descripcion: string | null
+  fecha_registro: string | null
 }
 
 export type LeadWithMeta = Lead & {
@@ -225,7 +226,7 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
 
       {/* Footer */}
       <div className="px-5 py-3 border-t border-slate-300/60 bg-slate-200/30 flex items-center justify-between">
-        <span className="text-[11px] text-slate-500 font-medium">{daysAgo(lead.created_at)}</span>
+        <span className="text-[11px] text-slate-500 font-medium">{daysAgo(form?.fecha_registro ?? lead.created_at)}</span>
         <span className="text-xs font-semibold text-slate-700 inline-flex items-center gap-1">
           Ver detalle
           <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
