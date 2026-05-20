@@ -25,7 +25,7 @@ export function useMetricas() {
       if (cancelled) return
       if (error || !data) { setLoading(false); return }
 
-      setMetricas(computeMetricasFromConsultorias(data as ConsultoriaForMetricas[]))
+      setMetricas(computeMetricasFromConsultorias(data as unknown as ConsultoriaForMetricas[]))
       setLoading(false)
     }
     fetchMetricas()
