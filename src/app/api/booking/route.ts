@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
     // 3. Crear o actualizar consultoría (idempotente por lead + fecha + hora)
     const { data: conExistente } = await supabase
       .from('consultorias')
-      .select('id')
+      .select('id, categoria_caso_uso')
       .eq('id_lead', leadId)
       .eq('fecha', fecha_sesion)
       .eq('hora_inicio', hora_inicio)
@@ -174,17 +174,28 @@ export async function POST(req: NextRequest) {
     let consultoriaError: unknown = null
 
     if (conExistente?.id) {
+      const existingCategoria =
+        typeof conExistente.categoria_caso_uso === 'string'
+          ? conExistente.categoria_caso_uso.trim()
+          : ''
+      const shouldWriteCategoria = !existingCategoria && !!service_name
+
+      const updatePayload: Record<string, unknown> = {
+        staff_name: staffName,
+        staff_email: staffEmail,
+        servicio: service_name,
+        duracion_minutos: duration,
+        hora_fin,
+        modalidad,
+        updated_at: new Date().toISOString(),
+      }
+      if (shouldWriteCategoria) {
+        updatePayload.categoria_caso_uso = service_name
+      }
+
       const { error } = await supabase
         .from('consultorias')
-        .update({
-          staff_name: staffName,
-          staff_email: staffEmail,
-          servicio: service_name,
-          duracion_minutos: duration,
-          hora_fin,
-          modalidad,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', conExistente.id)
       consultoriaError = error
     } else {
@@ -197,6 +208,7 @@ export async function POST(req: NextRequest) {
         duracion_minutos: duration,
         modalidad,
         servicio: service_name,
+        categoria_caso_uso: service_name,
         staff_name: staffName,
         staff_email: staffEmail,
         booking_id: body.booking_id ?? body.customer_id ?? null,

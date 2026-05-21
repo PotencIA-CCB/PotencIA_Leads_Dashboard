@@ -82,6 +82,10 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
   const initials = getInitials(fullName)
 
   const casoDeUso = con?.categoria_caso_uso ?? form?.tema ?? form?.descripcion ?? null
+  const displayConsultor =
+    lead.origen === 'booking'
+      ? (con?.staff_name ?? lead.consultor_nombre ?? null)
+      : (lead.consultor_nombre ?? null)
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -171,12 +175,12 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
                   <span>{con.hora_inicio}</span>
                 </>
               )}
-              {lead.consultor_nombre && (
+              {displayConsultor && (
                 <>
                   <span className="text-slate-300" aria-hidden="true">·</span>
-                  <span className="inline-flex items-center gap-1 truncate" title={lead.consultor_nombre}>
+                  <span className="inline-flex items-center gap-1 truncate" title={displayConsultor}>
                     <span className="material-symbols-outlined text-[14px] text-slate-500" aria-hidden="true">person</span>
-                    <span className="truncate">{lead.consultor_nombre}</span>
+                    <span className="truncate">{displayConsultor}</span>
                   </span>
                 </>
               )}
