@@ -1,11 +1,6 @@
-export interface PicoSemanal {
-  semana_inicio: string
-  total: number
-  leads_atendidos: number
-  resueltas: number
-  en_seguimiento: number
-  productos_creados: number | null
-  minutos_totales: number | null
+export interface RegistroSesionForMetricas {
+  id_consultoria: string
+  cantidad_productos: number | null
 }
 
 export interface MetricasGlobales {
@@ -16,8 +11,7 @@ export interface MetricasGlobales {
   porCasoUso: { caso: string; total: number }[]
   porCiudad: { city: string; total: number }[]
   porCargo: { cargo: string; total: number }[]
-  porSemana: { semana: string; total: number }[] // @deprecated — use picos
-  picos: PicoSemanal[]
+  porSemana: { semana: string; total: number }[]
   // Track B additions
   porPotencia: { nivel: string; total: number }[]
   porOrigen: { origen: string; total: number }[]
@@ -33,6 +27,7 @@ export interface ConsultoriaForMetricas {
   status: string
   servicio: string | null
   categoria_caso_uso: string | null
+  categoria_caso: string | null
   nivel_potencia: string | null
   duracion_minutos: number | null
   id_consultor: string | null
@@ -43,6 +38,21 @@ export interface ConsultoriaForMetricas {
     origen: string | null
     sector: string | null
   } | null
+}
+
+export const EFFECTIVE_STATUSES = ['Resuelto'] as const
+
+export const CASO_USO_NORMALIZATION_MAP: Record<string, string> = {
+  'agente': 'Agentes',
+  'asistentes de ia para tareas pequeñas y repetitivas': 'Asistentes',
+  'asistente de ia para tareas pequeñas y repetitivas': 'Asistentes',
+  'asistentes de ia para tareas pequeñas y repetitvas': 'Asistentes',
+}
+
+export function normalizeCasoUso(raw: string | null): string {
+  if (raw == null || raw.trim() === '') return 'Sin categorizar'
+  const key = raw.trim().toLowerCase()
+  return CASO_USO_NORMALIZATION_MAP[key] ?? raw.trim()
 }
 
 function normalizeKey(value: string | null | undefined, fallback: string): string {
@@ -65,13 +75,54 @@ function canonicalStatus(status: string) {
   return status.trim()
 }
 
+const MESES_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+export function computeWeeklyBuckets(
+  consultorias: ConsultoriaForMetricas[],
+): { semana: string; total: number }[] {
+  const resueltas = consultorias.filter((c) => canonicalStatus(c.status) === 'Resuelto')
+
+  // bucket key → { label, isoDate for sorting }
+  const buckets: Record<string, { label: string; isoDate: string; total: number }> = {}
+
+  for (const c of resueltas) {
+    if (!c.fecha) continue
+    const d = new Date(c.fecha + 'T00:00:00')
+    if (isNaN(d.getTime())) continue
+
+    const day = d.getDate()
+    const weekNum = Math.ceil(day / 7)
+    const mesLabel = MESES_ES[d.getMonth()]
+    const label = `Sem ${weekNum} ${mesLabel}`
+
+    // key for deduplication: year + month + weekNum
+    const bucketKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${weekNum}`
+
+    if (!buckets[bucketKey]) {
+      buckets[bucketKey] = { label, isoDate: bucketKey, total: 0 }
+    }
+    buckets[bucketKey].total++
+  }
+
+  return Object.values(buckets)
+    .sort((a, b) => a.isoDate.localeCompare(b.isoDate))
+    .map(({ label, total }) => ({ semana: label, total }))
+}
+
 const TOP_N = 6
 
-export function computeMetricasFromConsultorias(
-  consultorias: ConsultoriaForMetricas[],
-  picos: PicoSemanal[] = [],
-): MetricasGlobales {
-  const totalConsultorias = consultorias.length
+export function computeMetricasFromConsultorias({
+  consultorias,
+  registroSesion,
+}: {
+  consultorias: ConsultoriaForMetricas[]
+  registroSesion: RegistroSesionForMetricas[]
+}): MetricasGlobales {
+  const totalConsultorias = consultorias.filter((c) => canonicalStatus(c.status) === 'Resuelto').length
+
+  const totalProductos = registroSesion.reduce((sum, r) => sum + (r.cantidad_productos ?? 0), 0)
+  const totalMinutos = consultorias.reduce((sum, c) => sum + (c.duracion_minutos ?? 0), 0)
+  const eficiencia = '—'
 
   const estadoMap: Record<string, number> = {}
   const servicioMap: Record<string, number> = {}
@@ -91,10 +142,9 @@ export function computeMetricasFromConsultorias(
       servicioMap[key] = (servicioMap[key] || 0) + 1
     }
 
-    const casoKey = normalizeKey(con.categoria_caso_uso, 'Sin categorizar')
-    casoUsoMap[casoKey] = (casoUsoMap[casoKey] || 0) + 1
+    const casoLabel = normalizeCasoUso(con.categoria_caso)
+    casoUsoMap[casoLabel] = (casoUsoMap[casoLabel] || 0) + 1
 
-    // nivel_potencia — null → 'Sin nivel'
     const potenciaKey = normalizeKey(con.nivel_potencia, 'Sin nivel')
     potenciaMap[potenciaKey] = (potenciaMap[potenciaKey] || 0) + 1
 
@@ -108,11 +158,9 @@ export function computeMetricasFromConsultorias(
       cargoMap[key] = (cargoMap[key] || 0) + 1
     }
 
-    // leads.origen — null/empty → 'Sin origen'
     const origenKey = normalizeKey(con.leads?.origen ?? null, 'Sin origen')
     origenMap[origenKey] = (origenMap[origenKey] || 0) + 1
 
-    // leads.sector — null/empty → 'Sin sector'
     const sectorKey = normalizeKey(con.leads?.sector ?? null, 'Sin sector')
     sectorMap[sectorKey] = (sectorMap[sectorKey] || 0) + 1
   }
@@ -120,7 +168,8 @@ export function computeMetricasFromConsultorias(
   const porEstado = Object.entries(estadoMap).map(([status, total]) => ({ status, total }))
 
   const resueltos = estadoMap['Resuelto'] || 0
-  const tasaConversion = totalConsultorias > 0 ? Math.round((resueltos / totalConsultorias) * 100) : 0
+  const totalAll = consultorias.length
+  const tasaConversion = totalAll > 0 ? Math.round((resueltos / totalAll) * 100) : 0
 
   const porServicio = Object.entries(servicioMap)
     .map(([servicio, total]) => ({ servicio, total }))
@@ -166,16 +215,7 @@ export function computeMetricasFromConsultorias(
   }
   const porSector = topSectors
 
-  // Aggregate picos-derived KPIs
-  const totalProductos = picos.reduce((acc, p) => acc + (p.productos_creados ?? 0), 0)
-  const totalMinutos = picos.reduce((acc, p) => acc + (p.minutos_totales ?? 0), 0)
-  // totalLeadsAtendidos: sum of leads_atendidos across all picos weeks
-  const totalLeadsAtendidos = picos.reduce((acc, p) => acc + p.leads_atendidos, 0)
-  // eficiencia = totalProductos / totalLeadsAtendidos; '—' when denominator is 0
-  const eficiencia = totalLeadsAtendidos === 0 ? '—' : (totalProductos / totalLeadsAtendidos).toFixed(2)
-
-  // @deprecated porSemana — retained for one release; use picos instead
-  const porSemana: { semana: string; total: number }[] = []
+  const porSemana = computeWeeklyBuckets(consultorias)
 
   return {
     totalConsultorias,
@@ -186,7 +226,6 @@ export function computeMetricasFromConsultorias(
     porCiudad,
     porCargo,
     porSemana,
-    picos,
     porPotencia,
     porOrigen,
     porSector,

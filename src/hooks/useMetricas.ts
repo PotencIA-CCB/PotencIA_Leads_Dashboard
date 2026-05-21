@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
-import { computeMetricasFromConsultorias, type MetricasGlobales, type ConsultoriaForMetricas, type PicoSemanal } from '@/lib/metricas'
+import { computeMetricasFromConsultorias, type MetricasGlobales, type ConsultoriaForMetricas, type RegistroSesionForMetricas } from '@/lib/metricas'
 
 export function useMetricas() {
   const [metricas, setMetricas] = useState<MetricasGlobales | null>(null)
@@ -19,26 +19,25 @@ export function useMetricas() {
 
       const consultoriasQuery = supabase
         .from('consultorias')
-        .select('fecha, status, servicio, duracion_minutos, id_consultor, id_lead, categoria_caso_uso, nivel_potencia, leads!inner(city, company_role_level, origen, sector)')
+        .select('fecha, status, servicio, duracion_minutos, id_consultor, id_lead, categoria_caso_uso, categoria_caso, nivel_potencia, leads!inner(city, company_role_level, origen, sector)')
       if (consultor.rol === 'consultor') consultoriasQuery.eq('id_consultor', consultor.id)
 
-      const picosQuery = supabase
-        .from('consultas_por_semana')
-        .select('*')
-        .order('semana_inicio', { ascending: true })
-        .limit(24)
+      const registroQuery = supabase
+        .from('registro_sesion')
+        .select('id_consultoria, cantidad_productos')
 
-      const [{ data: consultoriasData, error: consultoriasError }, { data: picosData }] = await Promise.all([
-        consultoriasQuery,
-        picosQuery,
-      ])
+      const [
+        { data: consultoriasData, error: consultoriasError },
+        { data: sesionData, error: sesionError },
+      ] = await Promise.all([consultoriasQuery, registroQuery])
 
       if (cancelled) return
-      if (consultoriasError || !consultoriasData) { setLoading(false); return }
+      if (consultoriasError || sesionError || !consultoriasData) { setLoading(false); return }
 
-      const picos: PicoSemanal[] = (picosData ?? []) as PicoSemanal[]
-
-      setMetricas(computeMetricasFromConsultorias(consultoriasData as unknown as ConsultoriaForMetricas[], picos))
+      setMetricas(computeMetricasFromConsultorias({
+        consultorias: consultoriasData as unknown as ConsultoriaForMetricas[],
+        registroSesion: (sesionData ?? []) as RegistroSesionForMetricas[],
+      }))
       setLoading(false)
     }
     fetchMetricas()

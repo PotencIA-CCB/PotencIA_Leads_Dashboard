@@ -106,7 +106,8 @@ export async function POST(req: NextRequest) {
     const openCodeBase = process.env.OPENCODE_API_BASE_URL
     const openCodeModel = process.env.OPENCODE_MODEL
     if (!openCodeKey || !openCodeBase || !openCodeModel) {
-      return NextResponse.json({ error: 'OpenCode API not configured — set OPENCODE_API_KEY, OPENCODE_API_BASE_URL, OPENCODE_MODEL' }, { status: 500 })
+      const missing = ['OPENCODE_API_KEY', 'OPENCODE_API_BASE_URL', 'OPENCODE_MODEL'].filter((k) => !process.env[k])
+      return NextResponse.json({ skipped: true, reason: 'config_missing', details: { missing } })
     }
 
     // Check threshold: skip if not enough new consultorias since last insight
@@ -125,13 +126,9 @@ export async function POST(req: NextRequest) {
 
       if (typeof newConsultorias === 'number' && newConsultorias < minNew) {
         return NextResponse.json({
-          _meta: {
-            skipped: true,
-            reason: 'threshold',
-            threshold: minNew,
-            new_records: newConsultorias,
-            since: lastInsight.created_at,
-          },
+          skipped: true,
+          reason: 'threshold_not_met',
+          details: { newCount: newConsultorias, threshold: minNew },
         })
       }
     }
@@ -236,7 +233,13 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
       }),
     }).finally(() => clearTimeout(timeoutId))
 
-    if (!response.ok) throw new Error(`OpenCode API error: ${response.status}`)
+    if (!response.ok) {
+      return NextResponse.json({
+        skipped: true,
+        reason: 'upstream_error',
+        details: { status: response.status, message: `OpenCode API error: ${response.status}` },
+      })
+    }
 
     const aiData = await response.json()
     const content = aiData.choices[0].message.content
