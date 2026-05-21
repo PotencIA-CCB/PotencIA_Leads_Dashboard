@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +8,66 @@ function getSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+}
+
+async function buildImpactContext(supabase: SupabaseClient): Promise<string> {
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
+    const { data: consulData } = await supabase
+      .from('consultorias')
+      .select('id, categoria_caso_uso, nivel_potencia')
+      .gte('fecha', thirtyDaysAgo)
+
+    const ids = (consulData ?? []).map((c) => c.id)
+    const { data: sesionData } = ids.length > 0
+      ? await supabase.from('registro_sesion').select('id_consultoria, cantidad_productos').in('id_consultoria', ids)
+      : { data: [] }
+
+    const { data: picosData } = await supabase
+      .from('consultas_por_semana')
+      .select('semana_inicio, total, productos_creados, minutos_totales')
+      .order('semana_inicio', { ascending: false })
+      .limit(4)
+
+    const prodByConsultoria: Record<string, number> = {}
+    for (const s of sesionData ?? []) {
+      prodByConsultoria[s.id_consultoria] = s.cantidad_productos || 0
+    }
+
+    const casoMap: Record<string, number> = {}
+    const potenciaMap: Record<string, number> = {}
+    for (const c of consulData ?? []) {
+      const caso = c.categoria_caso_uso ?? 'Sin categorizar'
+      const potencia = c.nivel_potencia ?? 'Sin nivel'
+      casoMap[caso] = (casoMap[caso] || 0) + (prodByConsultoria[c.id] || 0)
+      potenciaMap[potencia] = (potenciaMap[potencia] || 0) + 1
+    }
+
+    const top5Casos = Object.entries(casoMap)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([caso, prod]) => `  - ${caso}: ${prod} productos`)
+      .join('\n')
+
+    const potenciaDistrib = Object.entries(potenciaMap)
+      .sort(([, a], [, b]) => b - a)
+      .map(([nivel, count]) => `  - ${nivel}: ${count}`)
+      .join('\n')
+
+    const picosCtx = (picosData ?? [])
+      .map((p) => `  - Sem ${p.semana_inicio}: ${p.total} consultas, ${p.productos_creados ?? 0} productos, ${((p.minutos_totales ?? 0) / 60).toFixed(1)}h`)
+      .join('\n')
+
+    const parts: string[] = []
+    if (top5Casos) parts.push(`Top 5 casos de uso (últ. 30 días, por productos):\n${top5Casos}`)
+    if (potenciaDistrib) parts.push(`Distribución nivel PotencIA:\n${potenciaDistrib}`)
+    if (picosCtx) parts.push(`Últimas 4 semanas:\n${picosCtx}`)
+
+    return parts.join('\n\n')
+  } catch {
+    return ''
+  }
 }
 
 export async function GET() {
@@ -40,6 +100,14 @@ export async function POST(req: NextRequest) {
 
     if (!Number.isFinite(minNew) || minNew < 1) minNew = 20
     if (minNew > 1000) minNew = 1000
+
+    // Previously: DEEPSEEK_API_KEY
+    const openCodeKey = process.env.OPENCODE_API_KEY
+    const openCodeBase = process.env.OPENCODE_API_BASE_URL
+    const openCodeModel = process.env.OPENCODE_MODEL
+    if (!openCodeKey || !openCodeBase || !openCodeModel) {
+      return NextResponse.json({ error: 'OpenCode API not configured — set OPENCODE_API_KEY, OPENCODE_API_BASE_URL, OPENCODE_MODEL' }, { status: 500 })
+    }
 
     // Check threshold: skip if not enough new consultorias since last insight
     const { data: lastInsight } = await supabase
@@ -109,6 +177,8 @@ export async function POST(req: NextRequest) {
 
     const novedadesCtx = (novedades || []).slice(0, 10).map((n) => `[${n.tipo}] ${n.titulo}: ${n.contenido?.slice(0, 150)}`).join('\n')
 
+    const impactContext = await buildImpactContext(supabase)
+
     const prompt = `Eres un analista de negocios experto de la Cámara de Comercio de Barranquilla.
 Analiza los siguientes datos del dashboard de consultoría PotencIA y genera insights accionables en español, usando un tono ejecutivo.
 
@@ -123,6 +193,9 @@ DATOS:
 - Consultorías por estado: ${JSON.stringify(estadoMap)}
 - Servicios más solicitados: ${JSON.stringify(servicioMap)}
 - Consultorías últimos 7 días: ${conLast7}${growth7dPct === null ? '' : ` (vs semana anterior: ${growth7dPct >= 0 ? '+' : ''}${growth7dPct}%)`}
+
+IMPACTO ENTREGADO:
+${impactContext || 'Sin datos de impacto disponibles.'}
 
 NOVEDADES DE CONSULTORES:
 ${novedadesCtx || 'Sin novedades registradas.'}
@@ -149,21 +222,21 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 70_000)
 
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
+    const response = await fetch(`${openCodeBase}/chat/completions`, {
       method: 'POST',
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        'Authorization': `Bearer ${openCodeKey}`,
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: openCodeModel,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
       }),
     }).finally(() => clearTimeout(timeoutId))
 
-    if (!response.ok) throw new Error(`DeepSeek API error: ${response.status}`)
+    if (!response.ok) throw new Error(`OpenCode API error: ${response.status}`)
 
     const aiData = await response.json()
     const content = aiData.choices[0].message.content
@@ -189,13 +262,13 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
     }> = []
 
     for (const item of parsed.insights ?? []) {
-      rows.push({ tipo: 'insight', metrica: 'insight_text', valor_texto: item, descripcion: item, fuente: 'DeepSeek', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+      rows.push({ tipo: 'insight', metrica: 'insight_text', valor_texto: item, descripcion: item, fuente: 'OpenCode', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
     }
     for (const item of parsed.recomendaciones ?? []) {
-      rows.push({ tipo: 'recomendacion', metrica: 'recomendacion_text', valor_texto: item, descripcion: item, fuente: 'DeepSeek', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+      rows.push({ tipo: 'recomendacion', metrica: 'recomendacion_text', valor_texto: item, descripcion: item, fuente: 'OpenCode', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
     }
     for (const item of parsed.alertas ?? []) {
-      rows.push({ tipo: 'alerta', metrica: 'alerta_text', valor_texto: item, descripcion: item, fuente: 'DeepSeek', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+      rows.push({ tipo: 'alerta', metrica: 'alerta_text', valor_texto: item, descripcion: item, fuente: 'OpenCode', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
     }
 
     // Also store aggregate KPI metrics
@@ -213,7 +286,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
   } catch (error) {
     console.error('Error generando insights:', error)
     if (error instanceof Error && error.name === 'AbortError') {
-      return NextResponse.json({ error: 'DeepSeek timeout' }, { status: 504 })
+      return NextResponse.json({ error: 'OpenCode timeout' }, { status: 504 })
     }
     return NextResponse.json({ error: 'Error generando insights' }, { status: 500 })
   }
