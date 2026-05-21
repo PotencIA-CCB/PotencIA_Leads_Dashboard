@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
-import { computeMetricasFromConsultorias, type MetricasGlobales, type ConsultoriaForMetricas } from '@/lib/metricas'
+import { computeMetricasFromConsultorias, type MetricasGlobales, type ConsultoriaForMetricas, type PicoSemanal } from '@/lib/metricas'
 
 export function useMetricas() {
   const [metricas, setMetricas] = useState<MetricasGlobales | null>(null)
@@ -17,15 +17,28 @@ export function useMetricas() {
 
       const supabase = createClient()
 
-      // Fetch consultorias with joined lead info for metrics
-      const query = supabase.from('consultorias').select('fecha, status, servicio, duracion_minutos, id_consultor, id_lead, leads!inner(city, company_role_level)')
-      if (consultor.rol === 'consultor') query.eq('id_consultor', consultor.id)
+      const consultoriasQuery = supabase
+        .from('consultorias')
+        .select('fecha, status, servicio, duracion_minutos, id_consultor, id_lead, categoria_caso_uso, nivel_potencia, leads!inner(city, company_role_level, origen, sector)')
+      if (consultor.rol === 'consultor') consultoriasQuery.eq('id_consultor', consultor.id)
 
-      const { data, error } = await query
+      const picosQuery = supabase
+        .from('consultas_por_semana')
+        .select('*')
+        .order('semana_inicio', { ascending: true })
+        .limit(24)
+
+      const [{ data: consultoriasData, error: consultoriasError }, { data: picosData }] = await Promise.all([
+        consultoriasQuery,
+        picosQuery,
+      ])
+
       if (cancelled) return
-      if (error || !data) { setLoading(false); return }
+      if (consultoriasError || !consultoriasData) { setLoading(false); return }
 
-      setMetricas(computeMetricasFromConsultorias(data as unknown as ConsultoriaForMetricas[]))
+      const picos: PicoSemanal[] = (picosData ?? []) as PicoSemanal[]
+
+      setMetricas(computeMetricasFromConsultorias(consultoriasData as unknown as ConsultoriaForMetricas[], picos))
       setLoading(false)
     }
     fetchMetricas()
