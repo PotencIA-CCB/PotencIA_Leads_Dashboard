@@ -10,8 +10,15 @@ import {
 } from 'recharts'
 
 const DONUT_COLORS = ['#003087', '#00C8FF', '#E8470A', '#004BB5']
-const POTENCIA_COLORS = ['#6366F1', '#8B5CF6', '#A78BFA', '#C4B5FD', '#5A6475']
-const NO_DATA_COLOR = '#5A6475'
+
+const STATUS_STACK_COLORS: Record<string, string> = {
+  Pendiente: '#5A6475',
+  Agendado: '#00C8FF',
+  'En seguimiento': '#6366F1',
+  Resuelto: '#003087',
+  Cancelado: '#E8470A',
+  Otros: '#A78BFA',
+}
 
 type InsightsState = {
   insights: string[]
@@ -92,9 +99,6 @@ export default function MetricasPage() {
     </div>
   )
 
-  const resueltos = metricas.porEstado.find((e) => e.status === 'Resuelto')?.total || 0
-  const enSeguimiento = metricas.porEstado.find((e) => e.status === 'En seguimiento')?.total || 0
-
   const maxCasoUso = Math.max(...metricas.porCasoUso.map((c) => c.total), 1)
   const porCasoUsoPct = metricas.porCasoUso.map((c) => ({
     ...c,
@@ -126,8 +130,8 @@ export default function MetricasPage() {
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
         {[
           { label: 'Total Consultorías', value: metricas.totalConsultorias, icon: 'event', sub: 'Sesiones registradas' },
-          { label: 'Resueltas', value: resueltos, icon: 'task_alt', sub: 'Estado Resuelto' },
-          { label: 'En Seguimiento', value: enSeguimiento, icon: 'monitoring', sub: 'Active pipeline' },
+          { label: 'Resueltas', value: metricas.consultoriasResueltas, icon: 'task_alt', sub: 'Estado Resuelto' },
+          { label: 'En Seguimiento', value: metricas.casosEnSeguimientoLeads, icon: 'monitoring', sub: 'Leads en seguimiento' },
           { label: '% Conversión', value: `${metricas.tasaConversion}%`, icon: 'trending_up', sub: 'Consultorías → Resuelto' },
           {
             label: 'Productos generados',
@@ -256,88 +260,67 @@ export default function MetricasPage() {
         </div>
       </section>
 
-      {/* Charts Row 3 — Potencia donut + Origen bar (2-up) */}
+      {/* Charts Row 3 — Top consultores (horizontal bar) + Origen x estado (stacked bar) */}
       <section className="grid grid-cols-12 gap-6 mb-8">
-        {/* Nivel de potencia donut */}
+        {/* Top consultores por sesiones */}
         <div className="col-span-12 lg:col-span-6 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm flex flex-col">
-          <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Nivel de potencia</h4>
-          {metricas.porPotencia.length === 0 || metricas.porPotencia.every((p) => p.nivel === 'Sin nivel') ? (
+          <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Top consultores por sesiones</h4>
+          {metricas.topConsultores.length === 0 ? (
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-slate-400 text-center max-w-xs">Sin datos disponibles. El campo nivel de potencia no está siendo poblado por el flujo de importación.</p>
+              <p className="text-sm text-slate-400">Sin datos de consultores.</p>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center">
-              <ResponsiveContainer width="100%" height={200} minWidth={0}>
-                <PieChart>
-                  <Pie
-                    data={metricas.porPotencia}
-                    dataKey="total"
-                    nameKey="nivel"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius="60%"
-                    outerRadius="80%"
-                  >
-                    {metricas.porPotencia.map((entry, i) => (
-                      <Cell
-                        key={entry.nivel}
-                        fill={entry.nivel === 'Sin nivel' ? NO_DATA_COLOR : POTENCIA_COLORS[i % POTENCIA_COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value, name) => {
-                      const numValue = typeof value === 'number' ? value : 0
-                      const total = metricas.porPotencia.reduce((acc, p) => acc + p.total, 0)
-                      const pct = total > 0 ? ((numValue / total) * 100).toFixed(1) : '0'
-                      return [`${numValue} (${pct}%)`, String(name)]
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex flex-col gap-2 mt-2 w-full">
-                {metricas.porPotencia.map((entry, i) => (
-                  <div key={entry.nivel} className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ background: entry.nivel === 'Sin nivel' ? NO_DATA_COLOR : POTENCIA_COLORS[i % POTENCIA_COLORS.length] }}
-                    />
-                    <span className="text-xs text-slate-600 font-medium truncate" title={entry.nivel}>{entry.nivel}</span>
-                    <span className="text-xs text-slate-400 ml-auto shrink-0">{entry.total}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Canal de adquisición bar chart */}
-        <div className="col-span-12 lg:col-span-6 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm flex flex-col">
-          <h4 className="text-lg font-bold text-[#003087] mb-6" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Canal de adquisición</h4>
-          {metricas.porOrigen.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-slate-400">Sin datos de origen.</p>
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={240} minWidth={0}>
+            <ResponsiveContainer width="100%" height={260} minWidth={0}>
               <BarChart
                 layout="vertical"
-                data={metricas.porOrigen}
-                margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
+                data={metricas.topConsultores}
+                margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
               >
                 <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="origen" tick={{ fontSize: 10 }} width={72} />
+                <YAxis type="category" dataKey="nombre" tick={{ fontSize: 10 }} width={100} />
                 <Tooltip />
                 <Bar dataKey="total" radius={[0, 4, 4, 0]}>
-                  {metricas.porOrigen.map((entry, i) => (
-                    <Cell
-                      key={entry.origen}
-                      fill={entry.origen === 'Sin origen' ? NO_DATA_COLOR : barColors[i % barColors.length]}
-                    />
+                  {metricas.topConsultores.map((_, i) => (
+                    <Cell key={i} fill={barColors[i % barColors.length]} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Canal de adquisición × estado (stacked bar) */}
+        <div className="col-span-12 lg:col-span-6 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm flex flex-col">
+          <h4 className="text-lg font-bold text-[#003087] mb-4" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Origen × estado (funnel)</h4>
+          {metricas.origenStatusBreakdown.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-sm text-slate-400">Sin datos de origen.</p>
+            </div>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={220} minWidth={0}>
+                <BarChart
+                  data={metricas.origenStatusBreakdown}
+                  margin={{ top: 0, right: 8, left: 0, bottom: 20 }}
+                >
+                  <XAxis dataKey="origen" tick={{ fontSize: 9 }} interval={0} angle={-20} textAnchor="end" />
+                  <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                  <Tooltip />
+                  {Object.entries(STATUS_STACK_COLORS).map(([status, color]) => (
+                    <Bar key={status} dataKey={status} stackId="status" fill={color} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+              {/* Color legend chips */}
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
+                {Object.entries(STATUS_STACK_COLORS).map(([status, color]) => (
+                  <div key={status} className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: color }} />
+                    <span className="text-[10px] text-slate-500 font-medium">{status}</span>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </section>

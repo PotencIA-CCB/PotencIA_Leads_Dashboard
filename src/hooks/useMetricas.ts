@@ -19,7 +19,7 @@ export function useMetricas() {
 
       const consultoriasQuery = supabase
         .from('consultorias')
-        .select('fecha, status, servicio, duracion_minutos, id_consultor, id_lead, categoria_caso_uso, categoria_caso, nivel_potencia, leads!inner(city, company_role_level, origen, sector)')
+        .select('fecha, status, servicio, duracion_minutos, id_consultor, id_lead, categoria_caso_uso, categoria_caso, nivel_potencia, leads!inner(city, company_role_level, origen, sector), consultores(nombre)')
       if (consultor.rol === 'consultor') consultoriasQuery.eq('id_consultor', consultor.id)
 
       const registroQuery = supabase
