@@ -173,10 +173,16 @@ export default function LeadModal({ lead, onClose, onStatusChange, onAsignarCons
           )}
 
           {/* Necesidad del cliente — del formulario */}
-          {form && (form.tema || form.descripcion) && (
+          {form && (form.tema || form.descripcion || form.fecha_registro) && (
             <Section title="Necesidad del cliente (Form PotencIA)">
               <Row label="Tema elegido" value={form.tema} fullWidth />
               <Row label="Descripción" value={form.descripcion} fullWidth />
+              <Row
+                label="Fecha de registro"
+                value={form.fecha_registro
+                  ? new Date(form.fecha_registro).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })
+                  : null}
+              />
             </Section>
           )}
 
@@ -199,14 +205,17 @@ export default function LeadModal({ lead, onClose, onStatusChange, onAsignarCons
                   : null}
               />
               <Row label="Modalidad" value={con.modalidad} />
-              <Row label="Servicio" value={form?.tema ?? con.servicio} />
+              <Row label="Servicio" value={con.servicio} />
+              <Row
+                label="Duración"
+                value={typeof con.duracion_minutos === 'number' && con.duracion_minutos > 0
+                  ? `${con.duracion_minutos} minutos`
+                  : null}
+              />
+              <Row label="Caso de uso" value={con.categoria_caso_uso} />
               <Row label="Consultor Bookings" value={con.staff_name} />
               <Row label="Email staff" value={con.staff_email} />
-              {typeof con.duracion_minutos === 'number' && con.duracion_minutos > 0 && (
-                <Row label="Duración" value={`${con.duracion_minutos} minutos`} />
-              )}
-              <Row label="Caso de uso" value={con.categoria_caso_uso} />
-              <Row label="Consultor asignado" value={lead.consultor_nombre ?? null} />
+              <Row label="Consultor asignado" value={lead.consultor_nombre} />
             </Section>
           )}
 

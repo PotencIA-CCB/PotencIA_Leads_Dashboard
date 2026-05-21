@@ -81,7 +81,7 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
   const fullName = leadFullName(lead)
   const initials = getInitials(fullName)
 
-  const descripcion = form?.descripcion ?? con?.categoria_caso_uso ?? null
+  const casoDeUso = con?.categoria_caso_uso ?? form?.tema ?? form?.descripcion ?? null
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -120,105 +120,76 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
             {status.label}
           </span>
         </div>
+
+        {(con || form) && (
+          <div className="shrink-0 flex items-center gap-1">
+            {con && (
+              <span
+                className="material-symbols-outlined text-[16px] text-sky-600"
+                title="Tiene agendamiento de Microsoft Bookings"
+                aria-label="Tiene agendamiento"
+              >
+                event_available
+              </span>
+            )}
+            {form && (
+              <span
+                className="material-symbols-outlined text-[16px] text-emerald-600"
+                title="Completó el formulario de PotencIA"
+                aria-label="Completó formulario"
+              >
+                description
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
 
-      {/* Tema + Descripción — use_case y texto del formulario o caso de uso */}
-      {(form?.tema || descripcion) && (
+      {/* Body — at-a-glance rows */}
+      {(casoDeUso || con || lead.phone) && (
         <div className="px-5 pb-4 flex flex-col gap-2">
-          {form?.tema && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-2.5 py-0.5 w-fit max-w-full">
-              <span className="material-symbols-outlined text-[12px] shrink-0" aria-hidden="true">label</span>
-              <span className="truncate" title={form.tema}>{form.tema}</span>
-            </span>
-          )}
-          {descripcion && (
-            <p
-              className="text-[13px] text-slate-600 italic leading-snug line-clamp-2 border-l-2 border-slate-300 pl-3"
-              title={descripcion}
-            >
-              &ldquo;{descripcion}&rdquo;
-            </p>
-          )}
-        </div>
-      )}
 
-      {/* Agendamiento callout — solo si hay consultoría */}
-      {con ? (
-        <div className="mx-5 mb-5 rounded-xl bg-white/70 backdrop-blur-sm border border-slate-200 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="material-symbols-outlined text-[14px] text-slate-500" aria-hidden="true">
-              event_available
-            </span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-              Agendamiento
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-base font-bold text-slate-900" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-              {formatSessionDate(con.fecha)}
-            </span>
-            {con.hora_inicio && (
-              <span className="text-sm text-slate-600 font-medium">
-                {con.hora_inicio}
-                {con.hora_fin ? ` – ${con.hora_fin}` : ''}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
-            {con.modalidad && (
+          {casoDeUso && (
+            <div className="flex items-start gap-2">
+              <span className="material-symbols-outlined text-[16px] text-slate-500 mt-0.5 shrink-0" aria-hidden="true">category</span>
+              <p className="text-[14px] font-medium text-slate-800 leading-snug line-clamp-2" title={casoDeUso}>
+                {casoDeUso}
+              </p>
+            </div>
+          )}
+
+          {con && (
+            <div className="flex items-center gap-2 text-[12px] text-slate-600 flex-wrap">
               <span className="inline-flex items-center gap-1">
-                <span className="material-symbols-outlined text-[13px]" aria-hidden="true">videocam</span>
-                {con.modalidad}
+                <span className="material-symbols-outlined text-[14px] text-slate-500" aria-hidden="true">calendar_month</span>
+                <span className="font-medium text-slate-700">{formatSessionDate(con.fecha)}</span>
               </span>
-            )}
-            {con.modalidad && (lead.consultor_nombre || con.status === 'Agendado') && (
-              <span className="text-slate-300" aria-hidden="true">·</span>
-            )}
-            {lead.consultor_nombre ? (
-              <span className="inline-flex items-center gap-1 truncate" title={lead.consultor_nombre}>
-                <span className="material-symbols-outlined text-[13px]" aria-hidden="true">person</span>
-                <span className="truncate">{lead.consultor_nombre}</span>
-              </span>
-            ) : con.status === 'Agendado' ? (
-              <span className="inline-flex items-center gap-1 text-amber-600 font-medium">
-                <span className="material-symbols-outlined text-[13px]" aria-hidden="true">person_off</span>
-                Sin consultor
-              </span>
-            ) : null}
-          </div>
-          {(form?.tema || con.staff_name || (con.duracion_minutos && con.duracion_minutos > 0)) && (
-            <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap mt-2 pt-2 border-t border-slate-100">
-              {form?.tema && (
-                <span className="inline-flex items-center gap-1 truncate" title={form.tema}>
-                  <span className="material-symbols-outlined text-[13px]" aria-hidden="true">category</span>
-                  <span className="truncate">{form.tema}</span>
-                </span>
-              )}
-              {con.staff_name && (
+              {con.hora_inicio && (
                 <>
-                  {form?.tema && <span className="text-slate-300" aria-hidden="true">·</span>}
-                  <span className="inline-flex items-center gap-1 truncate" title={con.staff_name}>
-                    <span className="material-symbols-outlined text-[13px]" aria-hidden="true">support_agent</span>
-                    <span className="truncate">{con.staff_name}</span>
-                  </span>
+                  <span className="text-slate-300" aria-hidden="true">·</span>
+                  <span>{con.hora_inicio}</span>
                 </>
               )}
-              {typeof con.duracion_minutos === 'number' && con.duracion_minutos > 0 && (
+              {lead.consultor_nombre && (
                 <>
-                  {(form?.tema || con.staff_name) && <span className="text-slate-300" aria-hidden="true">·</span>}
-                  <span className="inline-flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[13px]" aria-hidden="true">timer</span>
-                    {con.duracion_minutos}m
+                  <span className="text-slate-300" aria-hidden="true">·</span>
+                  <span className="inline-flex items-center gap-1 truncate" title={lead.consultor_nombre}>
+                    <span className="material-symbols-outlined text-[14px] text-slate-500" aria-hidden="true">person</span>
+                    <span className="truncate">{lead.consultor_nombre}</span>
                   </span>
                 </>
               )}
             </div>
           )}
-        </div>
-      ) : (
-        <div className="mx-5 mb-5 px-4 py-3 rounded-xl bg-slate-200/40 border border-dashed border-slate-300 text-center">
-          <span className="text-xs text-slate-500 font-medium">Sin agendamiento programado</span>
+
+          {lead.phone && (
+            <div className="flex items-center gap-2 text-[12px] text-slate-600">
+              <span className="material-symbols-outlined text-[14px] text-slate-500 shrink-0" aria-hidden="true">phone</span>
+              <span className="truncate" title={lead.phone}>{lead.phone}</span>
+            </div>
+          )}
+
         </div>
       )}
 
