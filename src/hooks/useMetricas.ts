@@ -6,6 +6,7 @@ import { computeMetricasFromConsultorias, type MetricasGlobales, type Consultori
 
 export function useMetricas() {
   const [metricas, setMetricas] = useState<MetricasGlobales | null>(null)
+  const [consultorias, setConsultorias] = useState<ConsultoriaForMetricas[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -19,7 +20,7 @@ export function useMetricas() {
 
       const consultoriasQuery = supabase
         .from('consultorias')
-        .select('fecha, status, servicio, duracion_minutos, id_consultor, id_lead, categoria_caso_uso, categoria_caso, nivel_potencia, leads!inner(city, company_role_level, origen, sector), consultores(nombre)')
+        .select('fecha, status, servicio, duracion_minutos, id_consultor, id_lead, categoria_caso_uso, categoria_caso, nivel_potencia, hora_inicio, modalidad, leads!inner(city, company_role_level, origen, sector, company_role_area, nit), consultores(nombre)')
       if (consultor.rol === 'consultor') consultoriasQuery.eq('id_consultor', consultor.id)
 
       const registroQuery = supabase
@@ -34,8 +35,10 @@ export function useMetricas() {
       if (cancelled) return
       if (consultoriasError || sesionError || !consultoriasData) { setLoading(false); return }
 
+      const typed = consultoriasData as unknown as ConsultoriaForMetricas[]
+      setConsultorias(typed)
       setMetricas(computeMetricasFromConsultorias({
-        consultorias: consultoriasData as unknown as ConsultoriaForMetricas[],
+        consultorias: typed,
         registroSesion: (sesionData ?? []) as RegistroSesionForMetricas[],
       }))
       setLoading(false)
@@ -44,5 +47,5 @@ export function useMetricas() {
     return () => { cancelled = true }
   }, [])
 
-  return { metricas, loading }
+  return { metricas, consultorias, loading }
 }

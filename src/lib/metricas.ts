@@ -3,6 +3,8 @@ export interface RegistroSesionForMetricas {
   cantidad_productos: number | null
 }
 
+export type Granularidad = 'dia' | 'semana' | 'mes'
+
 export interface MetricasGlobales {
   /** All consultorias (no status filter) */
   totalConsultorias: number
@@ -36,6 +38,15 @@ export interface MetricasGlobales {
     Cancelado: number
     Otros: number
   }[]
+  // Track D (PR 1 data layer) additions
+  nitUnicos: number
+  porPeriodo: { label: string; count: number }[]
+  duracionPorConsultor: { consultor: string; avg: number }[]
+  consultasPorArea: { area: string; count: number }[]
+  recuentoPorConsultor: { consultor: string; count: number }[]
+  modalidadPorConsultor: { consultor: string; [modalidad: string]: string | number }[]
+  consultasPorFranja: { franja: string; count: number }[]
+  tiempoPorRol: { rol: string; minutos: number }[]
 }
 
 export interface ConsultoriaForMetricas {
@@ -48,11 +59,15 @@ export interface ConsultoriaForMetricas {
   duracion_minutos: number | null
   id_consultor: string | null
   id_lead: string
+  hora_inicio: string | null
+  modalidad: string | null
   leads: {
     city: string | null
     company_role_level: string | null
     origen: string | null
     sector: string | null
+    company_role_area: string | null
+    nit: string | null
   } | null
   /** Left-joined from consultores table; null when no matching consultor row */
   consultores: { nombre: string | null } | null
@@ -229,12 +244,197 @@ export function computeOrigenStatusBreakdown(
 
 const TOP_N = 6
 
+// ─── Phase D compute functions ────────────────────────────────────────────────
+
+/** Count distinct non-null nit values across all leads. */
+export function countUniqueNit(consultorias: ConsultoriaForMetricas[]): number {
+  const seen = new Set<string>()
+  for (const c of consultorias) {
+    if (c.leads?.nit != null) seen.add(c.leads.nit)
+  }
+  return seen.size
+}
+
+/** Group consultorias by time period (dia/semana/mes), sorted ascending. */
+export function groupByPeriod(
+  consultorias: ConsultoriaForMetricas[],
+  period: Granularidad,
+): { label: string; count: number }[] {
+  const buckets: Record<string, number> = {}
+
+  for (const c of consultorias) {
+    if (!c.fecha) continue
+    let label: string
+    if (period === 'dia') {
+      label = c.fecha.slice(0, 10)
+    } else if (period === 'semana') {
+      const d = new Date(c.fecha + 'T00:00:00')
+      if (isNaN(d.getTime())) continue
+      const { isoYear, isoWeek } = isoWeekParts(d)
+      label = `${isoYear}-W${String(isoWeek).padStart(2, '0')}`
+    } else {
+      label = c.fecha.slice(0, 7)
+    }
+    buckets[label] = (buckets[label] ?? 0) + 1
+  }
+
+  return Object.entries(buckets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, count]) => ({ label, count }))
+}
+
+/** Average duracion_minutos per consultor, sorted by avg descending. */
+export function avgDuracionByConsultor(
+  consultorias: ConsultoriaForMetricas[],
+): { consultor: string; avg: number }[] {
+  const map = new Map<string, { sum: number; count: number }>()
+
+  for (const c of consultorias) {
+    if (c.duracion_minutos == null) continue
+    const key = c.consultores?.nombre ?? 'Sin consultor'
+    const entry = map.get(key)
+    if (!entry) {
+      map.set(key, { sum: c.duracion_minutos, count: 1 })
+    } else {
+      entry.sum += c.duracion_minutos
+      entry.count++
+    }
+  }
+
+  return Array.from(map.entries())
+    .map(([consultor, { sum, count }]) => ({ consultor, avg: Math.round(sum / count) }))
+    .sort((a, b) => b.avg - a.avg)
+}
+
+/** Count consultorias grouped by leads.company_role_area, sorted by count descending. */
+export function countByArea(
+  consultorias: ConsultoriaForMetricas[],
+): { area: string; count: number }[] {
+  const map: Record<string, number> = {}
+
+  for (const c of consultorias) {
+    const key = c.leads?.company_role_area ?? 'Sin área'
+    map[key] = (map[key] ?? 0) + 1
+  }
+
+  return Object.entries(map)
+    .map(([area, count]) => ({ area, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+/** Count consultorias grouped by consultor name, sorted by count descending. */
+export function countByConsultor(
+  consultorias: ConsultoriaForMetricas[],
+): { consultor: string; count: number }[] {
+  const map: Record<string, number> = {}
+
+  for (const c of consultorias) {
+    const key = c.consultores?.nombre ?? 'Sin consultor'
+    map[key] = (map[key] ?? 0) + 1
+  }
+
+  return Object.entries(map)
+    .map(([consultor, count]) => ({ consultor, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+/** Cross-tab of consultor × modalidad counts. One object per consultor with modalidad keys. */
+export function modalidadByConsultor(
+  consultorias: ConsultoriaForMetricas[],
+): { consultor: string; [modalidad: string]: string | number }[] {
+  // map: consultor → { modalidad → count }
+  const map = new Map<string, Record<string, number>>()
+
+  for (const c of consultorias) {
+    const consultor = c.consultores?.nombre ?? 'Sin consultor'
+    const modalidad = c.modalidad ?? 'Sin modalidad'
+    if (!map.has(consultor)) map.set(consultor, {})
+    const entry = map.get(consultor)!
+    entry[modalidad] = (entry[modalidad] ?? 0) + 1
+  }
+
+  return Array.from(map.entries()).map(([consultor, counts]) => ({
+    consultor,
+    ...counts,
+  }))
+}
+
+const FRANJA_BUCKETS: { label: string; from: number; to: number }[] = [
+  { label: '06-09', from: 6, to: 9 },
+  { label: '09-12', from: 9, to: 12 },
+  { label: '12-15', from: 12, to: 15 },
+  { label: '15-18', from: 15, to: 18 },
+  { label: '18-21', from: 18, to: 21 },
+  { label: '21+', from: 21, to: 24 },
+]
+
+/** Group consultorias by franja horaria bucket (incl. 'Sin hora'). Returns all buckets. */
+export function countByFranjaHoraria(
+  consultorias: ConsultoriaForMetricas[],
+): { franja: string; count: number }[] {
+  const counts: Record<string, number> = {
+    '06-09': 0,
+    '09-12': 0,
+    '12-15': 0,
+    '15-18': 0,
+    '18-21': 0,
+    '21+': 0,
+    'Sin hora': 0,
+  }
+
+  for (const c of consultorias) {
+    if (c.hora_inicio == null) {
+      counts['Sin hora']++
+      continue
+    }
+    const h = parseInt(c.hora_inicio.slice(0, 2), 10)
+    if (isNaN(h)) {
+      counts['Sin hora']++
+      continue
+    }
+    if (h >= 21) {
+      counts['21+']++
+    } else {
+      const bucket = FRANJA_BUCKETS.find((b) => h >= b.from && h < b.to)
+      if (bucket) {
+        counts[bucket.label]++
+      } else {
+        counts['Sin hora']++
+      }
+    }
+  }
+
+  return [...FRANJA_BUCKETS.map((b) => b.label), 'Sin hora'].map((franja) => ({
+    franja,
+    count: counts[franja] ?? 0,
+  }))
+}
+
+/** Sum duracion_minutos grouped by leads.company_role_level, sorted descending. */
+export function tiempoPorRol(
+  consultorias: ConsultoriaForMetricas[],
+): { rol: string; minutos: number }[] {
+  const map: Record<string, number> = {}
+
+  for (const c of consultorias) {
+    if (c.duracion_minutos == null) continue
+    const key = c.leads?.company_role_level ?? 'Sin rol'
+    map[key] = (map[key] ?? 0) + c.duracion_minutos
+  }
+
+  return Object.entries(map)
+    .map(([rol, minutos]) => ({ rol, minutos }))
+    .sort((a, b) => b.minutos - a.minutos)
+}
+
 export function computeMetricasFromConsultorias({
   consultorias,
   registroSesion,
+  period = 'mes',
 }: {
   consultorias: ConsultoriaForMetricas[]
   registroSesion: RegistroSesionForMetricas[]
+  period?: Granularidad
 }): MetricasGlobales {
   // Item 7: totalConsultorias = ALL rows; consultoriasResueltas = Resuelto-only
   const totalConsultorias = consultorias.length
@@ -352,6 +552,16 @@ export function computeMetricasFromConsultorias({
   const topConsultores = computeTopConsultores(consultorias)
   const origenStatusBreakdown = computeOrigenStatusBreakdown(consultorias)
 
+  // Phase D: new KPI compute functions
+  const nitUnicos = countUniqueNit(consultorias)
+  const porPeriodo = groupByPeriod(consultorias, period)
+  const duracionPorConsultor = avgDuracionByConsultor(consultorias)
+  const consultasPorArea = countByArea(consultorias)
+  const recuentoPorConsultor = countByConsultor(consultorias)
+  const modalidadPorConsultor = modalidadByConsultor(consultorias)
+  const consultasPorFranja = countByFranjaHoraria(consultorias)
+  const tiempoPorRolResult = tiempoPorRol(consultorias)
+
   return {
     totalConsultorias,
     consultoriasResueltas,
@@ -371,5 +581,13 @@ export function computeMetricasFromConsultorias({
     eficiencia,
     topConsultores,
     origenStatusBreakdown,
+    nitUnicos,
+    porPeriodo,
+    duracionPorConsultor,
+    consultasPorArea,
+    recuentoPorConsultor,
+    modalidadPorConsultor,
+    consultasPorFranja,
+    tiempoPorRol: tiempoPorRolResult,
   }
 }
