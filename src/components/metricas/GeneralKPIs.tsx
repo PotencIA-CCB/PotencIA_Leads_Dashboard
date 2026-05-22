@@ -19,12 +19,37 @@ interface GeneralKPIsProps {
   consultorias: ConsultoriaForMetricas[]
 }
 
+function ninetyDaysAgoISO(): string {
+  const d = new Date()
+  d.setDate(d.getDate() - 90)
+  return d.toISOString().slice(0, 10)
+}
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
 export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
   const [period, setPeriod] = useState<Granularidad>('mes')
+  const [range, setRange] = useState<{ start: string; end: string }>(() => ({
+    start: ninetyDaysAgoISO(),
+    end: todayISO(),
+  }))
+
+  const filtered = useMemo(
+    () =>
+      consultorias.filter((c) => {
+        if (!c.fecha) return false
+        if (range.start && c.fecha < range.start) return false
+        if (range.end && c.fecha > range.end) return false
+        return true
+      }),
+    [consultorias, range],
+  )
 
   const periodData = useMemo(
-    () => groupByPeriod(consultorias, period),
-    [consultorias, period],
+    () => groupByPeriod(filtered, period),
+    [filtered, period],
   )
 
   return (
@@ -44,6 +69,35 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
           </p>
           <p className="text-[10px] text-slate-400 mt-0.5">(empresas con NIT registrado)</p>
         </div>
+      </div>
+
+      {/* Date range filter */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <label className="text-[11px] text-slate-500 font-medium">
+          Desde
+          <input
+            type="date"
+            value={range.start}
+            onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))}
+            className="ml-1 text-[11px] border border-slate-200 rounded px-2 py-0.5 text-slate-700 focus:outline-none focus:border-[#004BB5]"
+          />
+        </label>
+        <label className="text-[11px] text-slate-500 font-medium">
+          Hasta
+          <input
+            type="date"
+            value={range.end}
+            onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))}
+            className="ml-1 text-[11px] border border-slate-200 rounded px-2 py-0.5 text-slate-700 focus:outline-none focus:border-[#004BB5]"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => setRange({ start: '', end: '' })}
+          className="text-[11px] font-semibold text-[#003087] border border-[#003087] rounded px-2 py-0.5 hover:bg-[#003087] hover:text-white transition-colors"
+        >
+          Todo
+        </button>
       </div>
 
       {/* Granularity selector */}

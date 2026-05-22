@@ -2,6 +2,7 @@
 
 import { useMetricas } from '@/hooks/useMetricas'
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { getCurrentConsultor } from '@/lib/supabase-browser'
 import {
   PieChart,
@@ -17,6 +18,8 @@ import {
 import { GeneralKPIs } from '@/components/metricas/GeneralKPIs'
 import { ProductividadKPIs } from '@/components/metricas/ProductividadKPIs'
 
+const CiudadMap = dynamic(() => import('@/components/metricas/CiudadMap'), { ssr: false })
+
 const DONUT_COLORS = ['#003087', '#00C8FF', '#E8470A', '#004BB5']
 
 const STATUS_STACK_COLORS: Record<string, string> = {
@@ -27,8 +30,6 @@ const STATUS_STACK_COLORS: Record<string, string> = {
   Cancelado: '#E8470A',
   Otros: '#A78BFA',
 }
-
-const BAR_COLORS = ['#003087', '#00C8FF', '#004BB5', '#E8470A', '#5A6475', '#003087']
 
 type InsightsState = {
   insights: string[]
@@ -140,7 +141,7 @@ export default function MetricasPage() {
       {/* KPI Cards — 6 tiles */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
         {[
-          { label: 'Total Consultorías', value: metricas.totalConsultorias, icon: 'event', sub: 'Sesiones registradas' },
+          { label: 'Total Consultorías', value: metricas.totalConsultorias, icon: 'event', sub: 'Resueltas + En seguimiento' },
           { label: 'Resueltas', value: metricas.consultoriasResueltas, icon: 'task_alt', sub: 'Estado Resuelto' },
           { label: 'En Seguimiento', value: metricas.casosEnSeguimientoLeads, icon: 'monitoring', sub: 'Leads en seguimiento' },
           { label: '% Conversión', value: `${metricas.tasaConversion}%`, icon: 'trending_up', sub: 'Consultorías → Resuelto' },
@@ -186,30 +187,9 @@ export default function MetricasPage() {
             className="text-lg font-bold text-[#003087] mb-6"
             style={{ fontFamily: 'Space Grotesk, sans-serif' }}
           >
-            Consultorías por ciudad
+            Distribución por departamento
           </h4>
-          {metricas.porCiudad.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-slate-400">Sin datos de ciudad.</p>
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={280} minWidth={0}>
-              <BarChart
-                layout="vertical"
-                data={metricas.porCiudad}
-                margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
-              >
-                <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="city" tick={{ fontSize: 10 }} width={80} />
-                <Tooltip />
-                <Bar dataKey="total" radius={[0, 4, 4, 0]}>
-                  {metricas.porCiudad.map((_, i) => (
-                    <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+          <CiudadMap data={metricas.porDepartamento} sinUbicacion={metricas.sinUbicacion} />
         </div>
 
         <div className="col-span-12 lg:col-span-5 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-95 flex flex-col">
