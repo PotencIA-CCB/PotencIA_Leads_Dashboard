@@ -3,6 +3,8 @@ import { CITY_TO_DEPT } from './geo/cityToDept'
 export interface RegistroSesionForMetricas {
   id_consultoria: string
   cantidad_productos: number | null
+  sesion_grabada?: boolean | null
+  resultado_final?: string | null
 }
 
 export type Granularidad = 'dia' | 'semana' | 'mes'
@@ -16,16 +18,12 @@ export interface MetricasGlobales {
   casosEnSeguimientoLeads: number
   porEstado: { status: string; total: number }[]
   tasaConversion: number
-  porServicio: { servicio: string; total: number }[] // @deprecated — use porCasoUso
   porCasoUso: { caso: string; total: number }[]
-  /** @deprecated Use porDepartamento + CiudadMap instead */
-  porCiudad: { city: string; total: number }[]
   porCargo: { cargo: string; total: number }[]
   porSemana: { semana: string; total: number }[]
   // Track B additions
   porPotencia: { nivel: string; total: number }[]
   porOrigen: { origen: string; total: number }[]
-  porSector: { sector: string; total: number }[]
   totalProductos: number
   totalMinutos: number
   /** totalProductos / totalLeadsAtendidos rounded to 2 decimals; '—' when denominator is 0 */
@@ -54,9 +52,34 @@ export interface MetricasGlobales {
   porDepartamento: { dept: string; total: number }[]
   /** Count of consultorias whose city does not map to a known department */
   sinUbicacion: number
+  // New metrics
+  /** % leads únicos con ≥1 sesión Resuelto|En seguimiento vs total leads únicos del dataset */
+  tasaLeadConversion: number
+  /** total leads (param) - leads con consultoria */
+  leadsSinConsultoria: number
+  /** COUNT DISTINCT id_lead en el dataset */
+  leadsConConsultoria: number
+  /** % status Escalar / total */
+  tasaEscalamiento: number
+  /** % sesion_grabada=true en registro_sesion */
+  tasaSesionesGrabadas: number
+  /** % leads con 2+ consultorias vs leads con ≥1 */
+  tasaRetorno: number
+  /** % resultado_final IS NOT NULL en registro_sesion */
+  tasaDocumentacion: number
+  /** histogram: cuántos leads tuvieron N visitas */
+  distribucionRetorno: { visitas: number; leads: number }[]
+  /** Resuelto sin registro_sesion vinculado */
+  consultoriasSinRegistro: number
+  /** buckets ISO semanales para status Agendado */
+  porAgendadoSemana: { semana: string; total: number }[]
+  scatterDuracionProductos: { duracion: number; productos: number; consultor: string }[]
+  heatmapFranjaDia: { franja: string; dia: string; count: number }[]
+  consultorMetrics: { consultor: string; sesiones: number; duracionAvg: number; productos: number; pctGrabadas: number }[]
 }
 
 export interface ConsultoriaForMetricas {
+  id?: string
   fecha: string
   status: string
   servicio: string | null
@@ -105,13 +128,17 @@ export function normalizeKey(value: string | null | undefined, fallback: string)
     .replace(/\s+/g, ' ')
 }
 
-function canonicalStatus(status: string) {
+export function canonicalStatus(status: string) {
   const key = normalizeKey(status, status)
   if (key === 'pendiente') return 'Pendiente'
   if (key === 'agendado') return 'Agendado'
   if (key === 'en seguimiento' || key === 'enseguimiento') return 'En seguimiento'
   if (key === 'resuelto' || key === 'completada' || key === 'completado') return 'Resuelto'
   if (key === 'cancelado' || key === 'cancelada') return 'Cancelado'
+  if (key === 'escalar') return 'Escalar'
+  if (key === 'no asistio' || key === 'no asistio') return 'No asistió'
+  // Handle with diacritics already stripped by normalizeKey: 'no asistio'
+  if (status.trim().toLowerCase() === 'no asistió') return 'No asistió'
   return status.trim()
 }
 
@@ -143,6 +170,33 @@ export function computeWeeklyBuckets(
   const buckets: Record<string, { label: string; bucketKey: string; total: number }> = {}
 
   for (const c of resueltas) {
+    if (!c.fecha) continue
+    const d = new Date(c.fecha + 'T00:00:00')
+    if (isNaN(d.getTime())) continue
+
+    const { isoYear, isoWeek } = isoWeekParts(d)
+    const bucketKey = `${isoYear}-W${String(isoWeek).padStart(2, '0')}`
+    const label = `Sem ${isoWeek}`
+
+    if (!buckets[bucketKey]) {
+      buckets[bucketKey] = { label, bucketKey, total: 0 }
+    }
+    buckets[bucketKey].total++
+  }
+
+  return Object.values(buckets)
+    .sort((a, b) => a.bucketKey.localeCompare(b.bucketKey))
+    .map(({ label, total }) => ({ semana: label, total }))
+}
+
+export function computeAgendadoWeeklyBuckets(
+  consultorias: ConsultoriaForMetricas[],
+): { semana: string; total: number }[] {
+  const agendadas = consultorias.filter((c) => canonicalStatus(c.status) === 'Agendado')
+
+  const buckets: Record<string, { label: string; bucketKey: string; total: number }> = {}
+
+  for (const c of agendadas) {
     if (!c.fecha) continue
     const d = new Date(c.fecha + 'T00:00:00')
     if (isNaN(d.getTime())) continue
@@ -466,14 +520,159 @@ export function countByDepartamento(consultorias: ConsultoriaForMetricas[]): {
   return { porDepartamento, sinUbicacion }
 }
 
+const HEATMAP_DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+const HEATMAP_FRANJAS = ['8-10am', '10am-12pm', '1-3pm', '3-5pm', 'Fuera de horario']
+
+export function computeHeatmapFranjaDia(
+  consultorias: ConsultoriaForMetricas[],
+): { franja: string; dia: string; count: number }[] {
+  // Initialize all cells to 0
+  const counts: Record<string, number> = {}
+  for (const franja of HEATMAP_FRANJAS) {
+    for (const dia of HEATMAP_DIAS) {
+      counts[`${franja}__${dia}`] = 0
+    }
+  }
+
+  for (const c of consultorias) {
+    if (!c.fecha) continue
+    const d = new Date(c.fecha + 'T00:00:00')
+    if (isNaN(d.getTime())) continue
+    const dayIndex = (d.getDay() + 6) % 7 // 0=Lun, 6=Dom
+    const dia = HEATMAP_DIAS[dayIndex]
+
+    let franja = 'Fuera de horario'
+    if (c.hora_inicio != null) {
+      const h = parseInt(c.hora_inicio.slice(0, 2), 10)
+      if (!isNaN(h)) {
+        const bucket = BUSINESS_HOUR_BUCKETS.find((b) => h >= b.min && h < b.max)
+        if (bucket) franja = bucket.label
+      }
+    }
+
+    const key = `${franja}__${dia}`
+    if (key in counts) {
+      counts[key]++
+    }
+  }
+
+  const result: { franja: string; dia: string; count: number }[] = []
+  for (const franja of HEATMAP_FRANJAS) {
+    for (const dia of HEATMAP_DIAS) {
+      result.push({ franja, dia, count: counts[`${franja}__${dia}`] })
+    }
+  }
+  return result
+}
+
+export function computeScatterDuracionProductos(
+  consultorias: ConsultoriaForMetricas[],
+  registroSesion: RegistroSesionForMetricas[],
+): { duracion: number; productos: number; consultor: string }[] {
+  const registroMap = new Map<string, RegistroSesionForMetricas>()
+  for (const r of registroSesion) {
+    registroMap.set(r.id_consultoria, r)
+  }
+
+  const result: { duracion: number; productos: number; consultor: string }[] = []
+  for (const c of consultorias) {
+    if (!c.id) continue
+    const registro = registroMap.get(c.id)
+    if (!registro) continue
+    if (c.duracion_minutos == null || c.duracion_minutos <= 0) continue
+    result.push({
+      duracion: c.duracion_minutos,
+      productos: registro.cantidad_productos ?? 0,
+      consultor: c.consultores?.nombre ?? 'Sin consultor',
+    })
+  }
+  return result
+}
+
+export function computeConsultorMetrics(
+  consultorias: ConsultoriaForMetricas[],
+  registroSesion: RegistroSesionForMetricas[],
+): { consultor: string; sesiones: number; duracionAvg: number; productos: number; pctGrabadas: number }[] {
+  const registroMap = new Map<string, RegistroSesionForMetricas>()
+  for (const r of registroSesion) {
+    registroMap.set(r.id_consultoria, r)
+  }
+
+  const map = new Map<string, {
+    sesiones: number
+    duracionSum: number
+    duracionCount: number
+    productos: number
+    grabadas: number
+    conRegistro: number
+  }>()
+
+  for (const c of consultorias) {
+    if (!c.id_consultor) continue
+    const nombre = c.consultores?.nombre ?? 'Sin consultor'
+    if (!map.has(nombre)) {
+      map.set(nombre, { sesiones: 0, duracionSum: 0, duracionCount: 0, productos: 0, grabadas: 0, conRegistro: 0 })
+    }
+    const entry = map.get(nombre)!
+    entry.sesiones++
+    if (c.duracion_minutos != null) {
+      entry.duracionSum += c.duracion_minutos
+      entry.duracionCount++
+    }
+
+    if (c.id) {
+      const registro = registroMap.get(c.id)
+      if (registro) {
+        entry.conRegistro++
+        entry.productos += registro.cantidad_productos ?? 0
+        if (registro.sesion_grabada === true) entry.grabadas++
+      }
+    }
+  }
+
+  return Array.from(map.entries())
+    .map(([consultor, e]) => ({
+      consultor,
+      sesiones: e.sesiones,
+      duracionAvg: e.duracionCount > 0 ? Math.round(e.duracionSum / e.duracionCount) : 0,
+      productos: e.productos,
+      pctGrabadas: e.conRegistro > 0 ? Math.round((e.grabadas / e.conRegistro) * 100) : 0,
+    }))
+    .sort((a, b) => b.sesiones - a.sesiones)
+}
+
+export function computeRetentionDistribution(
+  consultorias: ConsultoriaForMetricas[],
+): { visitas: number; leads: number }[] {
+  const visitasByLead = new Map<string, number>()
+  for (const c of consultorias) {
+    visitasByLead.set(c.id_lead, (visitasByLead.get(c.id_lead) ?? 0) + 1)
+  }
+
+  const buckets: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 }
+  for (const count of visitasByLead.values()) {
+    const bucket = count >= 4 ? 4 : count
+    buckets[bucket]++
+  }
+
+  return [
+    { visitas: 1, leads: buckets[1] },
+    { visitas: 2, leads: buckets[2] },
+    { visitas: 3, leads: buckets[3] },
+    { visitas: 4, leads: buckets[4] },
+  ]
+}
+
 export function computeMetricasFromConsultorias({
   consultorias,
   registroSesion,
   period = 'mes',
+  totalLeads,
 }: {
   consultorias: ConsultoriaForMetricas[]
   registroSesion: RegistroSesionForMetricas[]
   period?: Granularidad
+  totalLeads?: number
 }): MetricasGlobales {
   // Counts only attended sessions (status Resuelto | En seguimiento)
   const totalConsultorias = consultorias.filter((c) => {
@@ -492,7 +691,16 @@ export function computeMetricasFromConsultorias({
 
   const totalProductos = registroSesion.reduce((sum, r) => sum + (r.cantidad_productos ?? 0), 0)
   const totalMinutos = consultorias.reduce((sum, c) => sum + (c.duracion_minutos ?? 0), 0)
-  const eficiencia = '—'
+
+  // Eficiencia: productos / leads atendidos
+  const leadsAtendidosSet = new Set(
+    consultorias
+      .filter(c => ['Resuelto', 'En seguimiento'].includes(canonicalStatus(c.status)))
+      .map(c => c.id_lead)
+  )
+  const eficiencia = leadsAtendidosSet.size === 0
+    ? '—'
+    : (totalProductos / leadsAtendidosSet.size).toFixed(2)
 
   const estadoMap: Record<string, number> = {}
   const servicioMap: Record<string, number> = {}
@@ -543,11 +751,6 @@ export function computeMetricasFromConsultorias({
   const totalAll = consultorias.length
   const tasaConversion = totalAll > 0 ? Math.round((resueltos / totalAll) * 100) : 0
 
-  const porServicio = Object.entries(servicioMap)
-    .map(([servicio, total]) => ({ servicio, total }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, TOP_N)
-
   const porCasoUso = Object.entries(casoUsoMap)
     .filter(([caso]) => caso !== 'Sin categorizar')
     .map(([caso, total]) => ({ caso, total }))
@@ -558,13 +761,6 @@ export function computeMetricasFromConsultorias({
   const allCities = Object.entries(ciudadMap)
     .map(([city, total]) => ({ city: titleCaseCity(city), total }))
     .sort((a, b) => b.total - a.total)
-
-  const topCities = allCities.slice(0, TOP_N)
-  const otrosCities = allCities.slice(TOP_N)
-  if (otrosCities.length > 0) {
-    topCities.push({ city: 'Otros', total: otrosCities.reduce((acc, c) => acc + c.total, 0) })
-  }
-  const porCiudad = topCities
 
   const porCargo = Object.entries(cargoMap)
     .map(([cargo, total]) => ({ cargo, total }))
@@ -578,16 +774,6 @@ export function computeMetricasFromConsultorias({
   const porOrigen = Object.entries(origenMap)
     .map(([origen, total]) => ({ origen, total }))
     .sort((a, b) => b.total - a.total)
-
-  const allSectors = Object.entries(sectorMap)
-    .map(([sector, total]) => ({ sector, total }))
-    .sort((a, b) => b.total - a.total)
-  const topSectors = allSectors.slice(0, TOP_N)
-  const otrosSectors = allSectors.slice(TOP_N)
-  if (otrosSectors.length > 0) {
-    topSectors.push({ sector: 'Otros', total: otrosSectors.reduce((acc, s) => acc + s.total, 0) })
-  }
-  const porSector = topSectors
 
   const porSemana = computeWeeklyBuckets(consultorias)
 
@@ -606,20 +792,86 @@ export function computeMetricasFromConsultorias({
   const tiempoPorRolResult = tiempoPorRol(consultorias)
   const { porDepartamento, sinUbicacion } = countByDepartamento(consultorias)
 
+  // New metrics
+  const leadsConConsultoriaSet = new Set(consultorias.map(c => c.id_lead))
+  const leadsConConsultoria = leadsConConsultoriaSet.size
+  const leadsSinConsultoria = totalLeads != null ? Math.max(0, totalLeads - leadsConConsultoria) : 0
+
+  // tasaLeadConversion: % leads únicos con ≥1 sesión Resuelto|En seguimiento vs total leads únicos del dataset
+  const leadsConversionSet = new Set(
+    consultorias
+      .filter(c => ['Resuelto', 'En seguimiento'].includes(canonicalStatus(c.status)))
+      .map(c => c.id_lead)
+  )
+  const tasaLeadConversion = leadsConConsultoria > 0
+    ? Math.round((leadsConversionSet.size / leadsConConsultoria) * 100)
+    : 0
+
+  // tasaEscalamiento: % status Escalar / total
+  const escalamientos = estadoMap['Escalar'] ?? 0
+  const tasaEscalamiento = totalAll > 0 ? Math.round((escalamientos / totalAll) * 100) : 0
+
+  // tasaSesionesGrabadas: % sesion_grabada=true en registro_sesion
+  const grabadas = registroSesion.filter(r => r.sesion_grabada === true).length
+  const tasaSesionesGrabadas = registroSesion.length > 0
+    ? Math.round((grabadas / registroSesion.length) * 100)
+    : 0
+
+  // tasaDocumentacion: % resultado_final IS NOT NULL en registro_sesion
+  const conResultado = registroSesion.filter(r => r.resultado_final != null && r.resultado_final !== '').length
+  const tasaDocumentacion = registroSesion.length > 0
+    ? Math.round((conResultado / registroSesion.length) * 100)
+    : 0
+
+  // distribucionRetorno
+  const distribucionRetorno = computeRetentionDistribution(consultorias)
+
+  // tasaRetorno: % leads con 2+ consultorias vs leads con ≥1
+  const visitasByLead = new Map<string, number>()
+  for (const c of consultorias) {
+    visitasByLead.set(c.id_lead, (visitasByLead.get(c.id_lead) ?? 0) + 1)
+  }
+  const leadsConRetorno = [...visitasByLead.values()].filter(v => v >= 2).length
+  const tasaRetorno = leadsConConsultoria > 0
+    ? Math.round((leadsConRetorno / leadsConConsultoria) * 100)
+    : 0
+
+  // consultoriasSinRegistro: Resuelto sin registro_sesion vinculado
+  const registroIds = new Set(registroSesion.map(r => r.id_consultoria))
+  const consultoriasSinRegistro = consultorias.filter(c => {
+    if (canonicalStatus(c.status) !== 'Resuelto') return false
+    if (!c.id) return false
+    return !registroIds.has(c.id)
+  }).length
+
+  // porAgendadoSemana
+  const porAgendadoSemana = computeAgendadoWeeklyBuckets(consultorias)
+
+  // scatterDuracionProductos
+  const scatterDuracionProductos = computeScatterDuracionProductos(consultorias, registroSesion)
+
+  // heatmapFranjaDia
+  const heatmapFranjaDia = computeHeatmapFranjaDia(consultorias)
+
+  // consultorMetrics
+  const consultorMetrics = computeConsultorMetrics(consultorias, registroSesion)
+
+  // Suppress unused variable warning for sectorMap and servicioMap
+  void Object.keys(sectorMap)
+  void Object.keys(servicioMap)
+  void allCities
+
   return {
     totalConsultorias,
     consultoriasResueltas,
     casosEnSeguimientoLeads,
     porEstado,
     tasaConversion,
-    porServicio,
     porCasoUso,
-    porCiudad,
     porCargo,
     porSemana,
     porPotencia,
     porOrigen,
-    porSector,
     totalProductos,
     totalMinutos,
     eficiencia,
@@ -635,5 +887,18 @@ export function computeMetricasFromConsultorias({
     tiempoPorRol: tiempoPorRolResult,
     porDepartamento,
     sinUbicacion,
+    tasaLeadConversion,
+    leadsSinConsultoria,
+    leadsConConsultoria,
+    tasaEscalamiento,
+    tasaSesionesGrabadas,
+    tasaRetorno,
+    tasaDocumentacion,
+    distribucionRetorno,
+    consultoriasSinRegistro,
+    porAgendadoSemana,
+    scatterDuracionProductos,
+    heatmapFranjaDia,
+    consultorMetrics,
   }
 }

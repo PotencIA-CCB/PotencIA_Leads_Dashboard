@@ -20,26 +20,35 @@ export function useMetricas() {
 
       const consultoriasQuery = supabase
         .from('consultorias')
-        .select('fecha, status, servicio, duracion_minutos, id_consultor, id_lead, categoria_caso_uso, categoria_caso, nivel_potencia, hora_inicio, modalidad, leads!inner(city, company_role_level, origen, sector, company_role_area, nit), consultores(nombre)')
+        .select('id, fecha, status, servicio, duracion_minutos, id_consultor, id_lead, categoria_caso_uso, categoria_caso, nivel_potencia, hora_inicio, modalidad, leads!inner(city, company_role_level, origen, sector, company_role_area, nit), consultores(nombre)')
       if (consultor.rol === 'consultor') consultoriasQuery.eq('id_consultor', consultor.id)
 
       const registroQuery = supabase
         .from('registro_sesion')
-        .select('id_consultoria, cantidad_productos')
+        .select('id_consultoria, cantidad_productos, sesion_grabada, resultado_final')
+
+      const leadsCountQuery = supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
 
       const [
         { data: consultoriasData, error: consultoriasError },
         { data: sesionData, error: sesionError },
-      ] = await Promise.all([consultoriasQuery, registroQuery])
+        { count: totalLeadsCount },
+      ] = await Promise.all([consultoriasQuery, registroQuery, leadsCountQuery])
 
       if (cancelled) return
       if (consultoriasError || sesionError || !consultoriasData) { setLoading(false); return }
+
+      // For consultor role, don't pass totalLeadsCount (they only see their own leads)
+      const leadsParam = consultor.rol === 'admin' ? (totalLeadsCount ?? undefined) : undefined
 
       const typed = consultoriasData as unknown as ConsultoriaForMetricas[]
       setConsultorias(typed)
       setMetricas(computeMetricasFromConsultorias({
         consultorias: typed,
         registroSesion: (sesionData ?? []) as RegistroSesionForMetricas[],
+        totalLeads: leadsParam,
       }))
       setLoading(false)
     }

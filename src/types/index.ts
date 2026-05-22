@@ -54,7 +54,7 @@ export interface Consultor {
   activo: boolean
 }
 
-export type ConsultoriaStatus = 'Pendiente' | 'Agendado' | 'En seguimiento' | 'Resuelto' | 'Cancelado'
+export type ConsultoriaStatus = 'Pendiente' | 'Agendado' | 'En seguimiento' | 'Resuelto' | 'Cancelado' | 'Escalar' | 'No asistió'
 
 export interface Consultoria {
   id: string

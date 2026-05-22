@@ -2,15 +2,16 @@
 
 import { useState, useMemo } from 'react'
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
+  Legend,
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts'
-import { type MetricasGlobales, type ConsultoriaForMetricas, type Granularidad, groupByPeriod } from '@/lib/metricas'
+import { type MetricasGlobales, type ConsultoriaForMetricas, type Granularidad, groupByPeriod, canonicalStatus } from '@/lib/metricas'
 import { MetricaChartCard } from './MetricaChartCard'
 import { PeriodGranularitySelector } from './PeriodGranularitySelector'
 
@@ -47,10 +48,31 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
     [consultorias, range],
   )
 
-  const periodData = useMemo(
-    () => groupByPeriod(filtered, period),
-    [filtered, period],
-  )
+  const mergedData = useMemo(() => {
+    const resueltoRaw = groupByPeriod(
+      filtered.filter(c => canonicalStatus(c.status) === 'Resuelto'),
+      period,
+    )
+    const agendadoRaw = groupByPeriod(
+      filtered.filter(c => canonicalStatus(c.status) === 'Agendado'),
+      period,
+    )
+
+    const labelsSet = new Set<string>()
+    for (const d of resueltoRaw) labelsSet.add(d.label)
+    for (const d of agendadoRaw) labelsSet.add(d.label)
+
+    const resueltoMap = new Map(resueltoRaw.map(d => [d.label, d.count]))
+    const agendadoMap = new Map(agendadoRaw.map(d => [d.label, d.count]))
+
+    return Array.from(labelsSet)
+      .sort((a, b) => a.localeCompare(b))
+      .map(label => ({
+        label,
+        resuelto: resueltoMap.get(label) ?? 0,
+        agendado: agendadoMap.get(label) ?? 0,
+      }))
+  }, [filtered, period])
 
   return (
     <MetricaChartCard title="Sesiones en el tiempo" className="mb-8">
@@ -68,6 +90,13 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
             {metricas.nitUnicos}
           </p>
           <p className="text-[10px] text-slate-400 mt-0.5">(empresas con NIT registrado)</p>
+        </div>
+        <div>
+          <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Leads convertidos</p>
+          <p className="text-2xl font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+            {metricas.tasaLeadConversion}%
+          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5">leads con ≥1 sesión atendida</p>
         </div>
       </div>
 
@@ -106,25 +135,47 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
       </div>
 
       {/* Chart */}
-      {periodData.length === 0 ? (
+      {mergedData.length === 0 ? (
         <div className="flex items-center justify-center h-[300px]">
           <p className="text-sm text-slate-400">Sin datos para el período seleccionado.</p>
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={periodData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+          <AreaChart data={mergedData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="colorAgendado" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#00C8FF" stopOpacity={0.4} />
+                <stop offset="95%" stopColor="#00C8FF" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="colorResuelto" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#003087" stopOpacity={0.6} />
+                <stop offset="95%" stopColor="#003087" stopOpacity={0} />
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
             <XAxis dataKey="label" tick={{ fontSize: 10 }} />
             <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
             <Tooltip />
-            <Line
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Area
               type="monotone"
-              dataKey="count"
-              stroke="#003087"
-              strokeWidth={3}
-              dot={{ fill: '#003087', r: 4, stroke: 'white', strokeWidth: 2 }}
+              dataKey="agendado"
+              stroke="#00C8FF"
+              fill="#E0F9FF"
+              fillOpacity={0.4}
+              stackId="1"
+              strokeWidth={2}
             />
-          </LineChart>
+            <Area
+              type="monotone"
+              dataKey="resuelto"
+              stroke="#003087"
+              fill="#C7D9FF"
+              fillOpacity={0.6}
+              stackId="1"
+              strokeWidth={2}
+            />
+          </AreaChart>
         </ResponsiveContainer>
       )}
     </MetricaChartCard>

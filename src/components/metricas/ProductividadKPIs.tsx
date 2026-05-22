@@ -10,6 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
   Cell,
+  Treemap,
 } from 'recharts'
 import { type MetricasGlobales } from '@/lib/metricas'
 import { MetricaChartCard } from './MetricaChartCard'
@@ -33,6 +34,104 @@ function calcLeftWidth(labels: string[]): number {
   return Math.min(120, Math.max(60, ...labels.map((l) => l.length * 6)))
 }
 
+interface TreemapContentProps {
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  name?: string
+  value?: number
+  fill?: string
+}
+
+function CustomTreemapContent({ x = 0, y = 0, width = 0, height = 0, name, value, fill }: TreemapContentProps) {
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} fill={fill ?? '#003087'} stroke="#fff" strokeWidth={2} rx={4} />
+      {width > 50 && height > 25 && (
+        <>
+          <text
+            x={x + width / 2}
+            y={y + height / 2 - 6}
+            textAnchor="middle"
+            fill="white"
+            fontSize={10}
+            fontWeight="600"
+          >
+            {name}
+          </text>
+          <text
+            x={x + width / 2}
+            y={y + height / 2 + 8}
+            textAnchor="middle"
+            fill="white"
+            fontSize={10}
+          >
+            {value}
+          </text>
+        </>
+      )}
+    </g>
+  )
+}
+
+const HEATMAP_DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+const HEATMAP_FRANJAS = ['8-10am', '10am-12pm', '1-3pm', '3-5pm', 'Fuera de horario']
+
+function HeatmapFranjaDia({ data }: { data: { franja: string; dia: string; count: number }[] }) {
+  const maxCount = Math.max(1, ...data.map(d => d.count))
+
+  const getColor = (count: number) => {
+    if (count === 0) return `rgba(0, 48, 135, 0.05)`
+    return `rgba(0, 48, 135, ${0.15 + (count / maxCount) * 0.8})`
+  }
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '90px repeat(7, 1fr)',
+          gap: '3px',
+          minWidth: '480px',
+        }}
+      >
+        {/* Header row */}
+        <div />
+        {HEATMAP_DIAS.map(dia => (
+          <div key={dia} className="text-[10px] text-slate-500 font-medium text-center py-1">
+            {dia}
+          </div>
+        ))}
+        {/* Data rows */}
+        {HEATMAP_FRANJAS.map(franja => (
+          <>
+            <div key={`label-${franja}`} className="text-[10px] text-slate-500 flex items-center pr-2 truncate">
+              {franja}
+            </div>
+            {HEATMAP_DIAS.map(dia => {
+              const cell = data.find(d => d.franja === franja && d.dia === dia)
+              const count = cell?.count ?? 0
+              return (
+                <div
+                  key={`${franja}-${dia}`}
+                  className="h-8 rounded flex items-center justify-center"
+                  style={{ backgroundColor: getColor(count) }}
+                  title={`${franja} ${dia}: ${count}`}
+                >
+                  {count > 0 && (
+                    <span className="text-[10px] font-medium text-white">{count}</span>
+                  )}
+                </div>
+              )
+            })}
+          </>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function ProductividadKPIs({ metricas }: ProductividadKPIsProps) {
   // Derive modalidad keys (everything except 'consultor')
   const modalidadKeys = Array.from(
@@ -47,6 +146,12 @@ export function ProductividadKPIs({ metricas }: ProductividadKPIsProps) {
     key === 'Sin modalidad'
       ? SIN_MODALIDAD_COLOR
       : BAR_COLORS[modalidadKeys.indexOf(key) % BAR_COLORS.length]
+
+  const treemapData = metricas.porCasoUso.map((d, i) => ({
+    name: d.caso,
+    size: d.total,
+    fill: BAR_COLORS[i % BAR_COLORS.length],
+  }))
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -140,32 +245,19 @@ export function ProductividadKPIs({ metricas }: ProductividadKPIsProps) {
         )}
       </MetricaChartCard>
 
-      {/* 4 — Consultas por caso de uso (vertical bar) */}
+      {/* 4 — Casos de uso (Treemap) */}
       <MetricaChartCard title="Casos de uso más solicitados">
         {metricas.porCasoUso.length === 0 ? (
           <EmptyState />
         ) : (
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart
-              data={metricas.porCasoUso}
-              margin={{ top: 4, right: 8, left: 0, bottom: 40 }}
+            <Treemap
+              data={treemapData}
+              dataKey="size"
+              content={<CustomTreemapContent />}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-              <XAxis
-                dataKey="caso"
-                tick={{ fontSize: 9 }}
-                interval={0}
-                angle={-30}
-                textAnchor="end"
-              />
-              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="total" radius={[4, 4, 0, 0]}>
-                {metricas.porCasoUso.map((_, i) => (
-                  <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
+              <Tooltip formatter={(value, name) => [value, name]} />
+            </Treemap>
           </ResponsiveContainer>
         )}
       </MetricaChartCard>
@@ -207,23 +299,12 @@ export function ProductividadKPIs({ metricas }: ProductividadKPIsProps) {
         )}
       </MetricaChartCard>
 
-      {/* 6 — Consultas por franja horaria */}
+      {/* 6 — Consultas por franja horaria (Heatmap) */}
       <MetricaChartCard title="Consultas por franja horaria">
-        {metricas.consultasPorFranja.length === 0 ? (
+        {metricas.heatmapFranjaDia.length === 0 ? (
           <EmptyState />
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart
-              data={metricas.consultasPorFranja}
-              margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-              <XAxis dataKey="franja" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#003087" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <HeatmapFranjaDia data={metricas.heatmapFranjaDia} />
         )}
       </MetricaChartCard>
 

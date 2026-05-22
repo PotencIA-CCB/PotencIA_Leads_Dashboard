@@ -17,13 +17,15 @@ import {
 } from 'recharts'
 import { GeneralKPIs } from '@/components/metricas/GeneralKPIs'
 import { ProductividadKPIs } from '@/components/metricas/ProductividadKPIs'
+import { RetentionFunnel } from '@/components/metricas/RetentionFunnel'
+import { QualityKPIs } from '@/components/metricas/QualityKPIs'
+import { ConsultorRadar } from '@/components/metricas/ConsultorRadar'
 
 const CiudadMap = dynamic(() => import('@/components/metricas/CiudadMap'), { ssr: false })
 
 const DONUT_COLORS = ['#003087', '#00C8FF', '#E8470A', '#004BB5']
 
 const STATUS_STACK_COLORS: Record<string, string> = {
-  Pendiente: '#5A6475',
   Agendado: '#00C8FF',
   'En seguimiento': '#6366F1',
   Resuelto: '#003087',
@@ -138,25 +140,22 @@ export default function MetricasPage() {
         </h2>
       </div>
 
-      {/* KPI Cards — 6 tiles */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+      {/* KPI Cards — 8 tiles */}
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6 mb-8">
         {[
           { label: 'Total Consultorías', value: metricas.totalConsultorias, icon: 'event', sub: 'Resueltas + En seguimiento' },
           { label: 'Resueltas', value: metricas.consultoriasResueltas, icon: 'task_alt', sub: 'Estado Resuelto' },
           { label: 'En Seguimiento', value: metricas.casosEnSeguimientoLeads, icon: 'monitoring', sub: 'Leads en seguimiento' },
           { label: '% Conversión', value: `${metricas.tasaConversion}%`, icon: 'trending_up', sub: 'Consultorías → Resuelto' },
-          {
-            label: 'Productos generados',
-            value: metricas.totalProductos === 0 ? '0' : metricas.totalProductos,
-            icon: 'inventory_2',
-            sub: 'Total productos creados',
-          },
+          { label: 'Productos generados', value: metricas.totalProductos, icon: 'inventory_2', sub: 'Total productos creados' },
           {
             label: 'Horas de consultoría',
             value: metricas.totalMinutos === 0 ? '0 h' : `${(metricas.totalMinutos / 60).toFixed(1)} h`,
             icon: 'schedule',
             sub: 'Tiempo total de sesiones',
           },
+          { label: 'Eficiencia', value: metricas.eficiencia, icon: 'speed', sub: 'Productos por lead atendido' },
+          { label: 'Escalamientos', value: `${metricas.tasaEscalamiento}%`, icon: 'escalator_warning', sub: 'Sesiones escaladas' },
         ].map((kpi) => (
           <div
             key={kpi.label}
@@ -282,6 +281,15 @@ export default function MetricasPage() {
 
       {/* ProductividadKPIs — 7 charts in a 2-column grid */}
       <ProductividadKPIs metricas={metricas} />
+
+      {/* RetentionFunnel — funnel + retention distribution */}
+      <RetentionFunnel metricas={metricas} />
+
+      {/* QualityKPIs — radial KPIs + scatter */}
+      <QualityKPIs metricas={metricas} />
+
+      {/* ConsultorRadar — normalized radar per consultor */}
+      <ConsultorRadar metricas={metricas} />
 
       {/* AI Insights */}
       <section className="bg-white rounded-[10px] border border-[#E5E7EB] shadow-sm">
