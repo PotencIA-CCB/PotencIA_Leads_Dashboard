@@ -31,7 +31,8 @@ function makeConsultoria(
     hora_inicio: null,
     modalidad: null,
     leads: {
-      full_name: null,
+      nombre: null,
+      apellidos: null,
       city: null,
       company_role_level: null,
       origen: null,

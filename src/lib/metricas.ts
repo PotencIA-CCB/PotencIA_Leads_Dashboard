@@ -106,7 +106,8 @@ export interface ConsultoriaForMetricas {
   hora_inicio: string | null
   modalidad: string | null
   leads: {
-    full_name?: string | null
+    nombre?: string | null
+    apellidos?: string | null
     city: string | null
     company_role_level: string | null
     origen: string | null
