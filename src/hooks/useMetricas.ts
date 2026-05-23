@@ -27,7 +27,7 @@ export function useMetricas() {
 
       const registroQuery = supabase
         .from('registro_sesion')
-        .select('id_consultoria, cantidad_productos, sesion_grabada, resultado_final')
+        .select('id_consultoria, cantidad_productos, sesion_grabada, resultado_final, duracion_sesion_minutos')
 
       const leadsCountQuery = supabase
         .from('leads')

@@ -5,6 +5,7 @@ export interface RegistroSesionForMetricas {
   cantidad_productos: number | null
   sesion_grabada?: boolean | null
   resultado_final?: string | null
+  duracion_sesion_minutos?: number | null
 }
 
 /** TASK-10: Build a Set of attended consultoria ids from registro_sesion rows. */
@@ -570,16 +571,19 @@ export function countByFranjaHoraria(
  */
 export function tiempoPromedioPorRol(
   consultorias: ConsultoriaForMetricas[],
+  registroSesion?: RegistroSesionForMetricas[],
 ): { rol: string; minutos: number }[] {
   const map: Record<string, { sum: number; count: number }> = {}
+  const registroMap = new Map<string, RegistroSesionForMetricas>()
+  for (const r of registroSesion ?? []) registroMap.set(r.id_consultoria, r)
 
   for (const c of consultorias) {
-    if (c.duracion_minutos == null) continue
+    const registro = c.id ? registroMap.get(c.id) : undefined
+    const duracion = registro?.duracion_sesion_minutos ?? c.duracion_minutos
+    if (duracion == null) continue
     const key = c.leads?.company_role_level ?? 'Sin rol'
-    if (!map[key]) {
-      map[key] = { sum: 0, count: 0 }
-    }
-    map[key].sum += c.duracion_minutos
+    if (!map[key]) map[key] = { sum: 0, count: 0 }
+    map[key].sum += duracion
     map[key].count++
   }
 
@@ -697,9 +701,10 @@ export function computeScatterDuracionProductos(
     if (!c.id) continue
     const registro = registroMap.get(c.id)
     if (!registro) continue
-    if (c.duracion_minutos == null || c.duracion_minutos <= 0) continue
+    const duracion = registro.duracion_sesion_minutos ?? c.duracion_minutos
+    if (duracion == null || duracion <= 0) continue
     result.push({
-      duracion: c.duracion_minutos,
+      duracion,
       productos: registro.cantidad_productos ?? 0,
       consultor: c.consultores?.nombre ?? 'Sin consultor',
     })
@@ -972,7 +977,7 @@ export function computeMetricasFromConsultorias({
   const modalidadPorConsultor = modalidadByConsultor(consultorias, attendedIds)
   const consultasPorFranja = countByFranjaHoraria(consultorias)
   // TASK-01: renamed to tiempoPromedioPorRol; now computes average instead of sum
-  const tiempoPromedioPorRolResult = tiempoPromedioPorRol(consultorias)
+  const tiempoPromedioPorRolResult = tiempoPromedioPorRol(consultorias, registroSesion)
   const { porDepartamento, sinUbicacion } = countByDepartamento(consultorias)
 
   // New metrics
