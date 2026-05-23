@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
-import { computeMetricasFromConsultorias, type MetricasGlobales, type ConsultoriaForMetricas, type RegistroSesionForMetricas } from '@/lib/metricas'
+import { computeMetricasFromConsultorias, buildAttendedSet, type MetricasGlobales, type ConsultoriaForMetricas, type RegistroSesionForMetricas } from '@/lib/metricas'
 
 export function useMetricas() {
   const [metricas, setMetricas] = useState<MetricasGlobales | null>(null)
   const [consultorias, setConsultorias] = useState<ConsultoriaForMetricas[]>([])
+  const [registroSesion, setRegistroSesion] = useState<RegistroSesionForMetricas[]>([])
+  const [attendedIds, setAttendedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,7 +22,7 @@ export function useMetricas() {
 
       const consultoriasQuery = supabase
         .from('consultorias')
-        .select('id, fecha, status, servicio, duracion_minutos, id_consultor, id_lead, categoria_caso_uso, categoria_caso, nivel_potencia, hora_inicio, modalidad, leads!inner(city, company_role_level, origen, sector, company_role_area, nit), consultores(nombre)')
+        .select('id, fecha, status, servicio, duracion_minutos, id_consultor, id_lead, categoria_caso_uso, categoria_caso, nivel_potencia, hora_inicio, modalidad, leads!inner(full_name, city, company_role_level, origen, sector, company_role_area, nit), consultores(nombre)')
       if (consultor.rol === 'consultor') consultoriasQuery.eq('id_consultor', consultor.id)
 
       const registroQuery = supabase
@@ -44,11 +46,17 @@ export function useMetricas() {
       const leadsParam = consultor.rol === 'admin' ? (totalLeadsCount ?? undefined) : undefined
 
       const typed = consultoriasData as unknown as ConsultoriaForMetricas[]
+      const typedRegistro = (sesionData ?? []) as RegistroSesionForMetricas[]
+      // TASK-11: build attended set once per fetch cycle; expose for drill-down and charts
+      const ids = buildAttendedSet(typedRegistro)
       setConsultorias(typed)
+      setRegistroSesion(typedRegistro)
+      setAttendedIds(ids)
       setMetricas(computeMetricasFromConsultorias({
         consultorias: typed,
-        registroSesion: (sesionData ?? []) as RegistroSesionForMetricas[],
+        registroSesion: typedRegistro,
         totalLeads: leadsParam,
+        attendedIds: ids,
       }))
       setLoading(false)
     }
@@ -56,5 +64,6 @@ export function useMetricas() {
     return () => { cancelled = true }
   }, [])
 
-  return { metricas, consultorias, loading }
+  // TASK-11: expose registroSesion and attendedIds for drill-down and attended-filter consumers
+  return { metricas, consultorias, registroSesion, attendedIds, loading }
 }

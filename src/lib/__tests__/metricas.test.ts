@@ -9,7 +9,7 @@ import {
   countByFranjaHoraria,
   countByDepartamento,
   computeMetricasFromConsultorias,
-  tiempoPorRol,
+  tiempoPromedioPorRol,
   type ConsultoriaForMetricas,
 } from '../metricas'
 
@@ -31,6 +31,7 @@ function makeConsultoria(
     hora_inicio: null,
     modalidad: null,
     leads: {
+      full_name: null,
       city: null,
       company_role_level: null,
       origen: null,
@@ -446,27 +447,39 @@ describe('modalidadByConsultor — excludes null id_consultor', () => {
   })
 })
 
-// ─── T-13: porCasoUso — no 'Sin categorizar' ─────────────────────────────────
+// ─── T-13: porCasoUso — sources from categoria_caso (TASK-04) ────────────────
 
-describe('porCasoUso — excludes Sin categorizar', () => {
+describe('porCasoUso — sources from categoria_caso, excludes Sin categorizar', () => {
   const noOp: import('../metricas').RegistroSesionForMetricas[] = []
 
-  it('row with null categoria_caso_uso produces no Sin categorizar entry', () => {
-    const data = [makeConsultoria({ categoria_caso_uso: null })]
+  it('row with null categoria_caso produces no Sin categorizar entry', () => {
+    const data = [makeConsultoria({ categoria_caso: null })]
     const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: noOp })
     expect(result.porCasoUso.find((e) => e.caso === 'Sin categorizar')).toBeUndefined()
   })
 
   it('rows with valid categories appear unaffected', () => {
     const data = [
-      makeConsultoria({ categoria_caso_uso: 'Agentes' }),
-      makeConsultoria({ categoria_caso_uso: 'Agentes' }),
-      makeConsultoria({ categoria_caso_uso: null }), // should be excluded
+      makeConsultoria({ categoria_caso: 'Agentes' }),
+      makeConsultoria({ categoria_caso: 'Agentes' }),
+      makeConsultoria({ categoria_caso: null }), // should be excluded
     ]
     const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: noOp })
     const casos = result.porCasoUso
     expect(casos.find((e) => e.caso === 'Agentes')?.total).toBe(2)
     expect(casos.find((e) => e.caso === 'Sin categorizar')).toBeUndefined()
+  })
+
+  it('normalizes typo variants to canonical labels', () => {
+    const data = [
+      makeConsultoria({ categoria_caso: 'agente de ia' }),
+      makeConsultoria({ categoria_caso: 'agente' }),
+      makeConsultoria({ categoria_caso: 'asistentes de ia para tareas pequeñas y repetitvas' }), // typo
+    ]
+    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: noOp })
+    const casos = result.porCasoUso
+    expect(casos.find((e) => e.caso === 'Agentes')?.total).toBe(2)
+    expect(casos.find((e) => e.caso === 'Asistentes')?.total).toBe(1)
   })
 })
 
@@ -531,26 +544,26 @@ describe('countByDepartamento', () => {
   })
 })
 
-// ─── tiempoPorRol ─────────────────────────────────────────────────────────────
+// ─── tiempoPromedioPorRol (renamed from tiempoPorRol; now computes average) ────
 
-describe('tiempoPorRol', () => {
+describe('tiempoPromedioPorRol', () => {
   it('returns empty array for empty input', () => {
-    expect(tiempoPorRol([])).toEqual([])
+    expect(tiempoPromedioPorRol([])).toEqual([])
   })
 
   it('ignores entries with null duracion_minutos', () => {
     const data = [makeConsultoria({ duracion_minutos: null })]
-    expect(tiempoPorRol(data)).toEqual([])
+    expect(tiempoPromedioPorRol(data)).toEqual([])
   })
 
-  it('sums minutos per rol and sorts descending', () => {
+  it('computes average minutos per rol and sorts descending', () => {
     const data = [
       makeConsultoria({
         duracion_minutos: 30,
         leads: { city: null, company_role_level: 'Director', origen: null, sector: null, company_role_area: null, nit: null },
       }),
       makeConsultoria({
-        duracion_minutos: 60,
+        duracion_minutos: 90,
         leads: { city: null, company_role_level: 'Director', origen: null, sector: null, company_role_area: null, nit: null },
       }),
       makeConsultoria({
@@ -558,14 +571,15 @@ describe('tiempoPorRol', () => {
         leads: { city: null, company_role_level: 'Analista', origen: null, sector: null, company_role_area: null, nit: null },
       }),
     ]
-    const result = tiempoPorRol(data)
-    expect(result[0]).toEqual({ rol: 'Director', minutos: 90 })
+    const result = tiempoPromedioPorRol(data)
+    // Director average: (30 + 90) / 2 = 60
+    expect(result[0]).toEqual({ rol: 'Director', minutos: 60 })
     expect(result[1]).toEqual({ rol: 'Analista', minutos: 45 })
   })
 
   it('maps null company_role_level to "Sin rol"', () => {
     const data = [makeConsultoria({ duracion_minutos: 30, leads: null })]
-    const result = tiempoPorRol(data)
+    const result = tiempoPromedioPorRol(data)
     expect(result).toEqual([{ rol: 'Sin rol', minutos: 30 }])
   })
 })

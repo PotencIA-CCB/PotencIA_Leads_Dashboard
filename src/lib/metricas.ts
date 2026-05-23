@@ -7,6 +7,15 @@ export interface RegistroSesionForMetricas {
   resultado_final?: string | null
 }
 
+/** TASK-10: Build a Set of attended consultoria ids from registro_sesion rows. */
+export function buildAttendedSet(registros: RegistroSesionForMetricas[]): Set<string> {
+  const set = new Set<string>()
+  for (const r of registros) {
+    set.add(r.id_consultoria)
+  }
+  return set
+}
+
 export type Granularidad = 'dia' | 'semana' | 'mes'
 
 export interface MetricasGlobales {
@@ -47,7 +56,10 @@ export interface MetricasGlobales {
   recuentoPorConsultor: { consultor: string; count: number }[]
   modalidadPorConsultor: { consultor: string; [modalidad: string]: string | number }[]
   consultasPorFranja: { franja: string; count: number }[]
-  tiempoPorRol: { rol: string; minutos: number }[]
+  /** Average minutes per session grouped by seniority level (company_role_level). Renamed from tiempoPorRol. */
+  tiempoPromedioPorRol: { rol: string; minutos: number }[]
+  /** OLS regression result over scatterDuracionProductos data points. */
+  scatterRegression: { slope: number; intercept: number; line: { x: number; y: number }[] }
   /** Sessions grouped by department name (NOMBRE_DPT from GeoJSON) */
   porDepartamento: { dept: string; total: number }[]
   /** Count of consultorias whose city does not map to a known department */
@@ -74,7 +86,8 @@ export interface MetricasGlobales {
   /** buckets ISO semanales para status Agendado */
   porAgendadoSemana: { semana: string; total: number }[]
   scatterDuracionProductos: { duracion: number; productos: number; consultor: string }[]
-  heatmapFranjaDia: { franja: string; dia: string; count: number }[]
+  /** TASK-15: cells carry ids for drill-down; only Mon–Fri, attended sessions only */
+  heatmapFranjaDia: { franja: string; dia: string; count: number; consultoriaIds: string[] }[]
   consultorMetrics: { consultor: string; sesiones: number; duracionAvg: number; productos: number; pctGrabadas: number }[]
 }
 
@@ -92,6 +105,7 @@ export interface ConsultoriaForMetricas {
   hora_inicio: string | null
   modalidad: string | null
   leads: {
+    full_name?: string | null
     city: string | null
     company_role_level: string | null
     origen: string | null
@@ -105,6 +119,7 @@ export interface ConsultoriaForMetricas {
 
 export const EFFECTIVE_STATUSES = ['Resuelto'] as const
 
+/** @deprecated Use NORMALIZE_CATEGORIA_CASO for categoria_caso field instead. */
 export const CASO_USO_NORMALIZATION_MAP: Record<string, string> = {
   'agente': 'Agentes',
   'asistentes de ia para tareas pequeñas y repetitivas': 'Asistentes',
@@ -112,10 +127,50 @@ export const CASO_USO_NORMALIZATION_MAP: Record<string, string> = {
   'asistentes de ia para tareas pequeñas y repetitvas': 'Asistentes',
 }
 
+/** @deprecated Use normalizeCategoriaCaso instead. */
 export function normalizeCasoUso(raw: string | null): string {
   if (raw == null || raw.trim() === '') return 'Sin categorizar'
   const key = raw.trim().toLowerCase()
   return CASO_USO_NORMALIZATION_MAP[key] ?? raw.trim()
+}
+
+/**
+ * Normalization map for the `categoria_caso` field in the consultorias table.
+ * Keys are lowercase; values are the canonical display labels.
+ * The live DB contains typos and variant spellings — this map collapses them.
+ */
+export const NORMALIZE_CATEGORIA_CASO: Record<string, string> = {
+  'agente': 'Agentes',
+  'agente de ia': 'Agentes',
+  'agentes de ia integrado a workspace': 'Agentes',
+  'asistente de ia para tareas pequeñas y repetitivas': 'Asistentes',
+  'asistentes de ia para tareas pequeñas y repetitivas': 'Asistentes',
+  'asistentes de ia para tareas pequeñas y repetitvas': 'Asistentes', // typo in DB
+  'asistente de ia para tareas repetitivas': 'Asistentes',
+  'asistentes de ia para tareas repetitivas': 'Asistentes',
+  'asistentes ia para tareas pequeñas y repetitivas': 'Asistentes',
+  'asistente creador de contenido y copys creativos': 'Asistentes',
+  'asistente de selección de candidatos': 'Asistentes',
+  'asistente de gestión documental': 'Asistentes',
+  'asistente de reportes financieros': 'Asistentes',
+  'prototipado ágil con ia': 'Prototipados',
+  'prototipado de apps con ia': 'Prototipados',
+  'prototipos de landing page': 'Prototipados',
+  'páginas web funcionales (landing page / mvp)': 'Prototipados',
+  'landing pages y mvp funcional': 'Prototipados',
+  'creación de dashboard': 'Otros',
+  'creación de dashboards': 'Otros',
+  'automatización': 'Otros',
+}
+
+/**
+ * Normalize a raw `categoria_caso` value from the DB.
+ * Applies the NORMALIZE_CATEGORIA_CASO map case-insensitively.
+ */
+export function normalizeCategoriaCaso(raw: string | null): string {
+  if (raw == null || raw.trim() === '') return 'Sin categorizar'
+  const key = raw.trim().toLowerCase()
+  return NORMALIZE_CATEGORIA_CASO[key] ?? raw.trim()
 }
 
 export function normalizeKey(value: string | null | undefined, fallback: string): string {
@@ -368,13 +423,37 @@ export function avgDuracionByConsultor(
     .sort((a, b) => b.avg - a.avg)
 }
 
-/** Count consultorias grouped by leads.company_role_area, sorted by count descending. */
+/**
+ * TASK-13: Filter consultorias to only those with a matching registro_sesion row.
+ * This is the single join-based attended filter used by all Batch B helpers.
+ */
+export function getAttendedConsultorias(
+  consultorias: ConsultoriaForMetricas[],
+  attendedIds: Set<string>,
+): ConsultoriaForMetricas[] {
+  return consultorias.filter((c) => c.id != null && attendedIds.has(c.id))
+}
+
+/**
+ * Count consultorias grouped by leads.company_role_area, sorted by count descending.
+ * TASK-13 (Batch B): when attendedIds is provided, replaces the provisional status filter
+ * (TASK-03) with the accurate join-based filter.
+ * Backward-compatible: when attendedIds is absent, falls back to status-based filter.
+ */
 export function countByArea(
   consultorias: ConsultoriaForMetricas[],
+  attendedIds?: Set<string>,
 ): { area: string; count: number }[] {
   const map: Record<string, number> = {}
 
-  for (const c of consultorias) {
+  const source = attendedIds != null
+    ? getAttendedConsultorias(consultorias, attendedIds)
+    : consultorias.filter((c) => {
+        const s = canonicalStatus(c.status)
+        return s === 'Resuelto' || s === 'En seguimiento'
+      })
+
+  for (const c of source) {
     const key = c.leads?.company_role_area ?? 'Sin área'
     map[key] = (map[key] ?? 0) + 1
   }
@@ -384,13 +463,22 @@ export function countByArea(
     .sort((a, b) => b.count - a.count)
 }
 
-/** Count consultorias grouped by consultor name, sorted by count descending. */
+/**
+ * Count consultorias grouped by consultor name, sorted by count descending.
+ * TASK-13: when attendedIds is provided, only counts attended sessions (join filter).
+ * Backward-compatible: when absent, counts all consultorias with an id_consultor.
+ */
 export function countByConsultor(
   consultorias: ConsultoriaForMetricas[],
+  attendedIds?: Set<string>,
 ): { consultor: string; count: number }[] {
   const map: Record<string, number> = {}
 
-  for (const c of consultorias) {
+  const source = attendedIds != null
+    ? getAttendedConsultorias(consultorias, attendedIds)
+    : consultorias
+
+  for (const c of source) {
     if (!c.id_consultor) continue
     const key = c.consultores?.nombre ?? 'Sin consultor'
     map[key] = (map[key] ?? 0) + 1
@@ -401,14 +489,23 @@ export function countByConsultor(
     .sort((a, b) => b.count - a.count)
 }
 
-/** Cross-tab of consultor × modalidad counts. One object per consultor with modalidad keys. */
+/**
+ * Cross-tab of consultor × modalidad counts. One object per consultor with modalidad keys.
+ * TASK-14: when attendedIds is provided, only counts attended sessions (join filter).
+ * Backward-compatible: when absent, counts all consultorias with an id_consultor.
+ */
 export function modalidadByConsultor(
   consultorias: ConsultoriaForMetricas[],
+  attendedIds?: Set<string>,
 ): { consultor: string; [modalidad: string]: string | number }[] {
   // map: consultor → { modalidad → count }
   const map = new Map<string, Record<string, number>>()
 
-  for (const c of consultorias) {
+  const source = attendedIds != null
+    ? getAttendedConsultorias(consultorias, attendedIds)
+    : consultorias
+
+  for (const c of source) {
     if (!c.id_consultor) continue
     const consultor = c.consultores?.nombre ?? 'Sin consultor'
     const modalidad = c.modalidad ?? 'Sin modalidad'
@@ -467,20 +564,27 @@ export function countByFranjaHoraria(
   )
 }
 
-/** Sum duracion_minutos grouped by leads.company_role_level, sorted descending. */
-export function tiempoPorRol(
+/**
+ * Average duracion_minutos per session grouped by leads.company_role_level (seniority), sorted descending.
+ * TASK-01: renamed from tiempoPorRol; changed aggregator from sum → average.
+ */
+export function tiempoPromedioPorRol(
   consultorias: ConsultoriaForMetricas[],
 ): { rol: string; minutos: number }[] {
-  const map: Record<string, number> = {}
+  const map: Record<string, { sum: number; count: number }> = {}
 
   for (const c of consultorias) {
     if (c.duracion_minutos == null) continue
     const key = c.leads?.company_role_level ?? 'Sin rol'
-    map[key] = (map[key] ?? 0) + c.duracion_minutos
+    if (!map[key]) {
+      map[key] = { sum: 0, count: 0 }
+    }
+    map[key].sum += c.duracion_minutos
+    map[key].count++
   }
 
   return Object.entries(map)
-    .map(([rol, minutos]) => ({ rol, minutos }))
+    .map(([rol, { sum, count }]) => ({ rol, minutos: Math.round(sum / count) }))
     .sort((a, b) => b.minutos - a.minutos)
 }
 
@@ -520,25 +624,37 @@ export function countByDepartamento(consultorias: ConsultoriaForMetricas[]): {
   return { porDepartamento, sinUbicacion }
 }
 
-const HEATMAP_DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+/**
+ * TASK-15: Only Mon–Fri (Sáb and Dom removed per design decision D12).
+ * Attended filter applied when attendedIds is provided.
+ * Each cell carries consultoriaIds for drill-down.
+ */
+const HEATMAP_DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
 const HEATMAP_FRANJAS = ['8-10am', '10am-12pm', '1-3pm', '3-5pm', 'Fuera de horario']
 
 export function computeHeatmapFranjaDia(
   consultorias: ConsultoriaForMetricas[],
-): { franja: string; dia: string; count: number }[] {
-  // Initialize all cells to 0
-  const counts: Record<string, number> = {}
+  attendedIds?: Set<string>,
+): { franja: string; dia: string; count: number; consultoriaIds: string[] }[] {
+  // Initialize all cells — count and ids list
+  const cells: Record<string, { count: number; ids: string[] }> = {}
   for (const franja of HEATMAP_FRANJAS) {
     for (const dia of HEATMAP_DIAS) {
-      counts[`${franja}__${dia}`] = 0
+      cells[`${franja}__${dia}`] = { count: 0, ids: [] }
     }
   }
 
-  for (const c of consultorias) {
+  const source = attendedIds != null
+    ? getAttendedConsultorias(consultorias, attendedIds)
+    : consultorias
+
+  for (const c of source) {
     if (!c.fecha) continue
     const d = new Date(c.fecha + 'T00:00:00')
     if (isNaN(d.getTime())) continue
     const dayIndex = (d.getDay() + 6) % 7 // 0=Lun, 6=Dom
+    // Only Mon–Fri (indices 0–4); skip Sat=5, Sun=6
+    if (dayIndex > 4) continue
     const dia = HEATMAP_DIAS[dayIndex]
 
     let franja = 'Fuera de horario'
@@ -551,15 +667,17 @@ export function computeHeatmapFranjaDia(
     }
 
     const key = `${franja}__${dia}`
-    if (key in counts) {
-      counts[key]++
+    if (key in cells) {
+      cells[key].count++
+      if (c.id != null) cells[key].ids.push(c.id)
     }
   }
 
-  const result: { franja: string; dia: string; count: number }[] = []
+  const result: { franja: string; dia: string; count: number; consultoriaIds: string[] }[] = []
   for (const franja of HEATMAP_FRANJAS) {
     for (const dia of HEATMAP_DIAS) {
-      result.push({ franja, dia, count: counts[`${franja}__${dia}`] })
+      const cell = cells[`${franja}__${dia}`]
+      result.push({ franja, dia, count: cell.count, consultoriaIds: cell.ids })
     }
   }
   return result
@@ -663,16 +781,87 @@ export function computeRetentionDistribution(
   ]
 }
 
+/**
+ * Ordinary least squares linear regression.
+ * Returns slope, intercept, and a 2-point line array spanning [min(x), max(x)]
+ * suitable for overlaying as a <Line> in a Recharts ScatterChart.
+ * Returns { slope: 0, intercept: NaN, line: [] } when:
+ *   - fewer than 2 points are provided
+ *   - all x values are identical (degenerate/zero variance)
+ */
+export function computeLinearRegression(
+  points: { x: number; y: number }[],
+): { slope: number; intercept: number; line: { x: number; y: number }[] } {
+  const DEGENERATE = { slope: 0, intercept: NaN, line: [] as { x: number; y: number }[] }
+  if (points.length < 2) return DEGENERATE
+
+  const n = points.length
+  let sumX = 0
+  let sumY = 0
+  let sumXX = 0
+  let sumXY = 0
+
+  for (const { x, y } of points) {
+    sumX += x
+    sumY += y
+    sumXX += x * x
+    sumXY += x * y
+  }
+
+  const denom = n * sumXX - sumX * sumX
+  if (denom === 0) return DEGENERATE // all x values identical
+
+  const slope = (n * sumXY - sumX * sumY) / denom
+  const intercept = (sumY - slope * sumX) / n
+
+  const xs = points.map((p) => p.x)
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs)
+
+  return {
+    slope,
+    intercept,
+    line: [
+      { x: minX, y: slope * minX + intercept },
+      { x: maxX, y: slope * maxX + intercept },
+    ],
+  }
+}
+
+/**
+ * Count consultorias grouped by normalized categoria_caso, sorted descending by count.
+ * TASK-04: replaces the old countByCasoUso / categoria_caso_uso source.
+ * Applies NORMALIZE_CATEGORIA_CASO map to collapse typos and variant spellings.
+ */
+export function countByCategoriaCaso(
+  consultorias: ConsultoriaForMetricas[],
+): { caso: string; total: number }[] {
+  const map: Record<string, number> = {}
+
+  for (const c of consultorias) {
+    const label = normalizeCategoriaCaso(c.categoria_caso)
+    if (label === 'Sin categorizar') continue
+    map[label] = (map[label] ?? 0) + 1
+  }
+
+  return Object.entries(map)
+    .map(([caso, total]) => ({ caso, total }))
+    .sort((a, b) => b.total - a.total)
+}
+
 export function computeMetricasFromConsultorias({
   consultorias,
   registroSesion,
   period = 'mes',
   totalLeads,
+  attendedIds,
 }: {
   consultorias: ConsultoriaForMetricas[]
   registroSesion: RegistroSesionForMetricas[]
   period?: Granularidad
   totalLeads?: number
+  /** TASK-12: Set of id_consultoria values from registro_sesion. Used for join-based attended filter. */
+  attendedIds?: Set<string>
 }): MetricasGlobales {
   // Counts only attended sessions (status Resuelto | En seguimiento)
   const totalConsultorias = consultorias.filter((c) => {
@@ -704,7 +893,6 @@ export function computeMetricasFromConsultorias({
 
   const estadoMap: Record<string, number> = {}
   const servicioMap: Record<string, number> = {}
-  const casoUsoMap: Record<string, number> = {}
   const ciudadMap: Record<string, number> = {}
   const cargoMap: Record<string, number> = {}
   const potenciaMap: Record<string, number> = {}
@@ -720,15 +908,11 @@ export function computeMetricasFromConsultorias({
       servicioMap[key] = (servicioMap[key] || 0) + 1
     }
 
-    // Item 3: use categoria_caso_uso (not categoria_caso)
-    const casoLabel = normalizeCasoUso(con.categoria_caso_uso)
-    casoUsoMap[casoLabel] = (casoUsoMap[casoLabel] || 0) + 1
-
     const potenciaKey = normalizeKey(con.nivel_potencia, 'Sin nivel')
     potenciaMap[potenciaKey] = (potenciaMap[potenciaKey] || 0) + 1
 
     if (con.leads?.city) {
-      // Item 2: dedup key stays normalized lowercase
+      // dedup key stays normalized lowercase
       const key = normalizeKey(con.leads.city, 'Sin ciudad')
       ciudadMap[key] = (ciudadMap[key] || 0) + 1
     }
@@ -751,11 +935,8 @@ export function computeMetricasFromConsultorias({
   const totalAll = consultorias.length
   const tasaConversion = totalAll > 0 ? Math.round((resueltos / totalAll) * 100) : 0
 
-  const porCasoUso = Object.entries(casoUsoMap)
-    .filter(([caso]) => caso !== 'Sin categorizar')
-    .map(([caso, total]) => ({ caso, total }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, TOP_N)
+  // TASK-04: porCasoUso now sources from categoria_caso with normalization
+  const porCasoUso = countByCategoriaCaso(consultorias)
 
   // Item 2: apply titleCaseCity on the display label; dedup key was normalized lowercase
   const allCities = Object.entries(ciudadMap)
@@ -785,11 +966,13 @@ export function computeMetricasFromConsultorias({
   const nitUnicos = countUniqueNit(consultorias)
   const porPeriodo = groupByPeriod(consultorias, period)
   const duracionPorConsultor = avgDuracionByConsultor(consultorias)
-  const consultasPorArea = countByArea(consultorias)
-  const recuentoPorConsultor = countByConsultor(consultorias)
-  const modalidadPorConsultor = modalidadByConsultor(consultorias)
+  // TASK-12/13: pass attendedIds for join-based attended filter when available
+  const consultasPorArea = countByArea(consultorias, attendedIds)
+  const recuentoPorConsultor = countByConsultor(consultorias, attendedIds)
+  const modalidadPorConsultor = modalidadByConsultor(consultorias, attendedIds)
   const consultasPorFranja = countByFranjaHoraria(consultorias)
-  const tiempoPorRolResult = tiempoPorRol(consultorias)
+  // TASK-01: renamed to tiempoPromedioPorRol; now computes average instead of sum
+  const tiempoPromedioPorRolResult = tiempoPromedioPorRol(consultorias)
   const { porDepartamento, sinUbicacion } = countByDepartamento(consultorias)
 
   // New metrics
@@ -850,8 +1033,13 @@ export function computeMetricasFromConsultorias({
   // scatterDuracionProductos
   const scatterDuracionProductos = computeScatterDuracionProductos(consultorias, registroSesion)
 
-  // heatmapFranjaDia
-  const heatmapFranjaDia = computeHeatmapFranjaDia(consultorias)
+  // TASK-02: OLS regression over scatter data (stored in MetricasGlobales for purely presentational components)
+  const scatterRegression = computeLinearRegression(
+    scatterDuracionProductos.map((p) => ({ x: p.duracion, y: p.productos })),
+  )
+
+  // heatmapFranjaDia — TASK-15: attended filter + Mon-Fri only + consultoriaIds
+  const heatmapFranjaDia = computeHeatmapFranjaDia(consultorias, attendedIds)
 
   // consultorMetrics
   const consultorMetrics = computeConsultorMetrics(consultorias, registroSesion)
@@ -884,7 +1072,8 @@ export function computeMetricasFromConsultorias({
     recuentoPorConsultor,
     modalidadPorConsultor,
     consultasPorFranja,
-    tiempoPorRol: tiempoPorRolResult,
+    tiempoPromedioPorRol: tiempoPromedioPorRolResult,
+    scatterRegression,
     porDepartamento,
     sinUbicacion,
     tasaLeadConversion,

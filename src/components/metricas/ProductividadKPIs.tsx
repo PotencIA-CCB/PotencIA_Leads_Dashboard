@@ -1,5 +1,6 @@
 'use client'
 
+// TASK-08: Replaced Treemap with BarChart layout="vertical" for casos más solicitados.
 import {
   BarChart,
   Bar,
@@ -10,13 +11,14 @@ import {
   Legend,
   ResponsiveContainer,
   Cell,
-  Treemap,
 } from 'recharts'
 import { type MetricasGlobales } from '@/lib/metricas'
 import { MetricaChartCard } from './MetricaChartCard'
 
 interface ProductividadKPIsProps {
   metricas: MetricasGlobales
+  /** TASK-16: called when the user clicks a heatmap cell */
+  onCellClick?: (cell: { dia: string; franja: string; consultoriaIds: string[] }) => void
 }
 
 const BAR_COLORS = ['#003087', '#00C8FF', '#004BB5', '#E8470A', '#5A6475', '#6366F1']
@@ -34,51 +36,18 @@ function calcLeftWidth(labels: string[]): number {
   return Math.min(120, Math.max(60, ...labels.map((l) => l.length * 6)))
 }
 
-interface TreemapContentProps {
-  x?: number
-  y?: number
-  width?: number
-  height?: number
-  name?: string
-  value?: number
-  fill?: string
-}
 
-function CustomTreemapContent({ x = 0, y = 0, width = 0, height = 0, name, value, fill }: TreemapContentProps) {
-  return (
-    <g>
-      <rect x={x} y={y} width={width} height={height} fill={fill ?? '#003087'} stroke="#fff" strokeWidth={2} rx={4} />
-      {width > 50 && height > 25 && (
-        <>
-          <text
-            x={x + width / 2}
-            y={y + height / 2 - 6}
-            textAnchor="middle"
-            fill="white"
-            fontSize={10}
-            fontWeight="600"
-          >
-            {name}
-          </text>
-          <text
-            x={x + width / 2}
-            y={y + height / 2 + 8}
-            textAnchor="middle"
-            fill="white"
-            fontSize={10}
-          >
-            {value}
-          </text>
-        </>
-      )}
-    </g>
-  )
-}
-
-const HEATMAP_DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+// TASK-15: Sáb and Dom removed — only Mon–Fri produced by compute layer
+const HEATMAP_DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
 const HEATMAP_FRANJAS = ['8-10am', '10am-12pm', '1-3pm', '3-5pm', 'Fuera de horario']
 
-function HeatmapFranjaDia({ data }: { data: { franja: string; dia: string; count: number }[] }) {
+function HeatmapFranjaDia({
+  data,
+  onCellClick,
+}: {
+  data: { franja: string; dia: string; count: number; consultoriaIds: string[] }[]
+  onCellClick?: (cell: { dia: string; franja: string; consultoriaIds: string[] }) => void
+}) {
   const maxCount = Math.max(1, ...data.map(d => d.count))
 
   const getColor = (count: number) => {
@@ -91,9 +60,9 @@ function HeatmapFranjaDia({ data }: { data: { franja: string; dia: string; count
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '90px repeat(7, 1fr)',
+          gridTemplateColumns: '90px repeat(5, 1fr)',
           gap: '3px',
-          minWidth: '480px',
+          minWidth: '380px',
         }}
       >
         {/* Header row */}
@@ -112,12 +81,17 @@ function HeatmapFranjaDia({ data }: { data: { franja: string; dia: string; count
             {HEATMAP_DIAS.map(dia => {
               const cell = data.find(d => d.franja === franja && d.dia === dia)
               const count = cell?.count ?? 0
+              const consultoriaIds = cell?.consultoriaIds ?? []
               return (
                 <div
                   key={`${franja}-${dia}`}
-                  className="h-8 rounded flex items-center justify-center"
+                  className={`h-8 rounded flex items-center justify-center${onCellClick ? ' cursor-pointer' : ''}`}
                   style={{ backgroundColor: getColor(count) }}
                   title={`${franja} ${dia}: ${count}`}
+                  onClick={onCellClick ? () => onCellClick({ dia, franja, consultoriaIds }) : undefined}
+                  role={onCellClick ? 'button' : undefined}
+                  tabIndex={onCellClick ? 0 : undefined}
+                  onKeyDown={onCellClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onCellClick({ dia, franja, consultoriaIds }) } : undefined}
                 >
                   {count > 0 && (
                     <span className="text-[10px] font-medium text-white">{count}</span>
@@ -132,7 +106,7 @@ function HeatmapFranjaDia({ data }: { data: { franja: string; dia: string; count
   )
 }
 
-export function ProductividadKPIs({ metricas }: ProductividadKPIsProps) {
+export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsProps) {
   // Derive modalidad keys (everything except 'consultor')
   const modalidadKeys = Array.from(
     new Set(
@@ -146,12 +120,6 @@ export function ProductividadKPIs({ metricas }: ProductividadKPIsProps) {
     key === 'Sin modalidad'
       ? SIN_MODALIDAD_COLOR
       : BAR_COLORS[modalidadKeys.indexOf(key) % BAR_COLORS.length]
-
-  const treemapData = metricas.porCasoUso.map((d, i) => ({
-    name: d.caso,
-    size: d.total,
-    fill: BAR_COLORS[i % BAR_COLORS.length],
-  }))
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -187,6 +155,7 @@ export function ProductividadKPIs({ metricas }: ProductividadKPIsProps) {
 
       {/* 2 — Consultas por área */}
       <MetricaChartCard title="Consultas por área">
+        <p className="text-xs text-gray-400 -mt-3 mb-3">Solo sesiones atendidas</p>
         {metricas.consultasPorArea.length === 0 ? (
           <EmptyState />
         ) : (
@@ -245,19 +214,32 @@ export function ProductividadKPIs({ metricas }: ProductividadKPIsProps) {
         )}
       </MetricaChartCard>
 
-      {/* 4 — Casos de uso (Treemap) */}
-      <MetricaChartCard title="Casos de uso más solicitados">
+      {/* 4 — Casos más solicitados (TASK-08: replaced Treemap with vertical BarChart) */}
+      <MetricaChartCard title="Casos más solicitados">
         {metricas.porCasoUso.length === 0 ? (
           <EmptyState />
         ) : (
           <ResponsiveContainer width="100%" height={260}>
-            <Treemap
-              data={treemapData}
-              dataKey="size"
-              content={<CustomTreemapContent />}
+            <BarChart
+              layout="vertical"
+              data={metricas.porCasoUso}
+              margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
             >
-              <Tooltip formatter={(value, name) => [value, name]} />
-            </Treemap>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+              <YAxis
+                type="category"
+                dataKey="caso"
+                tick={{ fontSize: 10 }}
+                width={calcLeftWidth(metricas.porCasoUso.map((d) => d.caso))}
+              />
+              <Tooltip formatter={(value) => [value, 'Consultas']} />
+              <Bar dataKey="total" radius={[0, 4, 4, 0]}>
+                {metricas.porCasoUso.map((_, i) => (
+                  <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         )}
       </MetricaChartCard>
@@ -299,24 +281,28 @@ export function ProductividadKPIs({ metricas }: ProductividadKPIsProps) {
         )}
       </MetricaChartCard>
 
-      {/* 6 — Consultas por franja horaria (Heatmap) */}
+      {/* 6 — Consultas por franja horaria (Heatmap) — TASK-16: onCellClick wired for drill-down */}
       <MetricaChartCard title="Consultas por franja horaria">
+        <p className="text-xs text-gray-400 -mt-3 mb-3">Solo sesiones atendidas · Clic en celda para ver detalle</p>
         {metricas.heatmapFranjaDia.length === 0 ? (
           <EmptyState />
         ) : (
-          <HeatmapFranjaDia data={metricas.heatmapFranjaDia} />
+          <HeatmapFranjaDia data={metricas.heatmapFranjaDia} onCellClick={onCellClick} />
         )}
       </MetricaChartCard>
 
-      {/* 7 — Tiempo por cargo/rol */}
-      <MetricaChartCard title="Tiempo por cargo (min)">
-        {metricas.tiempoPorRol.length === 0 ? (
+      {/* 7 — Tiempo promedio por nivel jerárquico (TASK-01: renamed + switched to average) */}
+      <MetricaChartCard title="Tiempo promedio por nivel jerárquico (min)">
+        <p className="text-[10px] text-slate-400 -mt-2 mb-2">
+          Promedio de minutos por sesión, agrupado por nivel
+        </p>
+        {metricas.tiempoPromedioPorRol.length === 0 ? (
           <EmptyState />
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={240}>
             <BarChart
               layout="vertical"
-              data={metricas.tiempoPorRol}
+              data={metricas.tiempoPromedioPorRol}
               margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
@@ -325,11 +311,11 @@ export function ProductividadKPIs({ metricas }: ProductividadKPIsProps) {
                 type="category"
                 dataKey="rol"
                 tick={{ fontSize: 10 }}
-                width={calcLeftWidth(metricas.tiempoPorRol.map((d) => d.rol))}
+                width={calcLeftWidth(metricas.tiempoPromedioPorRol.map((d) => d.rol))}
               />
-              <Tooltip />
+              <Tooltip formatter={(value) => [value, 'Minutos promedio']} />
               <Bar dataKey="minutos" radius={[0, 4, 4, 0]}>
-                {metricas.tiempoPorRol.map((_, i) => (
+                {metricas.tiempoPromedioPorRol.map((_, i) => (
                   <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
                 ))}
               </Bar>

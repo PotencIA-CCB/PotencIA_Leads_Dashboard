@@ -1,3 +1,9 @@
+// Required env vars:
+// OPENCODE_API_KEY      — API key (e.g. OpenRouter key)
+// OPENCODE_API_BASE_URL — Base URL (e.g. https://openrouter.ai/api/v1)
+// OPENCODE_MODEL        — Model ID (e.g. google/gemini-flash-1.5)
+// INSIGHTS_MIN_NEW_RECORDS — Min new consultorias before regenerating (default: 20)
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
@@ -265,13 +271,13 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
     }> = []
 
     for (const item of parsed.insights ?? []) {
-      rows.push({ tipo: 'insight', metrica: 'insight_text', valor_texto: item, descripcion: item, fuente: 'OpenCode', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+      rows.push({ tipo: 'insight', metrica: 'insight_text', valor_texto: item, descripcion: item, fuente: process.env.OPENCODE_MODEL ?? 'AI', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
     }
     for (const item of parsed.recomendaciones ?? []) {
-      rows.push({ tipo: 'recomendacion', metrica: 'recomendacion_text', valor_texto: item, descripcion: item, fuente: 'OpenCode', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+      rows.push({ tipo: 'recomendacion', metrica: 'recomendacion_text', valor_texto: item, descripcion: item, fuente: process.env.OPENCODE_MODEL ?? 'AI', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
     }
     for (const item of parsed.alertas ?? []) {
-      rows.push({ tipo: 'alerta', metrica: 'alerta_text', valor_texto: item, descripcion: item, fuente: 'OpenCode', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+      rows.push({ tipo: 'alerta', metrica: 'alerta_text', valor_texto: item, descripcion: item, fuente: process.env.OPENCODE_MODEL ?? 'AI', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
     }
 
     // Also store aggregate KPI metrics

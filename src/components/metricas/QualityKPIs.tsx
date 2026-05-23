@@ -1,10 +1,9 @@
 'use client'
+// TASK-06: Replaced RadialBarChart gauges with KPI card grid + horizontal progress bars.
+// TASK-07: Scatter chart — added title, axis labels, OLS trend line overlay, empty state.
 
 import {
-  RadialBarChart,
-  RadialBar,
-  PolarAngleAxis,
-  ScatterChart,
+  ComposedChart,
   Scatter,
   XAxis,
   YAxis,
@@ -13,6 +12,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Line,
 } from 'recharts'
 import { type MetricasGlobales } from '@/lib/metricas'
 import { MetricaChartCard } from './MetricaChartCard'
@@ -23,104 +23,115 @@ interface QualityKPIsProps {
 
 const BAR_COLORS = ['#003087', '#00C8FF', '#004BB5', '#E8470A', '#5A6475', '#6366F1']
 
-function RadialKPI({ value, label, color }: { value: number; label: string; color: string }) {
-  const data = [{ value, fill: color }]
+// ── KPI Card with horizontal progress bar ──────────────────────────────────────
+
+interface KpiCardProps {
+  value: number | undefined | null
+  label: string
+  color: string
+}
+
+function KpiCard({ value, label, color }: KpiCardProps) {
+  const displayValue = value != null ? value : null
+  const pct = displayValue != null ? Math.min(100, Math.max(0, displayValue)) : 0
+
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-[120px] h-[120px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <RadialBarChart
-            cx="50%"
-            cy="50%"
-            innerRadius={35}
-            outerRadius={55}
-            barSize={14}
-            startAngle={90}
-            endAngle={-270}
-            data={data}
-          >
-            <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
-            <RadialBar
-              dataKey="value"
-              angleAxisId={0}
-              cornerRadius={7}
-              background={{ fill: '#F1F5F9' }}
-            />
-          </RadialBarChart>
-        </ResponsiveContainer>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span
-            className="text-lg font-bold text-[#003087]"
-            style={{ fontFamily: 'Space Grotesk' }}
-          >
-            {value}%
-          </span>
-        </div>
+    <div className="bg-slate-50 rounded-lg p-4 flex flex-col gap-3">
+      <p className="text-xs text-slate-500 font-medium leading-tight">{label}</p>
+      <p
+        className="text-4xl font-bold leading-none"
+        style={{ color, fontFamily: 'Space Grotesk, sans-serif' }}
+      >
+        {displayValue != null ? `${displayValue}%` : '—'}
+      </p>
+      <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
       </div>
-      <p className="text-[11px] text-slate-500 text-center mt-1">{label}</p>
     </div>
   )
 }
 
+// ── QualityKPIs component ───────────────────────────────────────────────────────
+// Uses ComposedChart to overlay a Line (OLS regression) on Scatter series.
+
 export function QualityKPIs({ metricas }: QualityKPIsProps) {
-  // Group scatter data by consultor
+  const { scatterDuracionProductos, scatterRegression } = metricas
+
+  // Group scatter data by consultor for coloured series
   const consultorNames = Array.from(
-    new Set(metricas.scatterDuracionProductos.map(d => d.consultor))
+    new Set(scatterDuracionProductos.map((d) => d.consultor)),
   )
   const scatterByConsultor = consultorNames.map((nombre, i) => ({
     nombre,
     color: BAR_COLORS[i % BAR_COLORS.length],
-    data: metricas.scatterDuracionProductos
-      .filter(d => d.consultor === nombre)
-      .map(d => ({ x: d.duracion, y: d.productos })),
+    data: scatterDuracionProductos
+      .filter((d) => d.consultor === nombre)
+      .map((d) => ({ x: d.duracion, y: d.productos })),
   }))
+
+  const hasScatterData = scatterDuracionProductos.length >= 2
+  const hasRegression = scatterRegression.line.length === 2
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-      {/* Calidad de sesiones — Radial KPIs */}
+      {/* Calidad de sesiones — KPI cards (TASK-06) */}
       <MetricaChartCard title="Calidad de sesiones">
-        <div className="flex flex-wrap justify-around gap-4 py-4">
-          <RadialKPI
+        <div className="grid grid-cols-1 gap-3 py-2">
+          <KpiCard
             value={metricas.tasaSesionesGrabadas}
-            label="Sesiones grabadas"
+            label="% sesiones grabadas"
             color="#00C8FF"
           />
-          <RadialKPI
+          <KpiCard
             value={metricas.tasaDocumentacion}
-            label="Con resultado"
+            label="% sesiones documentadas"
             color="#003087"
           />
-          <RadialKPI
+          <KpiCard
             value={metricas.tasaRetorno}
-            label="Tasa de retorno"
+            label="% leads recurrentes"
             color="#6366F1"
           />
         </div>
       </MetricaChartCard>
 
-      {/* Duración vs. Productos — Scatter */}
-      <MetricaChartCard title="Duración vs. Productos">
-        {metricas.scatterDuracionProductos.length === 0 ? (
+      {/* Duración vs. Productos — Scatter with trend line (TASK-07) */}
+      <MetricaChartCard title="¿Las sesiones más largas producen más entregables?">
+        {!hasScatterData ? (
           <div className="flex items-center justify-center h-[260px]">
-            <p className="text-sm text-slate-400">Sin datos disponibles.</p>
+            <p className="text-sm text-slate-400">Sin datos suficientes para mostrar tendencia</p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={260}>
-            <ScatterChart margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+            <ComposedChart margin={{ top: 4, right: 16, left: 0, bottom: 24 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
               <XAxis
                 type="number"
                 dataKey="x"
-                name="Duración (min)"
+                name="Duración (minutos)"
                 tick={{ fontSize: 10 }}
-                label={{ value: 'Duración (min)', position: 'insideBottom', offset: -4, fontSize: 10 }}
+                label={{
+                  value: 'Duración (minutos)',
+                  position: 'insideBottom',
+                  offset: -16,
+                  fontSize: 10,
+                }}
               />
               <YAxis
                 type="number"
                 dataKey="y"
-                name="Productos"
+                name="Productos entregados"
                 tick={{ fontSize: 10 }}
-                label={{ value: 'Productos', angle: -90, position: 'insideLeft', offset: 10, fontSize: 10 }}
+                label={{
+                  value: 'Productos entregados',
+                  angle: -90,
+                  position: 'insideLeft',
+                  offset: 10,
+                  fontSize: 10,
+                }}
                 allowDecimals={false}
               />
               <ZAxis range={[40, 40]} />
@@ -129,15 +140,27 @@ export function QualityKPIs({ metricas }: QualityKPIsProps) {
                 formatter={(value, name) => [value, name]}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
+
+              {/* Scatter series per consultor */}
               {scatterByConsultor.map(({ nombre, color, data }) => (
-                <Scatter
-                  key={nombre}
-                  name={nombre}
-                  data={data}
-                  fill={color}
-                />
+                <Scatter key={nombre} name={nombre} data={data} fill={color} />
               ))}
-            </ScatterChart>
+
+              {/* OLS trend line overlay */}
+              {hasRegression && (
+                <Line
+                  data={scatterRegression.line}
+                  dataKey="y"
+                  stroke="#E8470A"
+                  strokeWidth={1.5}
+                  dot={false}
+                  activeDot={false}
+                  legendType="none"
+                  name="Tendencia"
+                  strokeDasharray="4 2"
+                />
+              )}
+            </ComposedChart>
           </ResponsiveContainer>
         )}
       </MetricaChartCard>

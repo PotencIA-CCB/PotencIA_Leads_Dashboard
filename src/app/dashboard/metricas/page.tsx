@@ -20,6 +20,7 @@ import { ProductividadKPIs } from '@/components/metricas/ProductividadKPIs'
 import { RetentionFunnel } from '@/components/metricas/RetentionFunnel'
 import { QualityKPIs } from '@/components/metricas/QualityKPIs'
 import { ConsultorRadar } from '@/components/metricas/ConsultorRadar'
+import { HeatmapDrilldown } from '@/components/metricas/HeatmapDrilldown'
 
 const CiudadMap = dynamic(() => import('@/components/metricas/CiudadMap'), { ssr: false })
 
@@ -44,12 +45,21 @@ export default function MetricasPage() {
   const [insights, setInsights] = useState<InsightsState>(null)
   const [insightsError, setInsightsError] = useState<string | null>(null)
   const [loadingInsights, setLoadingInsights] = useState(false)
+  // TASK-16: drill-down state for heatmap cell clicks
+  const [heatmapDrilldown, setHeatmapDrilldown] = useState<{
+    dia: string
+    franja: string
+    consultoriaIds: string[]
+  } | null>(null)
 
   useEffect(() => {
     async function cargarUltimoInsight() {
       const res = await fetch('/api/insights')
       const data = await res.json()
-      if (!Array.isArray(data) || data.length === 0) return
+      if (!Array.isArray(data) || data.length === 0) {
+        generarInsights()
+        return
+      }
       setInsights({
         insights: data
           .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'insight')
@@ -280,7 +290,17 @@ export default function MetricasPage() {
       </section>
 
       {/* ProductividadKPIs — 7 charts in a 2-column grid */}
-      <ProductividadKPIs metricas={metricas} />
+      <ProductividadKPIs
+        metricas={metricas}
+        onCellClick={(cell) => setHeatmapDrilldown(cell)}
+      />
+
+      {/* TASK-16: Heatmap drill-down panel — shown inline below the charts when a cell is clicked */}
+      <HeatmapDrilldown
+        consultorias={consultorias}
+        cell={heatmapDrilldown}
+        onClose={() => setHeatmapDrilldown(null)}
+      />
 
       {/* RetentionFunnel — funnel + retention distribution */}
       <RetentionFunnel metricas={metricas} />
