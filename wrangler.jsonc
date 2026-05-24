@@ -21,5 +21,9 @@
   },
   "observability": {
     "enabled": true
+  },
+  "vars": {
+    "OPENCODE_API_BASE_URL": "https://opencode.ai/zen/go/v1",
+    "OPENCODE_MODEL": "opencode-go/deepseek-v4-pro"
   }
 }
