@@ -239,10 +239,11 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
     }).finally(() => clearTimeout(timeoutId))
 
     if (!response.ok) {
+      const errBody = await response.text().catch(() => '')
       return NextResponse.json({
         skipped: true,
         reason: 'upstream_error',
-        details: { status: response.status, message: `OpenAI API error: ${response.status}` },
+        details: { status: response.status, message: `OpenAI API error: ${response.status}`, body: errBody },
       })
     }
 
