@@ -9,10 +9,10 @@ interface MetricaChartCardProps {
 export function MetricaChartCard({ title, className = '', children }: MetricaChartCardProps) {
   return (
     <div
-      className={`bg-white p-6 rounded-[10px] border border-[#E5E7EB] shadow-sm flex flex-col ${className}`}
+      className={`bg-white p-4 sm:p-6 rounded-[10px] border border-[#E5E7EB] shadow-sm flex flex-col ${className}`}
     >
       <h4
-        className="text-base font-bold text-[#003087] mb-4"
+        className="text-sm sm:text-base font-bold text-[#003087] mb-4"
         style={{ fontFamily: 'Space Grotesk, sans-serif' }}
       >
         {title}

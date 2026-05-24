@@ -20,9 +20,9 @@ const statusColors: Record<string, string> = {
 
 function KPICard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-1">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex flex-col gap-1">
       <span className="text-xs text-gray-400 uppercase tracking-wide">{label}</span>
-      <span className="text-3xl font-bold text-gray-900">{value}</span>
+      <span className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</span>
       {sub && <span className="text-xs text-gray-500">{sub}</span>}
     </div>
   )
@@ -95,9 +95,9 @@ export default function ConsultoresPage() {
   if (loading) return <div className="p-6 text-sm text-gray-400">Cargando...</div>
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 flex flex-col gap-8">
+    <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Métricas por Consultor</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Métricas por Consultor</h1>
         <p className="text-sm text-gray-500 mt-1">Desempeño individual de cada miembro del equipo</p>
       </div>
 
@@ -124,8 +124,8 @@ export default function ConsultoresPage() {
         <KPICard label="Tasa de cancelación" value={`${tasaCancelacion}%`} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Servicios trabajados</h2>
           {porServicio.length === 0 ? (
             <p className="text-sm text-gray-400">Sin datos</p>
@@ -133,7 +133,7 @@ export default function ConsultoresPage() {
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={porServicio} layout="vertical">
                 <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                <YAxis dataKey="servicio" type="category" tick={{ fontSize: 11 }} width={150} />
+                <YAxis dataKey="servicio" type="category" tick={{ fontSize: 11 }} width={120} />
                 <Tooltip />
                 <Bar dataKey="total" radius={[0, 4, 4, 0]}>
                   {porServicio.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
@@ -143,7 +143,7 @@ export default function ConsultoresPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Distribución por estado</h2>
           {porEstado.length === 0 ? (
             <p className="text-sm text-gray-400">Sin datos</p>
@@ -162,41 +162,62 @@ export default function ConsultoresPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Historial de leads</h2>
         {leadsConsultor.length === 0 ? (
           <p className="text-sm text-gray-400">Sin leads asignados</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-gray-400 border-b">
-                  <th className="pb-2 pr-4">Nombre</th>
-                  <th className="pb-2 pr-4">Email</th>
-                  <th className="pb-2 pr-4">Empresa</th>
-                  <th className="pb-2 pr-4">Origen</th>
-                  <th className="pb-2">Fecha</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leadsConsultor.map((l) => (
-                  <tr key={l.id} className="border-b last:border-0 hover:bg-gray-50">
-                    <td className="py-2 pr-4 font-medium text-gray-800">{leadFullName(l)}</td>
-                    <td className="py-2 pr-4 text-gray-500">{l.email}</td>
-                    <td className="py-2 pr-4 text-gray-500">{l.empresa || '—'}</td>
-                    <td className="py-2 pr-4">
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                        {l.origen}
-                      </span>
-                    </td>
-                    <td className="py-2 text-gray-400 text-xs">
-                      {new Date(l.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </td>
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-400 border-b">
+                    <th className="pb-2 pr-4">Nombre</th>
+                    <th className="pb-2 pr-4">Email</th>
+                    <th className="pb-2 pr-4">Empresa</th>
+                    <th className="pb-2 pr-4">Origen</th>
+                    <th className="pb-2">Fecha</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {leadsConsultor.map((l) => (
+                    <tr key={l.id} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="py-2 pr-4 font-medium text-gray-800">{leadFullName(l)}</td>
+                      <td className="py-2 pr-4 text-gray-500">{l.email}</td>
+                      <td className="py-2 pr-4 text-gray-500">{l.empresa || '—'}</td>
+                      <td className="py-2 pr-4">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                          {l.origen}
+                        </span>
+                      </td>
+                      <td className="py-2 text-gray-400 text-xs">
+                        {new Date(l.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Mobile card list */}
+            <div className="md:hidden space-y-3">
+              {leadsConsultor.map((l) => (
+                <div key={l.id} className="rounded-xl border border-gray-100 p-3 bg-white">
+                  <p className="text-sm font-semibold text-gray-800">{leadFullName(l)}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{l.email}</p>
+                  <p className="text-xs text-gray-500">{l.empresa || '—'}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                      {l.origen}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(l.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>

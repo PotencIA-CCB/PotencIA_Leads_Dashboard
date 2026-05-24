@@ -143,7 +143,7 @@ export default function MetricasPage() {
           </ol>
         </nav>
         <h2
-          className="text-4xl font-extrabold text-[#001d59] tracking-tight"
+          className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#001d59] tracking-tight"
           style={{ fontFamily: 'Space Grotesk, sans-serif' }}
         >
           Métricas Globales
@@ -176,7 +176,7 @@ export default function MetricasPage() {
               <span className="material-symbols-outlined text-[#00C8FF] text-xl">{kpi.icon}</span>
             </div>
             <h3
-              className="text-[32px] font-bold text-[#003087] leading-none"
+              className="text-2xl sm:text-3xl lg:text-[32px] font-bold text-[#003087] leading-none"
               style={{ fontFamily: 'Space Grotesk, sans-serif' }}
             >
               {kpi.value}
@@ -191,7 +191,7 @@ export default function MetricasPage() {
 
       {/* Charts — ciudad + estado */}
       <section className="grid grid-cols-12 gap-6 mb-8">
-        <div className="col-span-12 lg:col-span-4 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm flex flex-col">
+        <div className="col-span-12 md:col-span-6 lg:col-span-4 bg-white p-4 sm:p-6 lg:p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm flex flex-col">
           <h4
             className="text-lg font-bold text-[#003087] mb-6"
             style={{ fontFamily: 'Space Grotesk, sans-serif' }}
@@ -201,37 +201,39 @@ export default function MetricasPage() {
           <CiudadMap data={metricas.porDepartamento} sinUbicacion={metricas.sinUbicacion} />
         </div>
 
-        <div className="col-span-12 lg:col-span-5 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-95 flex flex-col">
+        <div className="col-span-12 md:col-span-6 lg:col-span-5 bg-white p-4 sm:p-6 lg:p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-auto md:h-95 flex flex-col">
           <h4
             className="text-lg font-bold text-[#003087] mb-6"
             style={{ fontFamily: 'Space Grotesk, sans-serif' }}
           >
             Estado consultorías
           </h4>
-          <div className="flex-1 flex items-center justify-between gap-4">
-            <div className="shrink-0">
-              <PieChart width={200} height={200}>
-                <Pie
-                  data={metricas.porEstado}
-                  dataKey="total"
-                  nameKey="status"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={80}
-                >
-                  {metricas.porEstado.map((_, i) => (
-                    <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
+          <div className="flex-1 flex flex-col sm:flex-row items-center gap-4">
+            <div className="w-full sm:w-[200px] h-[200px] shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={metricas.porEstado}
+                    dataKey="total"
+                    nameKey="status"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={80}
+                  >
+                    {metricas.porEstado.map((_, i) => (
+                      <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
             <div className="flex flex-col gap-3">
               {metricas.porEstado.map((e, i) => (
                 <div key={e.status} className="flex items-center gap-2">
                   <div
-                    className="w-3 h-3 rounded-full"
+                    className="w-3 h-3 rounded-full shrink-0"
                     style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }}
                   />
                   <span className="text-xs text-slate-600 font-medium">
@@ -244,7 +246,7 @@ export default function MetricasPage() {
         </div>
 
         {/* Origen × estado (stacked bar) */}
-        <div className="col-span-12 lg:col-span-3 bg-white p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm flex flex-col">
+        <div className="col-span-12 md:col-span-12 lg:col-span-3 bg-white p-4 sm:p-6 lg:p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm flex flex-col">
           <h4
             className="text-lg font-bold text-[#003087] mb-4"
             style={{ fontFamily: 'Space Grotesk, sans-serif' }}

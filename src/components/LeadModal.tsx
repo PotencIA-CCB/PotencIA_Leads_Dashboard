@@ -70,10 +70,10 @@ export default function LeadModal({ lead, onClose, onStatusChange, onAsignarCons
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-7 pt-6 pb-5">
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-4 sm:px-7 pt-5 sm:pt-6 pb-4 sm:pb-5">
           <div className="flex items-start gap-4">
             <div
-              className={`shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br ${avatarGradient[gradKey] ?? avatarGradient['landing']} text-white flex items-center justify-center font-bold text-lg shadow-md`}
+              className={`shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br ${avatarGradient[gradKey] ?? avatarGradient['landing']} text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-md`}
               aria-hidden="true"
             >
               {getInitials(fullName)}
@@ -82,7 +82,7 @@ export default function LeadModal({ lead, onClose, onStatusChange, onAsignarCons
               <div className="flex items-center gap-2 flex-wrap">
                 <h2
                   id="modal-title"
-                  className="text-xl font-bold text-slate-900 leading-tight"
+                  className="text-lg sm:text-xl font-bold text-slate-900 leading-tight"
                   style={{ fontFamily: 'Space Grotesk, sans-serif' }}
                 >
                   {fullName}
@@ -111,7 +111,7 @@ export default function LeadModal({ lead, onClose, onStatusChange, onAsignarCons
         </div>
 
         {/* Body */}
-        <div className="px-7 py-6 space-y-6">
+        <div className="px-4 sm:px-7 py-5 sm:py-6 space-y-5 sm:space-y-6">
           {/* Acciones: status y asignación */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {con && (

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient, invalidateAuthCache } from '@/lib/supabase-browser'
 
@@ -21,6 +22,7 @@ const navItems = [
 export default function DashboardShell({ nombre, rol, children }: DashboardShellProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   async function handleLogout() {
     const supabase = createClient()
@@ -32,8 +34,22 @@ export default function DashboardShell({ nombre, rol, children }: DashboardShell
 
   return (
     <div className="min-h-screen bg-[#f7f9fc]" style={{ fontFamily: "'Inter', sans-serif" }}>
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-screen w-[260px] bg-[#003087] flex flex-col py-6 shadow-2xl z-50" aria-label="Navegación principal">
+      <aside
+        className={`fixed left-0 top-0 h-screen w-[260px] bg-[#003087] flex flex-col py-6 shadow-2xl z-50 transition-transform duration-300 ease-in-out ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+        aria-label="Navegación principal"
+      >
         {/* Logo */}
         <div className="px-6 mb-10 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center overflow-hidden">
@@ -53,6 +69,7 @@ export default function DashboardShell({ nombre, rol, children }: DashboardShell
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm border-l-4 cursor-pointer ${
                   pathname === item.href
                     ? 'bg-white/10 text-[#00C8FF] border-[#00C8FF] font-semibold'
@@ -89,15 +106,24 @@ export default function DashboardShell({ nombre, rol, children }: DashboardShell
       </aside>
 
       {/* Header */}
-      <header className="fixed top-0 right-0 w-[calc(100%-260px)] h-16 bg-white/80 backdrop-blur-md border-b border-slate-100 flex items-center px-8 z-40">
-        <h1 className="text-lg font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+      <header className="fixed top-0 left-0 right-0 md:left-[260px] h-16 bg-white/80 backdrop-blur-md border-b border-slate-100 flex items-center gap-3 px-4 sm:px-6 lg:px-8 z-40">
+        <button
+          className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg text-[#003087] hover:bg-slate-100 transition-colors shrink-0"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Abrir menú"
+        >
+          <span className="material-symbols-outlined text-[22px]">menu</span>
+        </button>
+        <h1 className="text-base md:text-lg font-bold text-[#003087] truncate" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
           Executive Intelligence Dashboard
         </h1>
       </header>
 
       {/* Main */}
-      <main className="ml-[260px] pt-20 pb-12 px-8 min-h-screen">
-        {children}
+      <main className="md:ml-[260px] pt-20 pb-12 px-4 sm:px-6 lg:px-8 min-h-screen">
+        <div className="max-w-screen-2xl mx-auto w-full">
+          {children}
+        </div>
       </main>
     </div>
   )

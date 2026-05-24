@@ -26,7 +26,7 @@ export function HeatmapDrilldown({ consultorias, cell, onClose }: HeatmapDrilldo
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-[10px] shadow-sm mt-4 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-slate-100">
         <h5
           className="text-sm font-bold text-[#003087]"
           style={{ fontFamily: 'Space Grotesk, sans-serif' }}

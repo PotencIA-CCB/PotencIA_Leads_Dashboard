@@ -77,7 +77,7 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
   return (
     <MetricaChartCard title="Sesiones en el tiempo" className="mb-8">
       {/* KPI summary row */}
-      <div className="flex flex-wrap gap-6 mb-5">
+      <div className="flex flex-wrap gap-4 sm:gap-6 mb-5">
         <div>
           <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Total sesiones</p>
           <p className="text-2xl font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
@@ -101,23 +101,23 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
       </div>
 
       {/* Date range filter */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <label className="text-[11px] text-slate-500 font-medium">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3 mb-4">
+        <label className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
           Desde
           <input
             type="date"
             value={range.start}
             onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))}
-            className="ml-1 text-[11px] border border-slate-200 rounded px-2 py-0.5 text-slate-700 focus:outline-none focus:border-[#004BB5]"
+            className="ml-0 sm:ml-1 w-full sm:w-auto text-[11px] border border-slate-200 rounded px-2 py-0.5 text-slate-700 focus:outline-none focus:border-[#004BB5]"
           />
         </label>
-        <label className="text-[11px] text-slate-500 font-medium">
+        <label className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
           Hasta
           <input
             type="date"
             value={range.end}
             onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))}
-            className="ml-1 text-[11px] border border-slate-200 rounded px-2 py-0.5 text-slate-700 focus:outline-none focus:border-[#004BB5]"
+            className="ml-0 sm:ml-1 w-full sm:w-auto text-[11px] border border-slate-200 rounded px-2 py-0.5 text-slate-700 focus:outline-none focus:border-[#004BB5]"
           />
         </label>
         <button

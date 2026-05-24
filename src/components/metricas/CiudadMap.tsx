@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts'
+import { useWindowWidth } from '@/hooks/useWindowWidth'
 
 interface CiudadMapProps {
   data: { dept: string; total: number }[]
@@ -21,6 +22,7 @@ interface CiudadMapProps {
 const BAR_COLORS = ['#003087', '#004BB5', '#00C8FF', '#6366F1', '#E8470A', '#5A6475']
 
 export default function CiudadMap({ data, sinUbicacion }: CiudadMapProps) {
+  const w = useWindowWidth()
   const top10 = data.slice(0, 10)
 
   if (top10.length === 0) {
@@ -44,8 +46,8 @@ export default function CiudadMap({ data, sinUbicacion }: CiudadMapProps) {
           <YAxis
             type="category"
             dataKey="dept"
-            tick={{ fontSize: 10 }}
-            width={140}
+            tick={{ fontSize: w < 768 ? 9 : 10 }}
+            width={w < 768 ? 80 : 140}
           />
           <Tooltip
             formatter={(value) => [value, 'Consultas']}

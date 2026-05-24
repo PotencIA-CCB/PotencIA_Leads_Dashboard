@@ -71,13 +71,13 @@ export default function NovedadesPage() {
             </li>
           </ol>
         </nav>
-        <div className="flex items-center justify-between">
-          <h2 className="text-4xl font-extrabold text-[#001d59] tracking-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#001d59] tracking-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             Novedades
           </h2>
           <button
             onClick={() => { resetForm(); setShowForm(true) }}
-            className="px-4 py-2 rounded-lg bg-[#003087] text-white text-sm font-semibold cursor-pointer inline-flex items-center gap-2"
+            className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg bg-[#003087] text-white text-sm font-semibold cursor-pointer inline-flex items-center gap-2"
           >
             <span className="material-symbols-outlined text-[18px]">add</span>
             Nueva novedad
@@ -90,7 +90,7 @@ export default function NovedadesPage() {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-6 mb-6">
+        <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-4 sm:p-6 mb-6">
           <h3 className="text-sm font-bold text-[#003087] mb-4" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             {editingId ? 'Editar novedad' : 'Nueva novedad'}
           </h3>
@@ -175,7 +175,7 @@ export default function NovedadesPage() {
           {novedades.map((n) => {
             const t = TIPOS.find((x) => x.value === n.tipo)
             return (
-              <article key={n.id} className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-6">
+              <article key={n.id} className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-4 sm:p-6">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-[#00C8FF] flex items-center justify-center text-white text-sm font-bold shrink-0">
                     {n.consultor_nombre?.charAt(0).toUpperCase() ?? '?'}

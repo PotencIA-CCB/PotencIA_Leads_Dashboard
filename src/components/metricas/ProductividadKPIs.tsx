@@ -14,6 +14,7 @@ import {
 } from 'recharts'
 import { type MetricasGlobales } from '@/lib/metricas'
 import { MetricaChartCard } from './MetricaChartCard'
+import { useWindowWidth } from '@/hooks/useWindowWidth'
 
 interface ProductividadKPIsProps {
   metricas: MetricasGlobales
@@ -48,6 +49,8 @@ function HeatmapFranjaDia({
   data: { franja: string; dia: string; count: number; consultoriaIds: string[] }[]
   onCellClick?: (cell: { dia: string; franja: string; consultoriaIds: string[] }) => void
 }) {
+  const w = useWindowWidth()
+  const labelCol = w < 640 ? '60px' : '90px'
   const maxCount = Math.max(1, ...data.map(d => d.count))
 
   const getColor = (count: number) => {
@@ -56,26 +59,22 @@ function HeatmapFranjaDia({
   }
 
   return (
-    <div style={{ overflowX: 'auto' }}>
+    <div className="overflow-x-auto">
       <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '90px repeat(5, 1fr)',
-          gap: '3px',
-          minWidth: '380px',
-        }}
+        className="grid gap-[3px]"
+        style={{ gridTemplateColumns: `${labelCol} repeat(5, minmax(0, 1fr))` }}
       >
         {/* Header row */}
         <div />
         {HEATMAP_DIAS.map(dia => (
-          <div key={dia} className="text-[10px] text-slate-500 font-medium text-center py-1">
+          <div key={dia} className="text-[9px] sm:text-[10px] text-slate-500 font-medium text-center py-1">
             {dia}
           </div>
         ))}
         {/* Data rows */}
         {HEATMAP_FRANJAS.map(franja => (
           <>
-            <div key={`label-${franja}`} className="text-[10px] text-slate-500 flex items-center pr-2 truncate">
+            <div key={`label-${franja}`} className="text-[9px] sm:text-[10px] text-slate-500 flex items-center pr-2 truncate">
               {franja}
             </div>
             {HEATMAP_DIAS.map(dia => {
@@ -85,7 +84,7 @@ function HeatmapFranjaDia({
               return (
                 <div
                   key={`${franja}-${dia}`}
-                  className={`h-8 rounded flex items-center justify-center${onCellClick ? ' cursor-pointer' : ''}`}
+                  className={`h-7 sm:h-8 rounded flex items-center justify-center${onCellClick ? ' cursor-pointer' : ''}`}
                   style={{ backgroundColor: getColor(count) }}
                   title={`${franja} ${dia}: ${count}`}
                   onClick={onCellClick ? () => onCellClick({ dia, franja, consultoriaIds }) : undefined}
@@ -94,7 +93,7 @@ function HeatmapFranjaDia({
                   onKeyDown={onCellClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onCellClick({ dia, franja, consultoriaIds }) } : undefined}
                 >
                   {count > 0 && (
-                    <span className="text-[10px] font-medium text-white">{count}</span>
+                    <span className="text-[9px] sm:text-[10px] font-medium text-white">{count}</span>
                   )}
                 </div>
               )
@@ -122,7 +121,7 @@ export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsPr
       : BAR_COLORS[modalidadKeys.indexOf(key) % BAR_COLORS.length]
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
       {/* 1 — Duración promedio por consultor */}
       <MetricaChartCard title="Duración promedio por consultor (min)">
         {metricas.duracionPorConsultor.length === 0 ? (
