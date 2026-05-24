@@ -222,7 +222,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
 }`
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 70_000)
+    const timeoutId = setTimeout(() => controller.abort(), 25_000)
 
     const response = await fetch(`${openAiBase}/chat/completions`, {
       method: 'POST',
@@ -235,6 +235,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
         model: openAiModel,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
+        max_tokens: 800,
       }),
     }).finally(() => clearTimeout(timeoutId))
 
