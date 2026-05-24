@@ -20,11 +20,42 @@ interface ConsultorRadarProps {
 
 const BAR_COLORS = ['#003087', '#00C8FF', '#004BB5', '#E8470A', '#5A6475', '#6366F1']
 
+/** Exported for unit testing — describes each radar axis in plain business language. */
+export const RADAR_LEGEND_ITEMS: { axis: string; description: string }[] = [
+  { axis: 'Sesiones', description: 'Total de sesiones atendidas por el consultor (cantidad).' },
+  { axis: 'Duración (avg)', description: 'Duración promedio por sesión (minutos).' },
+  { axis: 'Productos', description: 'Productos creados durante las sesiones del consultor (cantidad).' },
+  { axis: 'Grabadas %', description: 'Porcentaje de sesiones grabadas sobre el total del consultor (%).' },
+]
+
+/** Exported for unit testing — reading guide text. */
+export const RADAR_READING_GUIDE =
+  'Forma balanceada = perfil generalista · Pico pronunciado = especialista en esa dimensión.'
+
+/** Exported for unit testing — normalization footnote. */
+export const RADAR_FOOTNOTE = 'Valores normalizados 0–100 relativo al máximo del grupo'
+
 function EmptyState() {
   return (
     <div className="flex items-center justify-center h-[300px]">
       <p className="text-sm text-slate-400">Sin datos disponibles.</p>
     </div>
+  )
+}
+
+function RadarLegend() {
+  return (
+    <>
+      <dl className="mt-3 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1.5 text-[10px] sm:text-[11px]">
+        {RADAR_LEGEND_ITEMS.map(({ axis, description }) => (
+          <>
+            <dt key={`dt-${axis}`} className="font-semibold text-[#003087]">{axis}</dt>
+            <dd key={`dd-${axis}`} className="text-slate-500">{description}</dd>
+          </>
+        ))}
+      </dl>
+      <p className="text-[10px] text-slate-500 mt-2">{RADAR_READING_GUIDE}</p>
+    </>
   )
 }
 
@@ -48,6 +79,7 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
     return (
       <MetricaChartCard title="Perfil de consultores" className="mb-8">
         <EmptyState />
+        <RadarLegend />
       </MetricaChartCard>
     )
   }
@@ -102,8 +134,9 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
         </RadarChart>
       </ResponsiveContainer>
       <p className="text-[10px] text-slate-400 text-center mt-1">
-        Valores normalizados 0–100 relativo al máximo del grupo
+        {RADAR_FOOTNOTE}
       </p>
+      <RadarLegend />
     </MetricaChartCard>
   )
 }

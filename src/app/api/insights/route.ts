@@ -20,21 +20,26 @@ async function buildImpactContext(supabase: SupabaseClient): Promise<string> {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
-    const { data: consulData } = await supabase
-      .from('consultorias')
-      .select('id, categoria_caso_uso, nivel_potencia')
-      .gte('fecha', thirtyDaysAgo)
+    // consulData and picosData are independent — parallelize
+    const [consulRes, picosRes] = await Promise.all([
+      supabase
+        .from('consultorias')
+        .select('id, categoria_caso_uso, nivel_potencia')
+        .gte('fecha', thirtyDaysAgo),
+      supabase
+        .from('consultas_por_semana')
+        .select('semana_inicio, total, productos_creados, minutos_totales')
+        .order('semana_inicio', { ascending: false })
+        .limit(4),
+    ])
+    const consulData = consulRes.data
+    const picosData = picosRes.data
 
     const ids = (consulData ?? []).map((c) => c.id)
+    // sesionData depends on consulData ids — must run after, but only this one is sequential
     const { data: sesionData } = ids.length > 0
       ? await supabase.from('registro_sesion').select('id_consultoria, cantidad_productos').in('id_consultoria', ids)
-      : { data: [] }
-
-    const { data: picosData } = await supabase
-      .from('consultas_por_semana')
-      .select('semana_inicio, total, productos_creados, minutos_totales')
-      .order('semana_inicio', { ascending: false })
-      .limit(4)
+      : { data: [] as Array<{ id_consultoria: string; cantidad_productos: number | null }> }
 
     const prodByConsultoria: Record<string, number> = {}
     for (const s of sesionData ?? []) {
@@ -115,14 +120,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ skipped: true, reason: 'config_missing', details: { missing } })
     }
 
-    // Check threshold: skip if not enough new consultorias since last insight
-    const { data: lastInsight } = await supabase
-      .from('insights')
-      .select('created_at')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    // Stage A — fire all independent reads concurrently
+    const [
+      lastInsightRes,
+      consultoriasRes,
+      novedadesRes,
+      impactContext,
+    ] = await Promise.all([
+      supabase
+        .from('insights')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('consultorias')
+        .select('fecha, status, servicio, duracion_minutos, categoria_caso, categoria_caso_uso'),
+      supabase
+        .from('novedades')
+        .select('tipo, titulo, contenido')
+        .order('created_at', { ascending: false })
+        .limit(20),
+      buildImpactContext(supabase),
+    ])
 
+    const lastInsight = lastInsightRes.data
+    const { data: consultorias, error: conError } = consultoriasRes
+    const { data: novedades } = novedadesRes
+
+    // Threshold check — only after Stage A resolves, and only if lastInsight exists
     if (lastInsight) {
       const { count: newConsultorias } = await supabase
         .from('consultorias')
@@ -138,21 +164,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Fetch consultorias for context
-    const { data: consultorias, error: conError } = await supabase
-      .from('consultorias')
-      .select('fecha, status, servicio, duracion_minutos, categoria_caso, categoria_caso_uso')
-
     if (conError || !consultorias) {
       return NextResponse.json({ error: 'Error leyendo consultorías' }, { status: 500 })
     }
-
-    // Fetch novedades for qualitative context
-    const { data: novedades } = await supabase
-      .from('novedades')
-      .select('tipo, titulo, contenido')
-      .order('created_at', { ascending: false })
-      .limit(20)
 
     // Compute stats
     const estadoMap: Record<string, number> = {}
@@ -178,8 +192,6 @@ export async function POST(req: NextRequest) {
     const growth7dPct = conPrev7 > 0 ? Math.round(((conLast7 - conPrev7) / conPrev7) * 100) : null
 
     const novedadesCtx = (novedades || []).slice(0, 10).map((n) => `[${n.tipo}] ${n.titulo}: ${n.contenido?.slice(0, 150)}`).join('\n')
-
-    const impactContext = await buildImpactContext(supabase)
 
     const prompt = `Eres un analista de negocios experto de la Cámara de Comercio de Barranquilla.
 Analiza los siguientes datos del dashboard de consultoría PotencIA y genera insights accionables en español, usando un tono ejecutivo.
@@ -235,7 +247,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
         model: openAiModel,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        max_tokens: 1200,
+        max_tokens: 700,
       }),
     }).finally(() => clearTimeout(timeoutId))
 

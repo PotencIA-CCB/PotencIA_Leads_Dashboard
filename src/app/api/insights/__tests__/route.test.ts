@@ -124,6 +124,63 @@ function makeRequest(body: Record<string, unknown> = {}): Request {
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
+describe('POST /api/insights — parallelized pre-queries', () => {
+  beforeEach(() => {
+    setEnv()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('uses Promise.all to dispatch lastInsight, consultorias, novedades, and buildImpactContext concurrently', async () => {
+    setupSupabaseMock()
+
+    // Spy on Promise.all to verify it receives an array of 4 promises for Stage A
+    const originalPromiseAll = Promise.all.bind(Promise)
+    let capturedStagAArgLength = 0
+
+    const promiseAllSpy = vi.spyOn(Promise, 'all').mockImplementation((iterable: Iterable<unknown>) => {
+      const arr = Array.from(iterable)
+      // Capture the length of the largest Promise.all call (Stage A has 4 items)
+      if (arr.length > capturedStagAArgLength) capturedStagAArgLength = arr.length
+      return originalPromiseAll(arr)
+    })
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      makeFetchResponse(makeAiResponse(JSON.stringify({
+        insights: ['i1'], recomendaciones: ['r1'], alertas: ['a1'],
+      })))
+    ))
+
+    await POST(makeRequest() as never)
+
+    // Stage A fires: lastInsight + consultorias + novedades + buildImpactContext = 4
+    expect(promiseAllSpy).toHaveBeenCalled()
+    expect(capturedStagAArgLength).toBeGreaterThanOrEqual(4)
+
+    promiseAllSpy.mockRestore()
+  })
+
+  it('sends max_tokens: 700 in the DeepSeek fetch body', async () => {
+    setupSupabaseMock()
+
+    let capturedBody: Record<string, unknown> | null = null
+
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: RequestInit) => {
+      capturedBody = JSON.parse(opts.body as string) as Record<string, unknown>
+      return Promise.resolve(makeFetchResponse(makeAiResponse(JSON.stringify({
+        insights: ['i1'], recomendaciones: ['r1'], alertas: ['a1'],
+      }))))
+    }))
+
+    await POST(makeRequest() as never)
+
+    expect(capturedBody).not.toBeNull()
+    expect(capturedBody!['max_tokens']).toBe(700)
+  })
+})
+
 describe('POST /api/insights — JSON extraction and error handling', () => {
   beforeEach(() => {
     setEnv()

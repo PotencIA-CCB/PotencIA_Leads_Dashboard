@@ -175,7 +175,7 @@ export default function MetricasPage() {
 
       {/* Estado consultorías — donut chart */}
       <section className="grid grid-cols-12 gap-6 mb-8">
-        <div className="col-span-12 lg:col-span-6 bg-white p-4 sm:p-6 lg:p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-auto flex flex-col">
+        <div className="col-span-12 bg-white p-4 sm:p-6 lg:p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-auto flex flex-col">
           <h4
             className="text-lg font-bold text-[#003087] mb-6"
             style={{ fontFamily: 'Space Grotesk, sans-serif' }}

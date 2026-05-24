@@ -250,7 +250,7 @@ export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsPr
       </MetricaChartCard>
 
       {/* 6 — Consultas por franja horaria (Heatmap) — TASK-16: onCellClick wired for drill-down */}
-      <MetricaChartCard title="Consultas por franja horaria">
+      <MetricaChartCard title="Consultas por franja horaria" className="md:col-span-2">
         <p className="text-xs text-gray-400 -mt-3 mb-3">Solo sesiones atendidas · Clic en celda para ver detalle</p>
         {metricas.heatmapFranjaDia.length === 0 ? (
           <EmptyState />
