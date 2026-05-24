@@ -720,6 +720,7 @@ export function computeScatterDuracionProductos(
 export function computeConsultorMetrics(
   consultorias: ConsultoriaForMetricas[],
   registroSesion: RegistroSesionForMetricas[],
+  attendedIds?: Set<string>,
 ): { consultor: string; sesiones: number; duracionAvg: number; productos: number; pctGrabadas: number }[] {
   const registroMap = new Map<string, RegistroSesionForMetricas>()
   for (const r of registroSesion) {
@@ -737,24 +738,35 @@ export function computeConsultorMetrics(
 
   for (const c of consultorias) {
     if (!c.id_consultor) continue
+    // When attendedIds is provided, only count consultorias whose id is in the set
+    if (attendedIds != null && (c.id == null || !attendedIds.has(c.id))) continue
     const nombre = c.consultores?.nombre ?? 'Sin consultor'
     if (!map.has(nombre)) {
       map.set(nombre, { sesiones: 0, duracionSum: 0, duracionCount: 0, productos: 0, grabadas: 0, conRegistro: 0 })
     }
     const entry = map.get(nombre)!
     entry.sesiones++
-    if (c.duracion_minutos != null) {
-      entry.duracionSum += c.duracion_minutos
-      entry.duracionCount++
-    }
 
     if (c.id) {
       const registro = registroMap.get(c.id)
       if (registro) {
+        // Prefer registro.duracion_sesion_minutos; fall back to c.duracion_minutos (nullish, not falsy)
+        const duracion = registro.duracion_sesion_minutos ?? c.duracion_minutos
+        if (duracion != null && duracion > 0) {
+          entry.duracionSum += duracion
+          entry.duracionCount++
+        }
         entry.conRegistro++
         entry.productos += registro.cantidad_productos ?? 0
         if (registro.sesion_grabada === true) entry.grabadas++
+      } else if (c.duracion_minutos != null && c.duracion_minutos > 0) {
+        // No registro row: fall back to consultoria duration for duration average only
+        entry.duracionSum += c.duracion_minutos
+        entry.duracionCount++
       }
+    } else if (c.duracion_minutos != null && c.duracion_minutos > 0) {
+      entry.duracionSum += c.duracion_minutos
+      entry.duracionCount++
     }
   }
 
@@ -1068,7 +1080,7 @@ export function computeMetricasFromConsultorias({
   const heatmapFranjaDia = computeHeatmapFranjaDia(consultorias, attendedIds)
 
   // consultorMetrics
-  const consultorMetrics = computeConsultorMetrics(consultorias, registroSesion)
+  const consultorMetrics = computeConsultorMetrics(consultorias, registroSesion, attendedIds)
 
   // Suppress unused variable warning for sectorMap and servicioMap
   void Object.keys(sectorMap)

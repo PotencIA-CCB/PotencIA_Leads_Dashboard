@@ -10,7 +10,9 @@ import {
   countByDepartamento,
   computeMetricasFromConsultorias,
   tiempoPromedioPorRol,
+  computeConsultorMetrics,
   type ConsultoriaForMetricas,
+  type RegistroSesionForMetricas,
 } from '../metricas'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -660,5 +662,94 @@ describe('tiempoPromedioPorRol', () => {
     const data = [makeConsultoria({ duracion_minutos: 30, leads: null })]
     const result = tiempoPromedioPorRol(data)
     expect(result).toEqual([{ rol: 'Sin rol', minutos: 30 }])
+  })
+})
+
+// ─── computeConsultorMetrics ──────────────────────────────────────────────────
+
+/**
+ * Fixture layout (design doc §5):
+ *   id   | id_consultor | dur_min | registro? | reg.dur_sesion_min | reg.productos | reg.grabada
+ *   c1   | A            | 30      | yes       | 45                 | 2             | true
+ *   c2   | A            | 60      | yes       | null               | 1             | false
+ *   c3   | A            | 20      | no        | —                  | —             | —
+ *   c4   | B            | 90      | yes       | 120                | 3             | true
+ *   c5   | B            | null    | yes       | 60                 | 0             | null
+ *
+ * attendedIds = { c1, c2, c4, c5 }
+ */
+describe('computeConsultorMetrics', () => {
+  function makeReg(
+    id_consultoria: string,
+    duracion_sesion_minutos: number | null,
+    cantidad_productos: number | null,
+    sesion_grabada: boolean | null,
+  ): RegistroSesionForMetricas {
+    return { id_consultoria, duracion_sesion_minutos, cantidad_productos, sesion_grabada }
+  }
+
+  const consulA1 = makeConsultoria({ id: 'c1', id_consultor: 'A', duracion_minutos: 30, consultores: { nombre: 'Ana' } })
+  const consulA2 = makeConsultoria({ id: 'c2', id_consultor: 'A', duracion_minutos: 60, consultores: { nombre: 'Ana' } })
+  const consulA3 = makeConsultoria({ id: 'c3', id_consultor: 'A', duracion_minutos: 20, consultores: { nombre: 'Ana' } })
+  const consulB4 = makeConsultoria({ id: 'c4', id_consultor: 'B', duracion_minutos: 90, consultores: { nombre: 'Bob' } })
+  const consulB5 = makeConsultoria({ id: 'c5', id_consultor: 'B', duracion_minutos: null, consultores: { nombre: 'Bob' } })
+
+  const regC1 = makeReg('c1', 45, 2, true)
+  const regC2 = makeReg('c2', null, 1, false)
+  const regC4 = makeReg('c4', 120, 3, true)
+  const regC5 = makeReg('c5', 60, 0, null)
+
+  const allConsultorias = [consulA1, consulA2, consulA3, consulB4, consulB5]
+  const allRegistros = [regC1, regC2, regC4, regC5]
+  const attendedIds = new Set(['c1', 'c2', 'c4', 'c5'])
+
+  it('case 1: prefers registro.duracion_sesion_minutos over consultoria.duracion_minutos', () => {
+    // c1 should contribute 45 (from registro), not 30 (from consultoria)
+    const result = computeConsultorMetrics(allConsultorias, allRegistros, attendedIds)
+    const ana = result.find((r) => r.consultor === 'Ana')
+    // Ana: c1 contributes 45, c2 contributes 60 (fallback). avg = round((45+60)/2) = 52 (or 53)
+    expect(ana).toBeDefined()
+    expect(ana!.duracionAvg).toBe(Math.round((45 + 60) / 2))
+  })
+
+  it('case 2: falls back to consultoria.duracion_minutos when registro.duracion_sesion_minutos is null', () => {
+    // c2 has registro.duracion_sesion_minutos = null, so fallback to 60
+    const result = computeConsultorMetrics(allConsultorias, allRegistros, attendedIds)
+    const bob = result.find((r) => r.consultor === 'Bob')
+    // Bob: c4 contributes 120, c5 contributes 60. avg = round((120+60)/2) = 90
+    expect(bob).toBeDefined()
+    expect(bob!.duracionAvg).toBe(90)
+  })
+
+  it('case 3: excludes consultorias without registro when attendedIds provided (A.sesiones=2)', () => {
+    // c3 has no registro, so it must be excluded when attendedIds is provided
+    const result = computeConsultorMetrics(allConsultorias, allRegistros, attendedIds)
+    const ana = result.find((r) => r.consultor === 'Ana')
+    expect(ana!.sesiones).toBe(2)
+  })
+
+  it('case 4: backward compat — without attendedIds includes all consultorias (A.sesiones=3)', () => {
+    // Without attendedIds, all 3 Ana consultorias count
+    const result = computeConsultorMetrics(allConsultorias, allRegistros)
+    const ana = result.find((r) => r.consultor === 'Ana')
+    expect(ana!.sesiones).toBe(3)
+  })
+
+  it('case 5: productos unchanged — computed from registro only (A=3, B=3)', () => {
+    const result = computeConsultorMetrics(allConsultorias, allRegistros, attendedIds)
+    const ana = result.find((r) => r.consultor === 'Ana')
+    const bob = result.find((r) => r.consultor === 'Bob')
+    expect(ana!.productos).toBe(3)  // c1:2 + c2:1
+    expect(bob!.productos).toBe(3)  // c4:3 + c5:0
+  })
+
+  it('case 6: pctGrabadas unchanged — A=50% (1 of 2 with registro), B=50% (1 of 2 with registro)', () => {
+    const result = computeConsultorMetrics(allConsultorias, allRegistros, attendedIds)
+    const ana = result.find((r) => r.consultor === 'Ana')
+    const bob = result.find((r) => r.consultor === 'Bob')
+    // Ana: c1 grabada=true, c2 grabada=false → 1/2 = 50%
+    expect(ana!.pctGrabadas).toBe(50)
+    // Bob: c4 grabada=true, c5 grabada=null (falsy) → 1/2 = 50%
+    expect(bob!.pctGrabadas).toBe(50)
   })
 })

@@ -235,7 +235,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
         model: openAiModel,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        max_tokens: 800,
+        max_tokens: 1200,
       }),
     }).finally(() => clearTimeout(timeoutId))
 
@@ -248,10 +248,52 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
       })
     }
 
-    const aiData = await response.json()
-    const content = aiData.choices[0].message.content
-    const clean = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    const parsed: { insights?: string[]; recomendaciones?: string[]; alertas?: string[] } = JSON.parse(clean)
+    let aiData: { choices?: { message?: { content?: string } }[] }
+    try {
+      aiData = await response.json()
+    } catch (err) {
+      console.error('insights: upstream JSON parse failed', err)
+      return NextResponse.json(
+        { error: 'Respuesta del proveedor IA no es JSON válido', reason: 'upstream_json' },
+        { status: 502 },
+      )
+    }
+
+    const content = aiData?.choices?.[0]?.message?.content
+    if (typeof content !== 'string' || content.length === 0) {
+      console.error('insights: missing choices[0].message.content', { aiData })
+      return NextResponse.json(
+        { error: 'Respuesta del proveedor IA con forma inesperada', reason: 'missing_choices' },
+        { status: 422 },
+      )
+    }
+
+    // Strip markdown fences
+    const cleaned = content
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/g, '')
+      .trim()
+
+    // Extract JSON object body (handles prose-wrapped JSON)
+    const match = cleaned.match(/{[\s\S]*}/)
+    if (!match) {
+      console.error('insights: no JSON object found in content', { cleaned: cleaned.slice(0, 500) })
+      return NextResponse.json(
+        { error: 'No se encontró un objeto JSON en la respuesta', reason: 'no_json_match' },
+        { status: 422 },
+      )
+    }
+
+    let parsed: { insights?: string[]; recomendaciones?: string[]; alertas?: string[] }
+    try {
+      parsed = JSON.parse(match[0])
+    } catch (err) {
+      console.error('insights: JSON.parse failed', { snippet: match[0].slice(0, 500), err })
+      return NextResponse.json(
+        { error: 'JSON inválido en la respuesta del proveedor IA', reason: 'json_parse_failed' },
+        { status: 422 },
+      )
+    }
 
     // Derive period bounds: use provided values or fall back to current week
     const todayStr = new Date().toISOString().slice(0, 10)
@@ -294,10 +336,26 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
       _meta: { skipped: false, threshold: minNew },
     })
   } catch (error) {
-    console.error('Error generando insights:', error)
+    console.error('insights: unhandled error', error)
     if (error instanceof Error && error.name === 'AbortError') {
-      return NextResponse.json({ error: 'OpenAI timeout' }, { status: 504 })
+      return NextResponse.json(
+        { error: 'Timeout esperando al proveedor IA', reason: 'abort_timeout' },
+        { status: 504 },
+      )
     }
-    return NextResponse.json({ error: 'Error generando insights' }, { status: 500 })
+    if (error instanceof TypeError && /fetch/i.test(error.message)) {
+      return NextResponse.json(
+        { error: 'Fallo de red al contactar al proveedor IA', reason: 'upstream_fetch_failed', detail: error.message },
+        { status: 502 },
+      )
+    }
+    return NextResponse.json(
+      {
+        error: 'Error generando insights',
+        reason: 'unknown',
+        detail: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 },
+    )
   }
 }

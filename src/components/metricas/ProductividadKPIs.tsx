@@ -152,37 +152,6 @@ export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsPr
         )}
       </MetricaChartCard>
 
-      {/* 2 — Consultas por categoría de caso */}
-      <MetricaChartCard title="Consultas por categoría">
-        <p className="text-xs text-gray-400 -mt-3 mb-3">Solo sesiones atendidas</p>
-        {metricas.consultasPorArea.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart
-              layout="vertical"
-              data={metricas.consultasPorArea}
-              margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-              <YAxis
-                type="category"
-                dataKey="area"
-                tick={{ fontSize: 10 }}
-                width={calcLeftWidth(metricas.consultasPorArea.map((d) => d.area))}
-              />
-              <Tooltip />
-              <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                {metricas.consultasPorArea.map((_, i) => (
-                  <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </MetricaChartCard>
-
       {/* 3 — Recuento por consultor */}
       <MetricaChartCard title="Sesiones por consultor">
         {metricas.recuentoPorConsultor.length === 0 ? (

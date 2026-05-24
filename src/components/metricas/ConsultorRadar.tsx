@@ -12,6 +12,7 @@ import {
 } from 'recharts'
 import { type MetricasGlobales } from '@/lib/metricas'
 import { MetricaChartCard } from './MetricaChartCard'
+import { useWindowWidth } from '@/hooks/useWindowWidth'
 
 interface ConsultorRadarProps {
   metricas: MetricasGlobales
@@ -28,6 +29,19 @@ function EmptyState() {
 }
 
 export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
+  const w = useWindowWidth()
+  const isMobile = w < 640
+  const isTablet = w >= 640 && w < 1024
+
+  const margin = isMobile
+    ? { top: 8, right: 8, left: 8, bottom: 8 }
+    : isTablet
+      ? { top: 12, right: 20, left: 20, bottom: 12 }
+      : { top: 16, right: 32, left: 32, bottom: 16 }
+  const tickFontSize = isMobile ? 9 : isTablet ? 10 : 11
+  const legendFontSize = isMobile ? 9 : 11
+  const chartHeight = isMobile ? 280 : 320
+
   const rawData = metricas.consultorMetrics
 
   if (rawData.length <= 1) {
@@ -68,10 +82,10 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
 
   return (
     <MetricaChartCard title="Perfil de consultores" className="mb-8">
-      <ResponsiveContainer width="100%" height={320}>
-        <RadarChart data={radarData} margin={{ top: 16, right: 32, left: 32, bottom: 16 }}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
+        <RadarChart data={radarData} margin={margin}>
           <PolarGrid />
-          <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
+          <PolarAngleAxis dataKey="subject" tick={{ fontSize: tickFontSize }} />
           <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 9 }} tickCount={5} />
           {topConsultores.map((c, i) => (
             <Radar
@@ -83,7 +97,7 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
               fillOpacity={0.15}
             />
           ))}
-          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Legend wrapperStyle={{ fontSize: legendFontSize }} />
           <Tooltip formatter={(value) => [`${value ?? 0}`, 'Score (normalizado)']} />
         </RadarChart>
       </ResponsiveContainer>
