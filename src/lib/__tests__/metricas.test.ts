@@ -193,20 +193,21 @@ describe('countByArea', () => {
     expect(countByArea([])).toEqual([])
   })
 
-  it('maps null area to "Sin área"', () => {
-    const data = [makeConsultoria()]
-    expect(countByArea(data)).toEqual([{ area: 'Sin área', count: 1 }])
+  it('skips null categoria_caso (no "Sin categorizar" entry)', () => {
+    // countByArea now groups by categoria_caso; null is skipped
+    const data = [makeConsultoria({ categoria_caso: null })]
+    expect(countByArea(data)).toEqual([])
   })
 
-  it('counts and sorts by count descending', () => {
+  it('counts and sorts by count descending using categoria_caso', () => {
     const data = [
-      makeConsultoria({ leads: { city: null, company_role_level: null, origen: null, sector: null, company_role_area: 'Tech', nit: null } }),
-      makeConsultoria({ leads: { city: null, company_role_level: null, origen: null, sector: null, company_role_area: 'Tech', nit: null } }),
-      makeConsultoria({ leads: { city: null, company_role_level: null, origen: null, sector: null, company_role_area: 'Ventas', nit: null } }),
+      makeConsultoria({ categoria_caso: 'Agentes' }),
+      makeConsultoria({ categoria_caso: 'Agentes' }),
+      makeConsultoria({ categoria_caso: 'Prototipado ágil con ia' }), // maps to Prototipados
     ]
     const result = countByArea(data)
-    expect(result[0]).toEqual({ area: 'Tech', count: 2 })
-    expect(result[1]).toEqual({ area: 'Ventas', count: 1 })
+    expect(result[0]).toEqual({ area: 'Agentes', count: 2 })
+    expect(result[1]).toEqual({ area: 'Prototipados', count: 1 })
   })
 })
 
@@ -481,6 +482,83 @@ describe('porCasoUso — sources from categoria_caso, excludes Sin categorizar',
     const casos = result.porCasoUso
     expect(casos.find((e) => e.caso === 'Agentes')?.total).toBe(2)
     expect(casos.find((e) => e.caso === 'Asistentes')?.total).toBe(1)
+  })
+})
+
+// ─── porEstadoAtendidas — attended filter, excludes Agendado ─────────────────
+
+describe('porEstadoAtendidas — excludes Agendado and unattended', () => {
+  const noOp: import('../metricas').RegistroSesionForMetricas[] = []
+
+  it('returns empty when attendedIds provided but no consultorias match', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', status: 'Resuelto' }),
+      makeConsultoria({ id: 'c2', status: 'Agendado' }),
+    ]
+    const result = computeMetricasFromConsultorias({
+      consultorias: data,
+      registroSesion: noOp,
+      attendedIds: new Set<string>(), // none attended
+    })
+    expect(result.porEstadoAtendidas).toEqual([])
+  })
+
+  it('excludes Agendado even when in attendedIds', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', status: 'Resuelto' }),
+      makeConsultoria({ id: 'c2', status: 'Agendado' }),
+      makeConsultoria({ id: 'c3', status: 'En seguimiento' }),
+    ]
+    const result = computeMetricasFromConsultorias({
+      consultorias: data,
+      registroSesion: noOp,
+      attendedIds: new Set(['c1', 'c2', 'c3']),
+    })
+    const labels = result.porEstadoAtendidas.map((e) => e.status).sort()
+    expect(labels).toEqual(['En seguimiento', 'Resuelto'])
+    expect(result.porEstadoAtendidas.find((e) => e.status === 'Agendado')).toBeUndefined()
+  })
+
+  it('counts only sessions whose id is in attendedIds', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', status: 'Resuelto' }),  // attended
+      makeConsultoria({ id: 'c2', status: 'Resuelto' }),  // NOT attended
+      makeConsultoria({ id: 'c3', status: 'Cancelado' }), // attended
+    ]
+    const result = computeMetricasFromConsultorias({
+      consultorias: data,
+      registroSesion: noOp,
+      attendedIds: new Set(['c1', 'c3']),
+    })
+    expect(result.porEstadoAtendidas.find((e) => e.status === 'Resuelto')?.total).toBe(1)
+    expect(result.porEstadoAtendidas.find((e) => e.status === 'Cancelado')?.total).toBe(1)
+  })
+
+  it('does NOT mutate porEstado (Agendado still present there)', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', status: 'Resuelto' }),
+      makeConsultoria({ id: 'c2', status: 'Agendado' }),
+    ]
+    const result = computeMetricasFromConsultorias({
+      consultorias: data,
+      registroSesion: noOp,
+      attendedIds: new Set(['c1']),
+    })
+    expect(result.porEstado.find((e) => e.status === 'Agendado')?.total).toBe(1)
+  })
+
+  it('fallback when attendedIds undefined: mirror porEstado minus Agendado', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', status: 'Resuelto' }),
+      makeConsultoria({ id: 'c2', status: 'Agendado' }),
+    ]
+    const result = computeMetricasFromConsultorias({
+      consultorias: data,
+      registroSesion: noOp,
+      // no attendedIds
+    })
+    expect(result.porEstadoAtendidas.find((e) => e.status === 'Agendado')).toBeUndefined()
+    expect(result.porEstadoAtendidas.find((e) => e.status === 'Resuelto')?.total).toBe(1)
   })
 })
 

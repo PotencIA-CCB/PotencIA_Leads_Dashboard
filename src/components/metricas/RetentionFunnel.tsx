@@ -98,7 +98,7 @@ export function RetentionFunnel({ metricas }: RetentionFunnelProps) {
             <ResponsiveContainer width="100%" height={220}>
               <BarChart
                 data={retentionData}
-                margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
+                margin={{ top: 4, right: 16, left: 0, bottom: 28 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} label={{ value: 'Visitas', position: 'insideBottom', offset: -2, fontSize: 10 }} />

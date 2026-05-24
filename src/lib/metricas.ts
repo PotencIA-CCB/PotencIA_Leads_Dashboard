@@ -27,6 +27,9 @@ export interface MetricasGlobales {
   /** COUNT(DISTINCT id_lead) whose latest consultoria has status 'En seguimiento' */
   casosEnSeguimientoLeads: number
   porEstado: { status: string; total: number }[]
+  /** Attended sessions (id in registro_sesion.id_consultoria) AND status !== 'Agendado'.
+   *  Used by the estado donut chart to avoid Agendado contamination. */
+  porEstadoAtendidas: { status: string; total: number }[]
   tasaConversion: number
   porCasoUso: { caso: string; total: number }[]
   porCargo: { cargo: string; total: number }[]
@@ -437,7 +440,7 @@ export function getAttendedConsultorias(
 }
 
 /**
- * Count consultorias grouped by leads.company_role_area, sorted by count descending.
+ * Count consultorias grouped by categoria_caso, sorted by count descending.
  * TASK-13 (Batch B): when attendedIds is provided, replaces the provisional status filter
  * (TASK-03) with the accurate join-based filter.
  * Backward-compatible: when attendedIds is absent, falls back to status-based filter.
@@ -456,7 +459,8 @@ export function countByArea(
       })
 
   for (const c of source) {
-    const key = c.leads?.company_role_area ?? 'Sin área'
+    const key = normalizeCategoriaCaso(c.categoria_caso)
+    if (key === 'Sin categorizar') continue
     map[key] = (map[key] ?? 0) + 1
   }
 
@@ -937,6 +941,22 @@ export function computeMetricasFromConsultorias({
 
   const porEstado = Object.entries(estadoMap).map(([status, total]) => ({ status, total }))
 
+  // porEstadoAtendidas: attended (id in attendedIds) AND status !== 'Agendado'
+  const porEstadoAtendidas: { status: string; total: number }[] = (() => {
+    if (attendedIds == null) {
+      // Fallback when no join data: mirror porEstado but drop Agendado
+      return porEstado.filter((e) => e.status !== 'Agendado')
+    }
+    const attMap: Record<string, number> = {}
+    for (const c of consultorias) {
+      if (c.id == null || !attendedIds.has(c.id)) continue
+      const s = canonicalStatus(c.status)
+      if (s === 'Agendado') continue
+      attMap[s] = (attMap[s] ?? 0) + 1
+    }
+    return Object.entries(attMap).map(([status, total]) => ({ status, total }))
+  })()
+
   const resueltos = estadoMap['Resuelto'] || 0
   const totalAll = consultorias.length
   const tasaConversion = totalAll > 0 ? Math.round((resueltos / totalAll) * 100) : 0
@@ -1060,6 +1080,7 @@ export function computeMetricasFromConsultorias({
     consultoriasResueltas,
     casosEnSeguimientoLeads,
     porEstado,
+    porEstadoAtendidas,
     tasaConversion,
     porCasoUso,
     porCargo,

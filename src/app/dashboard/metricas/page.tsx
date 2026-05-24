@@ -2,37 +2,21 @@
 
 import { useMetricas } from '@/hooks/useMetricas'
 import { useState, useEffect } from 'react'
-import dynamic from 'next/dynamic'
 import { getCurrentConsultor } from '@/lib/supabase-browser'
 import {
   PieChart,
   Pie,
   Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
 import { GeneralKPIs } from '@/components/metricas/GeneralKPIs'
 import { ProductividadKPIs } from '@/components/metricas/ProductividadKPIs'
 import { RetentionFunnel } from '@/components/metricas/RetentionFunnel'
-import { QualityKPIs } from '@/components/metricas/QualityKPIs'
 import { ConsultorRadar } from '@/components/metricas/ConsultorRadar'
 import { HeatmapDrilldown } from '@/components/metricas/HeatmapDrilldown'
 
-const CiudadMap = dynamic(() => import('@/components/metricas/CiudadMap'), { ssr: false })
-
 const DONUT_COLORS = ['#003087', '#00C8FF', '#E8470A', '#004BB5']
-
-const STATUS_STACK_COLORS: Record<string, string> = {
-  Agendado: '#00C8FF',
-  'En seguimiento': '#6366F1',
-  Resuelto: '#003087',
-  Cancelado: '#E8470A',
-  Otros: '#A78BFA',
-}
 
 type InsightsState = {
   insights: string[]
@@ -189,19 +173,9 @@ export default function MetricasPage() {
       {/* GeneralKPIs — sesiones en el tiempo with granularity selector */}
       <GeneralKPIs metricas={metricas} consultorias={consultorias} />
 
-      {/* Charts — ciudad + estado */}
+      {/* Estado consultorías — donut chart */}
       <section className="grid grid-cols-12 gap-6 mb-8">
-        <div className="col-span-12 md:col-span-6 lg:col-span-4 bg-white p-4 sm:p-6 lg:p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm flex flex-col">
-          <h4
-            className="text-lg font-bold text-[#003087] mb-6"
-            style={{ fontFamily: 'Space Grotesk, sans-serif' }}
-          >
-            Distribución por departamento
-          </h4>
-          <CiudadMap data={metricas.porDepartamento} sinUbicacion={metricas.sinUbicacion} />
-        </div>
-
-        <div className="col-span-12 md:col-span-6 lg:col-span-5 bg-white p-4 sm:p-6 lg:p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-auto md:h-95 flex flex-col">
+        <div className="col-span-12 md:col-span-12 lg:col-span-12 bg-white p-4 sm:p-6 lg:p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-auto flex flex-col">
           <h4
             className="text-lg font-bold text-[#003087] mb-6"
             style={{ fontFamily: 'Space Grotesk, sans-serif' }}
@@ -213,7 +187,7 @@ export default function MetricasPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={metricas.porEstado}
+                    data={metricas.porEstadoAtendidas}
                     dataKey="total"
                     nameKey="status"
                     cx="50%"
@@ -221,7 +195,7 @@ export default function MetricasPage() {
                     innerRadius={55}
                     outerRadius={80}
                   >
-                    {metricas.porEstado.map((_, i) => (
+                    {metricas.porEstadoAtendidas.map((_, i) => (
                       <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
                     ))}
                   </Pie>
@@ -230,7 +204,7 @@ export default function MetricasPage() {
               </ResponsiveContainer>
             </div>
             <div className="flex flex-col gap-3">
-              {metricas.porEstado.map((e, i) => (
+              {metricas.porEstadoAtendidas.map((e, i) => (
                 <div key={e.status} className="flex items-center gap-2">
                   <div
                     className="w-3 h-3 rounded-full shrink-0"
@@ -243,51 +217,6 @@ export default function MetricasPage() {
               ))}
             </div>
           </div>
-        </div>
-
-        {/* Origen × estado (stacked bar) */}
-        <div className="col-span-12 md:col-span-12 lg:col-span-3 bg-white p-4 sm:p-6 lg:p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm flex flex-col">
-          <h4
-            className="text-lg font-bold text-[#003087] mb-4"
-            style={{ fontFamily: 'Space Grotesk, sans-serif' }}
-          >
-            Origen × estado
-          </h4>
-          {metricas.origenStatusBreakdown.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-slate-400">Sin datos de origen.</p>
-            </div>
-          ) : (
-            <>
-              <ResponsiveContainer width="100%" height={220} minWidth={0}>
-                <BarChart
-                  data={metricas.origenStatusBreakdown}
-                  margin={{ top: 0, right: 8, left: 0, bottom: 20 }}
-                >
-                  <XAxis
-                    dataKey="origen"
-                    tick={{ fontSize: 9 }}
-                    interval={0}
-                    angle={-20}
-                    textAnchor="end"
-                  />
-                  <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                  <Tooltip />
-                  {Object.entries(STATUS_STACK_COLORS).map(([status, color]) => (
-                    <Bar key={status} dataKey={status} stackId="status" fill={color} />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3">
-                {Object.entries(STATUS_STACK_COLORS).map(([status, color]) => (
-                  <div key={status} className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: color }} />
-                    <span className="text-[10px] text-slate-500 font-medium">{status}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
         </div>
       </section>
 
@@ -306,9 +235,6 @@ export default function MetricasPage() {
 
       {/* RetentionFunnel — funnel + retention distribution */}
       <RetentionFunnel metricas={metricas} />
-
-      {/* QualityKPIs — radial KPIs + scatter */}
-      <QualityKPIs metricas={metricas} />
 
       {/* ConsultorRadar — normalized radar per consultor */}
       <ConsultorRadar metricas={metricas} />

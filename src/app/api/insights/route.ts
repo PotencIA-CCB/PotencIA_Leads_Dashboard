@@ -1,7 +1,7 @@
 // Required env vars:
-// OPENCODE_API_KEY      — API key (e.g. OpenRouter key)
-// OPENCODE_API_BASE_URL — Base URL (e.g. https://openrouter.ai/api/v1)
-// OPENCODE_MODEL        — Model ID (e.g. google/gemini-flash-1.5)
+// OPENCODE_API_KEY      — API key for Opencode Go
+// OPENCODE_API_BASE_URL — Base URL for Opencode Go API
+// OPENCODE_MODEL        — Model ID to use
 // INSIGHTS_MIN_NEW_RECORDS — Min new consultorias before regenerating (default: 20)
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -107,11 +107,10 @@ export async function POST(req: NextRequest) {
     if (!Number.isFinite(minNew) || minNew < 1) minNew = 20
     if (minNew > 1000) minNew = 1000
 
-    // Previously: DEEPSEEK_API_KEY
-    const openCodeKey = process.env.OPENCODE_API_KEY
-    const openCodeBase = process.env.OPENCODE_API_BASE_URL
-    const openCodeModel = process.env.OPENCODE_MODEL
-    if (!openCodeKey || !openCodeBase || !openCodeModel) {
+    const openAiKey = process.env.OPENCODE_API_KEY
+    const openAiBase = process.env.OPENCODE_API_BASE_URL
+    const openAiModel = process.env.OPENCODE_MODEL
+    if (!openAiKey || !openAiBase || !openAiModel) {
       const missing = ['OPENCODE_API_KEY', 'OPENCODE_API_BASE_URL', 'OPENCODE_MODEL'].filter((k) => !process.env[k])
       return NextResponse.json({ skipped: true, reason: 'config_missing', details: { missing } })
     }
@@ -225,15 +224,15 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 70_000)
 
-    const response = await fetch(`${openCodeBase}/chat/completions`, {
+    const response = await fetch(`${openAiBase}/chat/completions`, {
       method: 'POST',
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openCodeKey}`,
+        'Authorization': `Bearer ${openAiKey}`,
       },
       body: JSON.stringify({
-        model: openCodeModel,
+        model: openAiModel,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
       }),
@@ -243,7 +242,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
       return NextResponse.json({
         skipped: true,
         reason: 'upstream_error',
-        details: { status: response.status, message: `OpenCode API error: ${response.status}` },
+        details: { status: response.status, message: `OpenAI API error: ${response.status}` },
       })
     }
 
@@ -295,7 +294,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
   } catch (error) {
     console.error('Error generando insights:', error)
     if (error instanceof Error && error.name === 'AbortError') {
-      return NextResponse.json({ error: 'OpenCode timeout' }, { status: 504 })
+      return NextResponse.json({ error: 'OpenAI timeout' }, { status: 504 })
     }
     return NextResponse.json({ error: 'Error generando insights' }, { status: 500 })
   }

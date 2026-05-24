@@ -152,8 +152,8 @@ export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsPr
         )}
       </MetricaChartCard>
 
-      {/* 2 — Consultas por área */}
-      <MetricaChartCard title="Consultas por área">
+      {/* 2 — Consultas por categoría de caso */}
+      <MetricaChartCard title="Consultas por categoría">
         <p className="text-xs text-gray-400 -mt-3 mb-3">Solo sesiones atendidas</p>
         {metricas.consultasPorArea.length === 0 ? (
           <EmptyState />
@@ -290,38 +290,6 @@ export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsPr
         )}
       </MetricaChartCard>
 
-      {/* 7 — Tiempo promedio por nivel jerárquico (TASK-01: renamed + switched to average) */}
-      <MetricaChartCard title="Tiempo promedio por nivel jerárquico (min)">
-        <p className="text-[10px] text-slate-400 -mt-2 mb-2">
-          Promedio de minutos por sesión, agrupado por nivel
-        </p>
-        {metricas.tiempoPromedioPorRol.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart
-              layout="vertical"
-              data={metricas.tiempoPromedioPorRol}
-              margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-              <YAxis
-                type="category"
-                dataKey="rol"
-                tick={{ fontSize: 10 }}
-                width={calcLeftWidth(metricas.tiempoPromedioPorRol.map((d) => d.rol))}
-              />
-              <Tooltip formatter={(value) => [value, 'Minutos promedio']} />
-              <Bar dataKey="minutos" radius={[0, 4, 4, 0]}>
-                {metricas.tiempoPromedioPorRol.map((_, i) => (
-                  <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </MetricaChartCard>
     </div>
   )
 }
