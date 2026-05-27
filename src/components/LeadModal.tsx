@@ -36,6 +36,21 @@ function getInitials(name: string): string {
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase()
 }
 
+/**
+ * Returns true if at least one registro_sesion field has non-empty content.
+ * Pure function extracted for testability.
+ */
+export function hasRegistroSesionData(
+  registro: { estado_inicial: string | null; acciones_realizadas: string | null; resultado_final: string | null } | null | undefined,
+): boolean {
+  if (registro == null) return false
+  return (
+    (registro.acciones_realizadas?.trim() ?? '') !== '' ||
+    (registro.estado_inicial?.trim() ?? '') !== '' ||
+    (registro.resultado_final?.trim() ?? '') !== ''
+  )
+}
+
 export default function LeadModal({ lead, onClose, onStatusChange, onAsignarConsultor, consultores = [] }: LeadModalProps) {
   const [saved, setSaved] = useState(false)
   const fullName = leadFullName(lead)
@@ -216,6 +231,15 @@ export default function LeadModal({ lead, onClose, onStatusChange, onAsignarCons
               <Row label="Consultor Bookings" value={con.staff_name} />
               <Row label="Email staff" value={con.staff_email} />
               <Row label="Consultor asignado" value={lead.consultor_nombre} />
+            </Section>
+          )}
+
+          {/* Registro de sesión */}
+          {con?.registro_sesion && hasRegistroSesionData(con.registro_sesion) && (
+            <Section title="Registro de sesión">
+              <Row label="Estado inicial" value={con.registro_sesion.estado_inicial} fullWidth />
+              <Row label="Acciones realizadas" value={con.registro_sesion.acciones_realizadas} fullWidth />
+              <Row label="Resultado final" value={con.registro_sesion.resultado_final} fullWidth />
             </Section>
           )}
 

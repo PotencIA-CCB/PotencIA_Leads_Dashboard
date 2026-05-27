@@ -112,6 +112,7 @@ function setupSupabaseMock() {
 // level — mocks registered with vi.mock are hoisted before imports.
 
 import { POST } from '../route'
+import { buildImpactContext } from '../route'
 
 // ─── Helper: build a minimal NextRequest-like object ─────────────────────────
 function makeRequest(body: Record<string, unknown> = {}): Request {
@@ -178,6 +179,26 @@ describe('POST /api/insights — parallelized pre-queries', () => {
 
     expect(capturedBody).not.toBeNull()
     expect(capturedBody!['max_tokens']).toBe(700)
+  })
+
+  it('includes response_format: json_object in the DeepSeek fetch body', async () => {
+    setupSupabaseMock()
+
+    let capturedBody: Record<string, unknown> | null = null
+
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: RequestInit) => {
+      capturedBody = JSON.parse(opts.body as string) as Record<string, unknown>
+      return Promise.resolve(makeFetchResponse(makeAiResponse(JSON.stringify({
+        insights: ['i1'], recomendaciones: ['r1'], alertas: ['a1'],
+      }))))
+    }))
+
+    await POST(makeRequest() as never)
+
+    expect(capturedBody).not.toBeNull()
+    const rf = capturedBody!['response_format'] as Record<string, string> | undefined
+    expect(rf).toBeDefined()
+    expect(rf?.type).toBe('json_object')
   })
 })
 
@@ -302,5 +323,87 @@ describe('POST /api/insights — JSON extraction and error handling', () => {
     expect(res.status).toBe(502)
     expect(json.reason).toBe('upstream_fetch_failed')
     expect(json.error).toBeDefined()
+  })
+})
+
+// ─── buildImpactContext with registro_sesion ───────────────────────────────
+
+describe('buildImpactContext — registro_sesion integration', () => {
+  beforeEach(() => {
+    setEnv()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('includes "ACCIONES REALIZADAS" section when registro_sesion data exists', async () => {
+    const sesionRows = [
+      { id_consultoria: 'c1', acciones_realizadas: 'Revisión financiera', estado_inicial: 'Pendiente', resultado_final: 'Interesado', cantidad_productos: 2 },
+      { id_consultoria: 'c2', acciones_realizadas: 'Demo de producto', estado_inicial: 'Agendado', resultado_final: 'Seguimiento', cantidad_productos: 1 },
+    ]
+
+    const consulRows = [
+      { id: 'c1', categoria_caso_uso: 'Agentes', nivel_potencia: 'Alto' },
+      { id: 'c2', categoria_caso_uso: 'Asistentes', nivel_potencia: 'Medio' },
+    ]
+
+    mockFrom.mockImplementation((table: string) => {
+      const chain = {
+        select: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        gte: vi.fn().mockReturnThis(),
+        gt: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        then: (resolve: (v: unknown) => void) => {
+          if (table === 'registro_sesion') {
+            resolve({ data: sesionRows, error: null })
+          } else if (table === 'consultorias') {
+            resolve({ data: consulRows, error: null })
+          } else {
+            resolve({ data: [], error: null })
+          }
+        },
+      }
+      return chain
+    })
+
+    const result = await buildImpactContext(mockSupabaseInstance as never)
+
+    // The result should include session data section
+    expect(result).toContain('ACCIONES REALIZADAS')
+    expect(result).toContain('Revisión financiera')
+    expect(result).toContain('Demo de producto')
+  })
+
+  it('degrades gracefully when no registro_sesion rows match', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      const chain = {
+        select: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        gte: vi.fn().mockReturnThis(),
+        gt: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        then: (resolve: (v: unknown) => void) => {
+          if (table === 'consultorias') {
+            resolve({ data: [], error: null })
+          } else {
+            resolve({ data: [], error: null })
+          }
+        },
+      }
+      return chain
+    })
+
+    const result = await buildImpactContext(mockSupabaseInstance as never)
+
+    // Should complete without error — may or may not include session section
+    expect(typeof result).toBe('string')
   })
 })

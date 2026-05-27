@@ -83,6 +83,8 @@ export interface MetricasGlobales {
   tasaRetorno: number
   /** % resultado_final IS NOT NULL en registro_sesion */
   tasaDocumentacion: number
+  /** Count of porEstadoAtendidas entries with status 'En seguimiento'. Aligns KPI card with donut segment. */
+  consultoriasEnSeguimientoAtendidas: number
   /** histogram: cuántos leads tuvieron N visitas */
   distribucionRetorno: { visitas: number; leads: number }[]
   /** Resuelto sin registro_sesion vinculado */
@@ -969,6 +971,10 @@ export function computeMetricasFromConsultorias({
     return Object.entries(attMap).map(([status, total]) => ({ status, total }))
   })()
 
+  // consultoriasEnSeguimientoAtendidas: derived from porEstadoAtendidas
+  const consultoriasEnSeguimientoAtendidas =
+    porEstadoAtendidas.find((e) => e.status === 'En seguimiento')?.total ?? 0
+
   const resueltos = estadoMap['Resuelto'] || 0
   const totalAll = consultorias.length
   const tasaConversion = totalAll > 0 ? Math.round((resueltos / totalAll) * 100) : 0
@@ -1128,5 +1134,6 @@ export function computeMetricasFromConsultorias({
     scatterDuracionProductos,
     heatmapFranjaDia,
     consultorMetrics,
+    consultoriasEnSeguimientoAtendidas,
   }
 }

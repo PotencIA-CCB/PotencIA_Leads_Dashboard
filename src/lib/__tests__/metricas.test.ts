@@ -743,6 +743,68 @@ describe('computeConsultorMetrics', () => {
     expect(bob!.productos).toBe(3)  // c4:3 + c5:0
   })
 
+// ─── consultoriasEnSeguimientoAtendidas ────────────────────────────────────────
+
+describe('consultoriasEnSeguimientoAtendidas', () => {
+  const noOp: import('../metricas').RegistroSesionForMetricas[] = []
+
+  it('returns 0 when porEstadoAtendidas has no "En seguimiento" entries', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', status: 'Resuelto' }),
+      makeConsultoria({ id: 'c2', status: 'Agendado' }),
+    ]
+    const result = computeMetricasFromConsultorias({
+      consultorias: data,
+      registroSesion: noOp,
+      attendedIds: new Set(['c1', 'c2']),
+    })
+    expect(result.consultoriasEnSeguimientoAtendidas).toBe(0)
+  })
+
+  it('returns correct count when "En seguimiento" exists in porEstadoAtendidas', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', status: 'En seguimiento' }),
+      makeConsultoria({ id: 'c2', status: 'En seguimiento' }),
+      makeConsultoria({ id: 'c3', status: 'En seguimiento' }),
+      makeConsultoria({ id: 'c4', status: 'En seguimiento' }),
+      makeConsultoria({ id: 'c5', status: 'Resuelto' }),
+    ]
+    const result = computeMetricasFromConsultorias({
+      consultorias: data,
+      registroSesion: noOp,
+      attendedIds: new Set(['c1', 'c2', 'c3', 'c4', 'c5']),
+    })
+    expect(result.consultoriasEnSeguimientoAtendidas).toBe(4)
+  })
+
+  it('does not count Agendado even when in attendedIds', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', status: 'En seguimiento' }),
+      makeConsultoria({ id: 'c2', status: 'Agendado' }),
+    ]
+    const result = computeMetricasFromConsultorias({
+      consultorias: data,
+      registroSesion: noOp,
+      attendedIds: new Set(['c1', 'c2']),
+    })
+    expect(result.consultoriasEnSeguimientoAtendidas).toBe(1)
+  })
+
+  it('casosEnSeguimientoLeads remains unaffected by new metric', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', id_lead: 'lead-a', status: 'En seguimiento', fecha: '2024-06-01' }),
+      makeConsultoria({ id: 'c2', id_lead: 'lead-b', status: 'En seguimiento', fecha: '2024-06-02' }),
+    ]
+    const result = computeMetricasFromConsultorias({
+      consultorias: data,
+      registroSesion: noOp,
+      attendedIds: new Set(['c1']), // only one attended: 1 from attended, 2 from leads
+    })
+    expect(result.consultoriasEnSeguimientoAtendidas).toBe(1)
+    expect(result.casosEnSeguimientoLeads).toBe(2) // both leads have En seguimiento
+  })
+})
+
   it('case 6: pctGrabadas unchanged — A=50% (1 of 2 with registro), B=50% (1 of 2 with registro)', () => {
     const result = computeConsultorMetrics(allConsultorias, allRegistros, attendedIds)
     const ana = result.find((r) => r.consultor === 'Ana')

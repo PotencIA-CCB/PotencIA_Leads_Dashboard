@@ -81,23 +81,47 @@ export default function DashboardPage() {
 
     const consultoriaByLead: Record<string, LeadCardConsultoria> = {}
     const allConsultorIds: string[] = []
+    const allConsultoriaIds: string[] = []
     if (consultoriasData) {
       for (const c of consultoriasData) {
         if (!consultoriaByLead[c.id_lead]) consultoriaByLead[c.id_lead] = c as LeadCardConsultoria
         if (c.id_consultor) allConsultorIds.push(c.id_consultor)
+        if (c.id) allConsultoriaIds.push(c.id)
       }
     }
 
-    // 4) Fetch consultores
-    const { data: consData } = await supabase.from('consultores').select('id, nombre, email, rol, created_at')
-    const allConsultores = (consData as Consultor[]) || []
+    // 4) Fetch consultores + registro_sesion (parallel — independent)
+    const [consRes, sesionRes] = await Promise.all([
+      supabase.from('consultores').select('id, nombre, email, rol, created_at'),
+      allConsultoriaIds.length > 0
+        ? supabase.from('registro_sesion').select('id_consultoria, estado_inicial, acciones_realizadas, resultado_final').in('id_consultoria', allConsultoriaIds)
+        : Promise.resolve({ data: [] as Array<{ id_consultoria: string; estado_inicial: string | null; acciones_realizadas: string | null; resultado_final: string | null }> }),
+    ])
+
+    const allConsultores = (consRes.data as Consultor[]) || []
     if (consultor.rol === 'admin') setConsultores(allConsultores)
     const consultorById: Record<string, string> = {}
     for (const c of allConsultores) consultorById[c.id] = c.nombre
 
+    // Build session data map by consultoria ID
+    const sesionByConsultoria: Record<string, LeadCardConsultoria['registro_sesion']> = {}
+    if (sesionRes.data) {
+      for (const s of sesionRes.data) {
+        sesionByConsultoria[s.id_consultoria] = {
+          estado_inicial: s.estado_inicial,
+          acciones_realizadas: s.acciones_realizadas,
+          resultado_final: s.resultado_final,
+        }
+      }
+    }
+
     // 5) Build LeadWithMeta list
     let merged: LeadWithMeta[] = baseLeads.map((l) => {
       const con = consultoriaByLead[l.id] ?? null
+      // Attach registro_sesion data to the consultoria
+      if (con?.id && sesionByConsultoria[con.id]) {
+        con.registro_sesion = sesionByConsultoria[con.id]
+      }
       return {
         ...l,
         formulario: formularioByLead[l.id] ?? null,

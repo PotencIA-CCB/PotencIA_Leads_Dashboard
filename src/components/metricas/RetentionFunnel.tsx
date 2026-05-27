@@ -15,6 +15,7 @@ import {
 } from 'recharts'
 import { type MetricasGlobales } from '@/lib/metricas'
 import { MetricaChartCard } from './MetricaChartCard'
+import InfoTooltip from './InfoTooltip'
 
 interface RetentionFunnelProps {
   metricas: MetricasGlobales
@@ -45,20 +46,29 @@ export function RetentionFunnel({ metricas }: RetentionFunnelProps) {
       {/* KPI row */}
       <div className="flex flex-wrap gap-6 mb-6">
         <div className="flex flex-col">
-          <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Leads con consultoría</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Leads con consultoría</p>
+            <InfoTooltip helpText="Cantidad de leads únicos que tienen al menos una consultoría registrada. Fuente: consultorias.id_lead (DISTINCT)" />
+          </div>
           <p className="text-2xl font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             {metricas.leadsConConsultoria}
           </p>
         </div>
         <div className="flex flex-col">
-          <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Tasa de retorno</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Tasa de retorno</p>
+            <InfoTooltip helpText="% de leads con 2+ consultorías sobre el total de leads con consultoría. Fórmula: (leads con 2+ visitas / leads con ≥1 consultoría) × 100. Fuente: consultorias.id_lead" />
+          </div>
           <p className="text-2xl font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             {metricas.tasaRetorno}%
           </p>
           <p className="text-[10px] text-slate-400 mt-0.5">leads con 2+ sesiones</p>
         </div>
         <div className="flex flex-col">
-          <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Sin consultoría</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Sin consultoría</p>
+            <InfoTooltip helpText="Leads que no tienen ninguna consultoría registrada (total de leads menos leads con consultoría). Fuente: leads vs consultorias" />
+          </div>
           <p className="text-2xl font-bold text-[#E8470A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             {metricas.leadsSinConsultoria}
           </p>

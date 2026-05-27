@@ -16,7 +16,7 @@ function getSupabase() {
   )
 }
 
-async function buildImpactContext(supabase: SupabaseClient): Promise<string> {
+export async function buildImpactContext(supabase: SupabaseClient): Promise<string> {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
@@ -37,13 +37,32 @@ async function buildImpactContext(supabase: SupabaseClient): Promise<string> {
 
     const ids = (consulData ?? []).map((c) => c.id)
     // sesionData depends on consulData ids — must run after, but only this one is sequential
+    // Include session free-text fields for insight generation
+    type SesionRow = {
+      id_consultoria: string
+      cantidad_productos: number | null
+      acciones_realizadas: string | null
+      estado_inicial: string | null
+      resultado_final: string | null
+    }
     const { data: sesionData } = ids.length > 0
-      ? await supabase.from('registro_sesion').select('id_consultoria, cantidad_productos').in('id_consultoria', ids)
-      : { data: [] as Array<{ id_consultoria: string; cantidad_productos: number | null }> }
+      ? await supabase.from('registro_sesion').select('id_consultoria, cantidad_productos, acciones_realizadas, estado_inicial, resultado_final').in('id_consultoria', ids)
+      : { data: [] as SesionRow[] }
 
     const prodByConsultoria: Record<string, number> = {}
-    for (const s of sesionData ?? []) {
+    const sesionSamples: string[] = []
+    for (const s of (sesionData ?? []) as SesionRow[]) {
       prodByConsultoria[s.id_consultoria] = s.cantidad_productos || 0
+      // Collect non-empty session text for AI prompt
+      if (s.acciones_realizadas?.trim()) {
+        sesionSamples.push(`  - Acciones: ${s.acciones_realizadas}`)
+      }
+      if (s.estado_inicial?.trim()) {
+        sesionSamples.push(`  - Estado inicial: ${s.estado_inicial}`)
+      }
+      if (s.resultado_final?.trim()) {
+        sesionSamples.push(`  - Resultado: ${s.resultado_final}`)
+      }
     }
 
     const casoMap: Record<string, number> = {}
@@ -74,6 +93,16 @@ async function buildImpactContext(supabase: SupabaseClient): Promise<string> {
     if (top5Casos) parts.push(`Top 5 casos de uso (últ. 30 días, por productos):\n${top5Casos}`)
     if (potenciaDistrib) parts.push(`Distribución nivel PotencIA:\n${potenciaDistrib}`)
     if (picosCtx) parts.push(`Últimas 4 semanas:\n${picosCtx}`)
+
+    // Session data for pattern extraction (exploratory — free-text fields)
+    if (sesionSamples.length > 0) {
+      const sessionSection = [
+        'DATOS DE SESIÓN (últ. 30 días):',
+        'ACCIONES REALIZADAS (muestra):',
+        ...sesionSamples.slice(0, 30), // cap at 30 samples to avoid token bloat
+      ].join('\n')
+      parts.push(sessionSection)
+    }
 
     return parts.join('\n\n')
   } catch {
@@ -248,6 +277,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
         max_tokens: 700,
+        response_format: { type: 'json_object' },
       }),
     }).finally(() => clearTimeout(timeoutId))
 
@@ -280,10 +310,13 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
       )
     }
 
-    // Strip markdown fences
+    // Strip markdown fences and reasoning_content prefix
+    // DeepSeek models may wrap JSON in ```json fences or prepend reasoning_content.
+    // The json_object response_format should prevent this, but keep the parser as safety net.
     const cleaned = content
       .replace(/```json\s*/gi, '')
       .replace(/```\s*/g, '')
+      .replace(/^[^{[]*/, '') // strip reasoning_content or any non-JSON prefix before the first {
       .trim()
 
     // Extract JSON object body (handles prose-wrapped JSON)
@@ -300,7 +333,12 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
     try {
       parsed = JSON.parse(match[0])
     } catch (err) {
-      console.error('insights: JSON.parse failed', { snippet: match[0].slice(0, 500), err })
+      console.error('insights: JSON.parse failed', {
+        responseType: typeof content,
+        responsePreview: content?.slice(0, 200),
+        snippet: match[0].slice(0, 500),
+        err,
+      })
       return NextResponse.json(
         { error: 'JSON inválido en la respuesta del proveedor IA', reason: 'json_parse_failed' },
         { status: 422 },

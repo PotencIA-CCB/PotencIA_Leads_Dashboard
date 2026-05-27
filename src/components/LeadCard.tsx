@@ -15,6 +15,11 @@ export type LeadCardConsultoria = {
   categoria_caso_uso: string | null
   id_consultor: string | null
   status: ConsultoriaStatus
+  registro_sesion?: {
+    estado_inicial: string | null
+    acciones_realizadas: string | null
+    resultado_final: string | null
+  } | null
 }
 
 export type LeadCardFormulario = {

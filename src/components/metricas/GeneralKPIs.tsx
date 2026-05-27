@@ -14,6 +14,7 @@ import {
 import { type MetricasGlobales, type ConsultoriaForMetricas, type Granularidad, groupByPeriod, canonicalStatus } from '@/lib/metricas'
 import { MetricaChartCard } from './MetricaChartCard'
 import { PeriodGranularitySelector } from './PeriodGranularitySelector'
+import InfoTooltip from './InfoTooltip'
 
 interface GeneralKPIsProps {
   metricas: MetricasGlobales
@@ -79,20 +80,29 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
       {/* KPI summary row */}
       <div className="flex flex-wrap gap-4 sm:gap-6 mb-5">
         <div>
-          <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Total sesiones</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Total sesiones</p>
+            <InfoTooltip helpText="Total de sesiones con estado Resuelto o En seguimiento. Fuente: consultorias.status" />
+          </div>
           <p className="text-2xl font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             {metricas.totalConsultorias}
           </p>
         </div>
         <div>
-          <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Empresas únicas</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Empresas únicas</p>
+            <InfoTooltip helpText="Cantidad de NIT únicos entre los leads con consultoría. Fuente: leads.nit" />
+          </div>
           <p className="text-2xl font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             {metricas.nitUnicos}
           </p>
           <p className="text-[10px] text-slate-400 mt-0.5">(empresas con NIT registrado)</p>
         </div>
         <div>
-          <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Leads convertidos</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Leads convertidos</p>
+            <InfoTooltip helpText="% de leads únicos con ≥1 sesión Resuelto o En seguimiento sobre el total de leads con consultoría. Fuente: consultorias.status + leads.id" />
+          </div>
           <p className="text-2xl font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             {metricas.tasaLeadConversion}%
           </p>

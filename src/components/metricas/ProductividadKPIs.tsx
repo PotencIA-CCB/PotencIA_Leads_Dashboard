@@ -15,6 +15,7 @@ import {
 import { type MetricasGlobales } from '@/lib/metricas'
 import { MetricaChartCard } from './MetricaChartCard'
 import { useWindowWidth } from '@/hooks/useWindowWidth'
+import EstadoConsultoriasDonut from './EstadoConsultoriasDonut'
 
 interface ProductividadKPIsProps {
   metricas: MetricasGlobales
@@ -249,8 +250,11 @@ export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsPr
         )}
       </MetricaChartCard>
 
+      {/* 5 — Estado consultorías (Donut) */}
+      <EstadoConsultoriasDonut porEstadoAtendidas={metricas.porEstadoAtendidas} />
+
       {/* 6 — Consultas por franja horaria (Heatmap) — TASK-16: onCellClick wired for drill-down */}
-      <MetricaChartCard title="Consultas por franja horaria" className="md:col-span-2">
+      <MetricaChartCard title="Consultas por franja horaria" className="md:col-span-1">
         <p className="text-xs text-gray-400 -mt-3 mb-3">Solo sesiones atendidas · Clic en celda para ver detalle</p>
         {metricas.heatmapFranjaDia.length === 0 ? (
           <EmptyState />

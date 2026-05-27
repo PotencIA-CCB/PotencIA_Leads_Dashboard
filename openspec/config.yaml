@@ -1,0 +1,76 @@
+schema: spec-driven
+
+context: |
+  Next.js 16 App Router + React 19 + TypeScript 5 (strict)
+  Tailwind CSS v4, Supabase (PostgreSQL + Auth), Recharts + react-simple-maps
+  Cloudflare Workers deploy via OpenNext + Wrangler
+  DeepSeek API for AI insights, Microsoft Bookings + Power Automate integration
+  Co-located __tests__ (Vitest 4.1), ESLint 9 next/core-web-vitals, no formatter
+  Roles: admin/consultor, auth via Supabase Auth Google OAuth + consultores table
+
+strict_tdd: true
+
+testing:
+  runner:
+    command: npm test
+    framework: Vitest 4.1.7
+  layers:
+    unit:
+      available: true
+      tool: Vitest
+      pattern: src/**/*.test.{ts,tsx}
+    integration:
+      available: false
+      tool: —
+    e2e:
+      available: false
+      tool: —
+  coverage:
+    available: true
+    command: npx vitest --coverage
+    tool: "@vitest/coverage-v8"
+  quality:
+    lint:
+      available: true
+      command: npm run lint
+      tool: "ESLint 9 + eslint-config-next"
+    typecheck:
+      available: true
+      command: npx tsc --noEmit
+      tool: TypeScript 5
+    formatter:
+      available: false
+      command: —
+      tool: —
+  ci:
+    available: true
+    workflow: ".github/workflows/claude-code-review.yml"
+    note: "Claude Code Review on PR (no test runner in CI yet)"
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Estimate impact on existing metrics pipeline (lib/metricas.ts)
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Reference DB schema from supabase/migrations/ when applicable
+  design:
+    - Document architecture decisions in Spanish or English (project is bilingual)
+    - Include sequence diagrams for multi-step flows (booking pipeline, insights generation)
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow co-located __tests__ pattern
+    - Keep metricas.ts pure functions (no side effects, no IO)
+    - Respect TypeScript strict mode
+    tdd: true
+    test_command: npm test
+  verify:
+    test_command: npm test
+    build_command: npm run build
+    coverage_threshold: 0
+  archive:
+    - Warn before merging delta specs that affect metricas.ts (high blast radius)
+    - Verify no regression on 88 existing tests

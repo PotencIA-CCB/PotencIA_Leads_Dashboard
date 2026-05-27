@@ -3,20 +3,12 @@
 import { useMetricas } from '@/hooks/useMetricas'
 import { useState, useEffect } from 'react'
 import { getCurrentConsultor } from '@/lib/supabase-browser'
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
 import { GeneralKPIs } from '@/components/metricas/GeneralKPIs'
 import { ProductividadKPIs } from '@/components/metricas/ProductividadKPIs'
 import { RetentionFunnel } from '@/components/metricas/RetentionFunnel'
 import { ConsultorRadar } from '@/components/metricas/ConsultorRadar'
 import { HeatmapDrilldown } from '@/components/metricas/HeatmapDrilldown'
-
-const DONUT_COLORS = ['#003087', '#00C8FF', '#E8470A', '#004BB5']
+import InfoTooltip from '@/components/metricas/InfoTooltip'
 
 type InsightsState = {
   insights: string[]
@@ -137,26 +129,30 @@ export default function MetricasPage() {
       {/* KPI Cards — 8 tiles */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6 mb-8">
         {[
-          { label: 'Total Consultorías', value: metricas.totalConsultorias, icon: 'event', sub: 'Resueltas + En seguimiento' },
-          { label: 'Resueltas', value: metricas.consultoriasResueltas, icon: 'task_alt', sub: 'Estado Resuelto' },
-          { label: 'En Seguimiento', value: metricas.casosEnSeguimientoLeads, icon: 'monitoring', sub: 'Leads en seguimiento' },
-          { label: '% Conversión', value: `${metricas.tasaConversion}%`, icon: 'trending_up', sub: 'Consultorías → Resuelto' },
-          { label: 'Productos generados', value: metricas.totalProductos, icon: 'inventory_2', sub: 'Total productos creados' },
+          { label: 'Total Consultorías', value: metricas.totalConsultorias, icon: 'event', sub: 'Resueltas + En seguimiento', helpText: 'Total de sesiones con estado Resuelto o En seguimiento. Fuente: consultorias.status' },
+          { label: 'Resueltas', value: metricas.consultoriasResueltas, icon: 'task_alt', sub: 'Estado Resuelto', helpText: 'Sesiones con estado Resuelto. Fuente: consultorias.status' },
+          { label: 'En Seguimiento', value: metricas.consultoriasEnSeguimientoAtendidas, icon: 'monitoring', sub: 'Consultorías atendidas en seguimiento', helpText: 'Consultorías atendidas con estado "En seguimiento". Fuente: consultorias.status filtrado por registro_sesion' },
+          { label: '% Conversión', value: `${metricas.tasaConversion}%`, icon: 'trending_up', sub: 'Consultorías → Resuelto', helpText: 'Porcentaje de consultorías resueltas respecto al total. Fórmula: (Resuelto / Total) × 100. Fuente: consultorias.status' },
+          { label: 'Productos generados', value: metricas.totalProductos, icon: 'inventory_2', sub: 'Total productos creados', helpText: 'Suma de cantidad_productos en registro_sesion. Fuente: registro_sesion.cantidad_productos' },
           {
             label: 'Horas de consultoría',
             value: metricas.totalMinutos === 0 ? '0 h' : `${(metricas.totalMinutos / 60).toFixed(1)} h`,
             icon: 'schedule',
             sub: 'Tiempo total de sesiones',
+            helpText: 'Suma de duracion_minutos de todas las consultorías, expresado en horas. Fuente: consultorias.duracion_minutos',
           },
-          { label: 'Eficiencia', value: metricas.eficiencia, icon: 'speed', sub: 'Productos por lead atendido' },
-          { label: 'Escalamientos', value: `${metricas.tasaEscalamiento}%`, icon: 'escalator_warning', sub: 'Sesiones escaladas' },
+          { label: 'Eficiencia', value: metricas.eficiencia, icon: 'speed', sub: 'Productos por lead atendido', helpText: 'Productos totales dividido por leads únicos atendidos (Resuelto + En seguimiento). Fuente: registro_sesion.cantidad_productos / leads.id' },
+          { label: 'Escalamientos', value: `${metricas.tasaEscalamiento}%`, icon: 'escalator_warning', sub: 'Sesiones escaladas', helpText: 'Porcentaje de consultorías con estado Escalar respecto al total. Fórmula: (Escalar / Total) × 100. Fuente: consultorias.status' },
         ].map((kpi) => (
           <div
             key={kpi.label}
             className="bg-white p-6 rounded-[10px] border-t-[3px] border-[#004BB5] border border-[#E5E7EB] shadow-sm"
           >
             <div className="flex justify-between items-start mb-4">
-              <p className="text-[12px] text-[#5A6475] font-medium tracking-tight">{kpi.label}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[12px] text-[#5A6475] font-medium tracking-tight">{kpi.label}</p>
+                <InfoTooltip helpText={kpi.helpText} />
+              </div>
               <span className="material-symbols-outlined text-[#00C8FF] text-xl">{kpi.icon}</span>
             </div>
             <h3
@@ -172,53 +168,6 @@ export default function MetricasPage() {
 
       {/* GeneralKPIs — sesiones en el tiempo with granularity selector */}
       <GeneralKPIs metricas={metricas} consultorias={consultorias} />
-
-      {/* Estado consultorías — donut chart */}
-      <section className="grid grid-cols-12 gap-6 mb-8">
-        <div className="col-span-12 bg-white p-4 sm:p-6 lg:p-8 rounded-[10px] border border-[#E5E7EB] shadow-sm h-auto flex flex-col">
-          <h4
-            className="text-lg font-bold text-[#003087] mb-6"
-            style={{ fontFamily: 'Space Grotesk, sans-serif' }}
-          >
-            Estado consultorías
-          </h4>
-          <div className="flex-1 flex flex-col sm:flex-row items-center gap-4">
-            <div className="w-full sm:w-[200px] h-[200px] shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={metricas.porEstadoAtendidas}
-                    dataKey="total"
-                    nameKey="status"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={80}
-                  >
-                    {metricas.porEstadoAtendidas.map((_, i) => (
-                      <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex flex-col gap-3">
-              {metricas.porEstadoAtendidas.map((e, i) => (
-                <div key={e.status} className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full shrink-0"
-                    style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }}
-                  />
-                  <span className="text-xs text-slate-600 font-medium">
-                    {e.status} ({e.total})
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* ProductividadKPIs — 7 charts in a 2-column grid */}
       <ProductividadKPIs
