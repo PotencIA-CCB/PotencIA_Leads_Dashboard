@@ -112,7 +112,7 @@ function setupSupabaseMock() {
 // level — mocks registered with vi.mock are hoisted before imports.
 
 import { POST } from '../route'
-import { buildImpactContext } from '../route'
+import { buildImpactContext } from '@/lib/insights-context'
 
 // ─── Helper: build a minimal NextRequest-like object ─────────────────────────
 function makeRequest(body: Record<string, unknown> = {}): Request {
