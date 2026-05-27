@@ -9,6 +9,8 @@ import { RetentionFunnel } from '@/components/metricas/RetentionFunnel'
 import { ConsultorRadar } from '@/components/metricas/ConsultorRadar'
 import { HeatmapDrilldown } from '@/components/metricas/HeatmapDrilldown'
 import InfoTooltip from '@/components/metricas/InfoTooltip'
+import WordCloud from '@/components/metricas/WordCloud'
+import { createClient } from '@/lib/supabase-browser'
 
 type InsightsState = {
   insights: string[]
@@ -27,6 +29,7 @@ export default function MetricasPage() {
     franja: string
     consultoriaIds: string[]
   } | null>(null)
+  const [wordCloudSentences, setWordCloudSentences] = useState<string[]>([])
 
   useEffect(() => {
     async function cargarUltimoInsight() {
@@ -50,6 +53,22 @@ export default function MetricasPage() {
     }
     if (!loading && metricas) cargarUltimoInsight()
   }, [loading, metricas])
+
+  // Fetch pregunta text from registro_sesion for word cloud
+  useEffect(() => {
+    async function cargarPreguntas() {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('registro_sesion')
+        .select('pregunta')
+        .not('pregunta', 'is', null)
+        .limit(200)
+      if (data) {
+        setWordCloudSentences(data.map((r: { pregunta: string }) => r.pregunta))
+      }
+    }
+    cargarPreguntas()
+  }, [])
 
   async function generarInsights() {
     setLoadingInsights(true)
@@ -187,6 +206,22 @@ export default function MetricasPage() {
 
       {/* ConsultorRadar — normalized radar per consultor */}
       <ConsultorRadar metricas={metricas} />
+
+      {/* Word Cloud — what leads want to achieve */}
+      <section className="bg-white rounded-[10px] border border-[#E5E7EB] shadow-sm">
+        <div className="px-6 py-4 border-b border-slate-100">
+          <h4
+            className="text-sm font-bold text-[#003087] uppercase tracking-widest"
+            style={{ fontFamily: 'Space Grotesk, sans-serif' }}
+          >
+            ¿Qué quieren lograr?
+          </h4>
+          <p className="text-[11px] text-slate-400 mt-1">
+            Palabras más frecuentes en las solicitudes de consultoría
+          </p>
+        </div>
+        <WordCloud sentences={wordCloudSentences} />
+      </section>
 
       {/* AI Insights */}
       <section className="bg-white rounded-[10px] border border-[#E5E7EB] shadow-sm">
