@@ -197,7 +197,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
       })
     }
 
-    let aiData: { choices?: { message?: { content?: string } }[] }
+    let aiData: { choices?: { message?: { content?: string; reasoning_content?: string } }[] }
     try {
       aiData = await response.json()
     } catch (err) {
@@ -208,11 +208,24 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
       )
     }
 
-    const content = aiData?.choices?.[0]?.message?.content
+    const choice = aiData?.choices?.[0]?.message
+    // DeepSeek R1 variants may put the actual response in reasoning_content instead of content
+    let content = choice?.content
+    if ((typeof content !== 'string' || content.length === 0) && typeof choice?.reasoning_content === 'string' && choice.reasoning_content.length > 0) {
+      content = choice.reasoning_content
+    }
     if (typeof content !== 'string' || content.length === 0) {
-      console.error('insights: missing choices[0].message.content', { aiData })
+      const debugShape = JSON.stringify({
+        hasChoices: Array.isArray(aiData?.choices),
+        choicesLen: aiData?.choices?.length ?? 0,
+        hasContent: typeof choice?.content === 'string',
+        contentLen: typeof choice?.content === 'string' ? choice.content.length : 0,
+        hasReasoning: typeof choice?.reasoning_content === 'string',
+        topKeys: aiData ? Object.keys(aiData).slice(0, 10) : [],
+      })
+      console.error('insights: missing content in AI response', debugShape)
       return NextResponse.json(
-        { error: 'Respuesta del proveedor IA con forma inesperada', reason: 'missing_choices' },
+        { error: 'Respuesta del proveedor IA con forma inesperada', reason: 'missing_choices', debug: debugShape },
         { status: 422 },
       )
     }
