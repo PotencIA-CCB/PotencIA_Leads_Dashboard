@@ -28,24 +28,40 @@ export async function buildImpactContext(supabase: SupabaseClient): Promise<stri
       acciones_realizadas: string | null
       estado_inicial: string | null
       resultado_final: string | null
+      pregunta: string | null
+      motivo_consulta: string | null
     }
     const { data: sesionData } = ids.length > 0
-      ? await supabase.from('registro_sesion').select('id_consultoria, cantidad_productos, acciones_realizadas, estado_inicial, resultado_final').in('id_consultoria', ids)
+      ? await supabase.from('registro_sesion').select('id_consultoria, cantidad_productos, acciones_realizadas, estado_inicial, resultado_final, pregunta, motivo_consulta').in('id_consultoria', ids)
       : { data: [] as SesionRow[] }
 
     const prodByConsultoria: Record<string, number> = {}
     const sesionSamples: string[] = []
+    const preguntaSamples: string[] = []
+    const motivoSamples: string[] = []
+
+    /** Truncate free-text to maxLen chars, appending "..." if truncated */
+    function truncateText(text: string, maxLen: number): string {
+      return text.length > maxLen ? text.slice(0, maxLen) + '...' : text
+    }
+
     for (const s of (sesionData ?? []) as SesionRow[]) {
       prodByConsultoria[s.id_consultoria] = s.cantidad_productos || 0
       // Collect non-empty session text for AI prompt
       if (s.acciones_realizadas?.trim()) {
-        sesionSamples.push(`  - Acciones: ${s.acciones_realizadas}`)
+        sesionSamples.push(`  - Acciones: ${truncateText(s.acciones_realizadas, 200)}`)
       }
       if (s.estado_inicial?.trim()) {
-        sesionSamples.push(`  - Estado inicial: ${s.estado_inicial}`)
+        sesionSamples.push(`  - Estado inicial: ${truncateText(s.estado_inicial, 200)}`)
       }
       if (s.resultado_final?.trim()) {
-        sesionSamples.push(`  - Resultado: ${s.resultado_final}`)
+        sesionSamples.push(`  - Resultado: ${truncateText(s.resultado_final, 200)}`)
+      }
+      if (s.pregunta?.trim()) {
+        preguntaSamples.push(`  - ${truncateText(s.pregunta, 200)}`)
+      }
+      if (s.motivo_consulta?.trim()) {
+        motivoSamples.push(`  - ${truncateText(s.motivo_consulta, 200)}`)
       }
     }
 
@@ -79,13 +95,37 @@ export async function buildImpactContext(supabase: SupabaseClient): Promise<stri
     if (picosCtx) parts.push(`Últimas 4 semanas:\n${picosCtx}`)
 
     // Session data for pattern extraction (exploratory — free-text fields)
-    if (sesionSamples.length > 0) {
-      const sessionSection = [
-        'DATOS DE SESIÓN (últ. 30 días):',
-        'ACCIONES REALIZADAS (muestra):',
-        ...sesionSamples.slice(0, 30), // cap at 30 samples to avoid token bloat
-      ].join('\n')
-      parts.push(sessionSection)
+    // Build a combined section capped at 30 total samples to avoid token bloat
+    const hasActions = sesionSamples.length > 0
+    const hasPreguntas = preguntaSamples.length > 0
+    const hasMotivos = motivoSamples.length > 0
+
+    if (hasActions || hasPreguntas || hasMotivos) {
+      const sessionLines: string[] = ['DATOS DE SESIÓN (últ. 30 días):']
+      let sampleBudget = 30
+
+      if (hasActions) {
+        sessionLines.push('ACCIONES REALIZADAS (muestra):')
+        const actionsSlice = sesionSamples.slice(0, sampleBudget)
+        sessionLines.push(...actionsSlice)
+        sampleBudget -= actionsSlice.length
+      }
+
+      if (hasPreguntas && sampleBudget > 0) {
+        sessionLines.push('PREGUNTAS DE LEADS (muestra):')
+        const preguntaSlice = preguntaSamples.slice(0, sampleBudget)
+        sessionLines.push(...preguntaSlice)
+        sampleBudget -= preguntaSlice.length
+      }
+
+      if (hasMotivos && sampleBudget > 0) {
+        sessionLines.push('MOTIVOS DE CONSULTA (muestra):')
+        const motivoSlice = motivoSamples.slice(0, sampleBudget)
+        sessionLines.push(...motivoSlice)
+        sampleBudget -= motivoSlice.length
+      }
+
+      parts.push(sessionLines.join('\n'))
     }
 
     return parts.join('\n\n')

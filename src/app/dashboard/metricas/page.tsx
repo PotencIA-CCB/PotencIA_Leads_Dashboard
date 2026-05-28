@@ -32,26 +32,22 @@ export default function MetricasPage() {
   const [wordCloudSentences, setWordCloudSentences] = useState<string[]>([])
 
   useEffect(() => {
-    async function cargarUltimoInsight() {
-      const res = await fetch('/api/insights')
-      const data = await res.json()
-      if (!Array.isArray(data) || data.length === 0) {
-        generarInsights()
-        return
+    if (loading || !metricas) return
+
+    // Check sessionStorage cache first (5-min TTL)
+    try {
+      const cached = sessionStorage.getItem('insights_cache')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (parsed.expiresAt > Date.now() && parsed.data) {
+          setInsights(parsed.data)
+          return
+        }
       }
-      setInsights({
-        insights: data
-          .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'insight')
-          .map((r: { tipo: string; valor_texto: string }) => r.valor_texto),
-        recomendaciones: data
-          .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'recomendacion')
-          .map((r: { tipo: string; valor_texto: string }) => r.valor_texto),
-        alertas: data
-          .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'alerta')
-          .map((r: { tipo: string; valor_texto: string }) => r.valor_texto),
-      })
-    }
-    if (!loading && metricas) cargarUltimoInsight()
+    } catch { /* corrupted cache — ignore and regenerate */ }
+
+    // No valid cache → generate fresh insights
+    generarInsights()
   }, [loading, metricas])
 
   // Fetch pregunta text from registro_sesion for word cloud
@@ -91,18 +87,51 @@ export default function MetricasPage() {
         } else {
           setInsightsError('No se pudieron generar insights.')
         }
+        // Try fallback to stored insights on skip
+        await cargarInsightsGuardados()
         return
       }
       if (!res.ok) {
         setInsightsError(data.error ?? 'Error generando insights.')
+        // Fall back to stored insights on API failure
+        await cargarInsightsGuardados()
         return
       }
       setInsights(data)
+      // Cache in sessionStorage with 5-min TTL
+      try {
+        sessionStorage.setItem('insights_cache', JSON.stringify({
+          data,
+          expiresAt: Date.now() + 5 * 60 * 1000,
+        }))
+      } catch { /* sessionStorage full or unavailable — ignore */ }
     } catch (err) {
       setInsightsError(err instanceof Error ? err.message : 'Error desconocido')
+      await cargarInsightsGuardados()
     } finally {
       setLoadingInsights(false)
     }
+  }
+
+  /** Fallback: fetch stored insights from GET /api/insights and render */
+  async function cargarInsightsGuardados() {
+    try {
+      const res = await fetch('/api/insights')
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        setInsights({
+          insights: data
+            .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'insight')
+            .map((r: { tipo: string; valor_texto: string }) => r.valor_texto),
+          recomendaciones: data
+            .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'recomendacion')
+            .map((r: { tipo: string; valor_texto: string }) => r.valor_texto),
+          alertas: data
+            .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'alerta')
+            .map((r: { tipo: string; valor_texto: string }) => r.valor_texto),
+        })
+      }
+    } catch { /* fallback failed — already showing error from POST */ }
   }
 
   if (loading)

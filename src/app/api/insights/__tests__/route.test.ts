@@ -407,3 +407,62 @@ describe('buildImpactContext — registro_sesion integration', () => {
     expect(typeof result).toBe('string')
   })
 })
+
+// ─── insert failure → 500 ──────────────────────────────────────────────────
+
+describe('POST /api/insights — defensive insert', () => {
+  beforeEach(() => {
+    setEnv()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('returns 500 with reason insert_failed when supabase insert errors', async () => {
+    const validPayload = JSON.stringify({
+      insights: ['i1'],
+      recomendaciones: ['r1'],
+      alertas: ['a1'],
+    })
+
+    // Mock: all queries succeed, but insert on 'insights' table fails
+    mockFrom.mockImplementation((table: string) => {
+      const chain = {
+        select: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        gte: vi.fn().mockReturnThis(),
+        gt: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockResolvedValue(
+          table === 'insights'
+            ? { data: null, error: { message: 'column "tipo" does not exist' } }
+            : { data: null, error: null },
+        ),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        then: (resolve: (v: unknown) => void) => {
+          resolve({ data: [], error: null })
+        },
+      }
+      return chain
+    })
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      makeFetchResponse(makeAiResponse(validPayload)),
+    ))
+
+    const req = new Request('http://localhost/api/insights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const res = await POST(req as never)
+    const json = await res.json()
+
+    expect(res.status).toBe(500)
+    expect(json.reason).toBe('insert_failed')
+    expect(json.error).toBeDefined()
+    expect(json.detail).toBeDefined()
+  })
+})

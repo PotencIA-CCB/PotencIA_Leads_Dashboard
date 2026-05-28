@@ -362,7 +362,13 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
     rows.push({ tipo: 'kpi', metrica: 'consultorias_last7d', valor_texto: String(conLast7), descripcion: `Consultorías últimos 7 días: ${conLast7}`, fuente: 'computed', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
 
     if (rows.length > 0) {
-      await supabase.from('insights').insert(rows)
+      const { error: insError } = await supabase.from('insights').insert(rows)
+      if (insError) {
+        return NextResponse.json(
+          { error: 'Error guardando insights', reason: 'insert_failed', detail: insError.message },
+          { status: 500 },
+        )
+      }
     }
 
     return NextResponse.json({
