@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       if (typeof body?.periodo_fin === 'string') periodoFin = body.periodo_fin
     } catch { /* no body */ }
 
-    if (!Number.isFinite(minNew) || minNew < 1) minNew = 20
+    if (!Number.isFinite(minNew) || minNew < 0) minNew = 20
     if (minNew > 1000) minNew = 1000
 
     const openAiKey = process.env.OPENCODE_API_KEY

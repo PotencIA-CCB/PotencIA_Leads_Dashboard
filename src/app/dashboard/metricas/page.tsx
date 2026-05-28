@@ -78,7 +78,7 @@ export default function MetricasPage() {
       const res = await fetch('/api/insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_consultor: consultor?.id ?? null }),
+        body: JSON.stringify({ id_consultor: consultor?.id ?? null, minNew: 0 }),
       })
       const data = await res.json()
       if (data.skipped === true) {
