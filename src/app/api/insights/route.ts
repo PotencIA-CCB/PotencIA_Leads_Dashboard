@@ -29,6 +29,56 @@ export async function GET() {
   return NextResponse.json(data ?? [])
 }
 
+/**
+ * Extract a JSON object with balanced braces from a string that may contain
+ * extra text before/after. More robust than a simple greedy regex.
+ */
+function extractBalancedJSON(text: string): string | null {
+  const start = text.indexOf('{')
+  if (start === -1) return null
+
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (ch === '\\' && inString) {
+      escaped = true
+      continue
+    }
+    if (ch === '"') {
+      inString = !inString
+      continue
+    }
+    if (inString) continue
+
+    if (ch === '{') depth++
+    else if (ch === '}') {
+      depth--
+      if (depth === 0) return text.slice(start, i + 1)
+    }
+  }
+  return null
+}
+
+/**
+ * Repair common JSON issues from AI output:
+ * - Trailing commas before } or ]
+ * - Unescaped newlines in string values (replace with space)
+ */
+function repairJSON(text: string): string {
+  return text
+    .replace(/,\s*([}\]])/g, '$1') // remove trailing commas
+    .replace(/\n/g, ' ')            // collapse newlines
+    .replace(/\r/g, '')             // remove carriage returns
+}
+
 export async function POST(req: NextRequest) {
   const supabase = getSupabase()
   try {
@@ -231,38 +281,52 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
     }
 
     // Strip markdown fences and reasoning_content prefix
-    // DeepSeek models may wrap JSON in ```json fences or prepend reasoning_content.
-    // The json_object response_format should prevent this, but keep the parser as safety net.
     const cleaned = content
       .replace(/```json\s*/gi, '')
       .replace(/```\s*/g, '')
-      .replace(/^[^{[]*/, '') // strip reasoning_content or any non-JSON prefix before the first {
+      .replace(/^[^{[]*/, '')
       .trim()
 
-    // Extract JSON object body (handles prose-wrapped JSON)
-    const match = cleaned.match(/{[\s\S]*}/)
-    if (!match) {
-      console.error('insights: no JSON object found in content', { cleaned: cleaned.slice(0, 500) })
-      return NextResponse.json(
-        { error: 'No se encontró un objeto JSON en la respuesta', reason: 'no_json_match' },
-        { status: 422 },
-      )
-    }
-
     let parsed: { insights?: string[]; recomendaciones?: string[]; alertas?: string[] }
+
+    // Strategy 1: try direct parse (best case — json_object mode)
     try {
-      parsed = JSON.parse(match[0])
-    } catch (err) {
-      console.error('insights: JSON.parse failed', {
-        responseType: typeof content,
-        responsePreview: content?.slice(0, 200),
-        snippet: match[0].slice(0, 500),
-        err,
-      })
-      return NextResponse.json(
-        { error: 'JSON inválido en la respuesta del proveedor IA', reason: 'json_parse_failed' },
-        { status: 422 },
-      )
+      parsed = JSON.parse(cleaned)
+    } catch {
+      // Strategy 2: extract JSON object with balanced braces
+      const extracted = extractBalancedJSON(cleaned)
+      if (extracted) {
+        try {
+          parsed = JSON.parse(extracted)
+        } catch {
+          // Strategy 3: repair common issues and retry
+          const repaired = repairJSON(extracted)
+          try {
+            parsed = JSON.parse(repaired)
+          } catch (err) {
+            console.error('insights: JSON.parse failed after repair', {
+              responseType: typeof content,
+              responsePreview: content?.slice(0, 200),
+              snippet: extracted.slice(0, 500),
+              repaired: repaired.slice(0, 500),
+            })
+            return NextResponse.json(
+              {
+                error: 'JSON inválido en la respuesta del proveedor IA',
+                reason: 'json_parse_failed',
+                debug: extracted.slice(0, 300),
+              },
+              { status: 422 },
+            )
+          }
+        }
+      } else {
+        console.error('insights: no JSON object found in content', { cleaned: cleaned.slice(0, 500) })
+        return NextResponse.json(
+          { error: 'No se encontró un objeto JSON en la respuesta', reason: 'no_json_match' },
+          { status: 422 },
+        )
+      }
     }
 
     // Derive period bounds: use provided values or fall back to current week
