@@ -5,8 +5,8 @@ import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
 import { Lead, ConsultoriaStatus, Consultor, leadFullName } from '@/types'
 import LeadCard, { effectiveStatus, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
 import LeadModal from '@/components/LeadModal'
-import { computeCapturaStats } from '@/lib/capturaStats'
-import { StatCard } from '@/components/dashboard/StatCard'
+import { computeFunnelStats, type FunnelStats } from '@/lib/capturaStats'
+import LeadsFunnel from '@/components/dashboard/LeadsFunnel'
 
 const statusOptions: Array<'Todos' | ConsultoriaStatus> = ['Todos', 'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
 
@@ -17,6 +17,17 @@ const statusChip: Record<string, { active: string; idle: string }> = {
   'En seguimiento': { active: 'bg-indigo-600 text-white border border-indigo-600',   idle: 'bg-white text-indigo-700 border border-indigo-200' },
   Resuelto:         { active: 'bg-emerald-600 text-white border border-emerald-600', idle: 'bg-white text-emerald-700 border border-emerald-200' },
   Cancelado:        { active: 'bg-slate-600 text-white border border-slate-600',     idle: 'bg-white text-slate-600 border border-slate-200' },
+}
+
+const emptyFunnelStats: FunnelStats = {
+  totalLandingLeads: 0,
+  landingNeverBooked: 0,
+  landingBooked: 0,
+  noShows: 0,
+  cicloCompleto: 0,
+  bookedNoLandingDirecto: 0,
+  soloBookedNoSession: 0,
+  asistieronSinLandingNiBooking: 0,
 }
 
 export default function DashboardPage() {
@@ -30,17 +41,8 @@ export default function DashboardPage() {
   const [filterDateTo, setFilterDateTo] = useState('')
   const [pendientesMas5, setPendientesMas5] = useState(false)
   const [rol, setRol] = useState('')
-  const [totalRegistrosSesion, setTotalRegistrosSesion] = useState<number>(0)
-  const [globalStats, setGlobalStats] = useState({
-    uniqueNits: 0,
-    caso1: 0,
-    caso2: 0,
-    caso3: 0,
-    caso4: 0,
-    enSeguimiento: 0,
-    resuelto: 0,
-    escalar: 0,
-  })
+  const [funnelStats, setFunnelStats] = useState<FunnelStats>(emptyFunnelStats)
+  const [totalBookings, setTotalBookings] = useState<number>(0)
 
   const fetchData = async () => {
     setLoading(true)
@@ -96,26 +98,24 @@ export default function DashboardPage() {
     const allConsultorIds: string[] = []
     const allConsultoriaIds: string[] = []
     const consultoriaCountByLead: Record<string, number> = {}
-    const consultoriaIdsByLead: Record<string, string[]> = {}
     if (consultoriasData) {
       for (const c of consultoriasData) {
         if (!consultoriaByLead[c.id_lead]) consultoriaByLead[c.id_lead] = c as LeadCardConsultoria
         if (c.id_consultor) allConsultorIds.push(c.id_consultor)
         if (c.id) allConsultoriaIds.push(c.id)
         consultoriaCountByLead[c.id_lead] = (consultoriaCountByLead[c.id_lead] ?? 0) + 1
-        if (c.id) (consultoriaIdsByLead[c.id_lead] ??= []).push(c.id)
       }
     }
 
-    // 4) Fetch consultores + registro_sesion (parallel — independent)
-    const [consRes, sesionRes, totalSesionRes] = await Promise.all([
+    // 4) Fetch consultores + registro_sesion + unfiltered bookings count (parallel — independent)
+    const [consRes, sesionRes, totalBookingsRes] = await Promise.all([
       supabase.from('consultores').select('id, nombre, email, rol, created_at'),
       allConsultoriaIds.length > 0
         ? supabase.from('registro_sesion').select('id_consultoria, estado_inicial, acciones_realizadas, resultado_final, resultado').in('id_consultoria', allConsultoriaIds)
         : Promise.resolve({ data: [] as Array<{ id_consultoria: string; estado_inicial: string | null; acciones_realizadas: string | null; resultado_final: string | null; resultado: string | null }> }),
-      supabase.from('registro_sesion').select('*', { count: 'exact', head: true }),
+      supabase.from('consultorias').select('*', { count: 'exact', head: true }),
     ])
-    setTotalRegistrosSesion(totalSesionRes.count ?? 0)
+    setTotalBookings(totalBookingsRes.count ?? 0)
 
     const allConsultores = (consRes.data as Consultor[]) || []
     if (consultor.rol === 'admin') setConsultores(allConsultores)
@@ -134,30 +134,13 @@ export default function DashboardPage() {
       }
     }
 
-    // 5a) Global stats — computed over baseLeads BEFORE role filter
-    const uniqueNits = new Set(baseLeads.filter((l) => l.nit).map((l) => l.nit!)).size
-    let caso2 = 0, caso3 = 0, caso4 = 0
-    for (const l of baseLeads) {
-      if (l.origen === 'landing') caso2++
-      if (l.origen === 'booking') caso3++
-      if ((consultoriaCountByLead[l.id] ?? 0) >= 2) caso4++
-    }
-    const capturaStats = computeCapturaStats(
+    // 5a) Compute funnel stats over baseLeads BEFORE role filter
+    setFunnelStats(computeFunnelStats(
       baseLeads,
       formulariosData ?? [],
       consultoriasData ?? [],
       sesionRes.data ?? [],
-    )
-    setGlobalStats({
-      uniqueNits,
-      caso1: capturaStats.caso1,
-      caso2,
-      caso3,
-      caso4,
-      enSeguimiento: capturaStats.enSeguimiento,
-      resuelto: capturaStats.resuelto,
-      escalar: capturaStats.escalar,
-    })
+    ))
 
     // 5) Build LeadWithMeta list
     let merged: LeadWithMeta[] = baseLeads.map((l) => {
@@ -230,15 +213,6 @@ export default function DashboardPage() {
     () => isAdmin ? leads.filter((l) => l.consultoria?.status === 'Agendado' && !l.consultoria?.id_consultor) : [],
     [leads, isAdmin]
   )
-
-  const stats = useMemo(() => {
-    const total = leads.filter((l) => effectiveStatus(l) !== 'Cancelado').length
-    const pendientes = leads.filter((l) => effectiveStatus(l) === 'Pendiente').length
-    const agendados = leads.filter((l) => effectiveStatus(l) === 'Agendado').length
-    const enSeguimiento = leads.filter((l) => effectiveStatus(l) === 'En seguimiento').length
-    const resueltos = leads.filter((l) => effectiveStatus(l) === 'Resuelto').length
-    return { total, pendientes, agendados, enSeguimiento, resueltos }
-  }, [leads])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -321,75 +295,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats — indicadores */}
-      <div className="space-y-4 mb-6">
-        {/* Row 1 — Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <StatCard label="Total activos" value={stats.total} accent="text-[#003087]" />
-          <StatCard label="Total Consultorias" value={totalRegistrosSesion} accent="text-[#00C8FF]" />
-          <StatCard label="NITs Unicos" value={globalStats.uniqueNits} accent="text-violet-600" />
-        </div>
-
-        {/* Row 2 — Estado del Pipeline */}
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Estado del Pipeline</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Pendientes" value={stats.pendientes} accent="text-amber-600" />
-            <StatCard label="Agendados" value={stats.agendados} accent="text-sky-600" />
-            <StatCard label="En seguimiento" value={stats.enSeguimiento} accent="text-indigo-600" />
-            <StatCard label="Resueltos" value={stats.resueltos} accent="text-emerald-600" />
-          </div>
-        </div>
-
-        {/* Row 3 — Captura de Leads */}
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Captura de Leads</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard
-              label="Landing + Booking + Sesion"
-              value={globalStats.caso1}
-              accent="text-emerald-600"
-              helpText="Leads con registro en formulario landing, consultoría y al menos una sesión. Fuente: formularios_landing + consultorias + registro_sesion"
-            />
-            <StatCard
-              label="Landing sin agendar"
-              value={globalStats.caso2}
-              accent="text-amber-600"
-              helpText="Leads cuyo origen es solo landing (sin booking). Fuente: leads.origen"
-            />
-            <StatCard
-              label="Solo Booking"
-              value={globalStats.caso3}
-              accent="text-sky-600"
-              helpText="Leads cuyo origen es solo Microsoft Bookings. Fuente: leads.origen"
-            />
-            <StatCard
-              label="Reagendado por consultor"
-              value={globalStats.caso4}
-              accent="text-indigo-600"
-              helpText="Leads con 2 o más consultorías registradas. Fuente: consultorias (conteo por id_lead)"
-            />
-            <StatCard
-              label="En seguimiento"
-              value={globalStats.enSeguimiento}
-              accent="text-indigo-600"
-              helpText="Sesiones con resultado En seguimiento. Fuente: registro_sesion.resultado"
-            />
-            <StatCard
-              label="Resuelto"
-              value={globalStats.resuelto}
-              accent="text-emerald-600"
-              helpText="Sesiones con resultado Resuelto. Fuente: registro_sesion.resultado"
-            />
-            <StatCard
-              label="Escalar"
-              value={globalStats.escalar}
-              accent="text-rose-600"
-              helpText="Sesiones con resultado Escalar. Fuente: registro_sesion.resultado"
-            />
-          </div>
-        </div>
-      </div>
+      {/* Funnel */}
+      <LeadsFunnel stats={funnelStats} totalBookings={totalBookings} />
 
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-4 mb-6">
