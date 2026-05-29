@@ -20,6 +20,8 @@ export interface Lead {
   booking_customer_id: string | null
   phone_normalized: string | null
   origen: LeadOrigen
+  nit_validado_rues: boolean
+  renovado_2026: boolean
 }
 
 export function leadFullName(lead: Pick<Lead, 'nombre' | 'apellidos'>): string {

@@ -5,8 +5,6 @@ import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
 import { Lead, ConsultoriaStatus, Consultor, leadFullName } from '@/types'
 import LeadCard, { effectiveStatus, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
 import LeadModal from '@/components/LeadModal'
-import { computeFunnelStats, type FunnelStats } from '@/lib/capturaStats'
-import LeadsFunnel from '@/components/dashboard/LeadsFunnel'
 
 const statusOptions: Array<'Todos' | ConsultoriaStatus> = ['Todos', 'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
 
@@ -19,16 +17,6 @@ const statusChip: Record<string, { active: string; idle: string }> = {
   Cancelado:        { active: 'bg-slate-600 text-white border border-slate-600',     idle: 'bg-white text-slate-600 border border-slate-200' },
 }
 
-const emptyFunnelStats: FunnelStats = {
-  totalLandingLeads: 0,
-  landingNeverBooked: 0,
-  landingBooked: 0,
-  noShows: 0,
-  cicloCompleto: 0,
-  bookedNoLandingDirecto: 0,
-  soloBookedNoSession: 0,
-  asistieronSinLandingNiBooking: 0,
-}
 
 export default function DashboardPage() {
   const [leads, setLeads] = useState<LeadWithMeta[]>([])
@@ -41,10 +29,7 @@ export default function DashboardPage() {
   const [filterDateTo, setFilterDateTo] = useState('')
   const [pendientesMas5, setPendientesMas5] = useState(false)
   const [rol, setRol] = useState('')
-  const [funnelStats, setFunnelStats] = useState<FunnelStats>(emptyFunnelStats)
-  const [totalBookings, setTotalBookings] = useState<number>(0)
-
-  const fetchData = async () => {
+const fetchData = async () => {
     setLoading(true)
     const consultor = await getCurrentConsultor()
     if (!consultor) {
@@ -107,15 +92,13 @@ export default function DashboardPage() {
       }
     }
 
-    // 4) Fetch consultores + registro_sesion + unfiltered bookings count (parallel — independent)
-    const [consRes, sesionRes, totalBookingsRes] = await Promise.all([
+    // 4) Fetch consultores + registro_sesion (parallel — independent)
+    const [consRes, sesionRes] = await Promise.all([
       supabase.from('consultores').select('id, nombre, email, rol, created_at'),
       allConsultoriaIds.length > 0
         ? supabase.from('registro_sesion').select('id_consultoria, estado_inicial, acciones_realizadas, resultado_final, resultado').in('id_consultoria', allConsultoriaIds)
         : Promise.resolve({ data: [] as Array<{ id_consultoria: string; estado_inicial: string | null; acciones_realizadas: string | null; resultado_final: string | null; resultado: string | null }> }),
-      supabase.from('consultorias').select('*', { count: 'exact', head: true }),
     ])
-    setTotalBookings(totalBookingsRes.count ?? 0)
 
     const allConsultores = (consRes.data as Consultor[]) || []
     if (consultor.rol === 'admin') setConsultores(allConsultores)
@@ -133,14 +116,6 @@ export default function DashboardPage() {
         }
       }
     }
-
-    // 5a) Compute funnel stats over baseLeads BEFORE role filter
-    setFunnelStats(computeFunnelStats(
-      baseLeads,
-      formulariosData ?? [],
-      consultoriasData ?? [],
-      sesionRes.data ?? [],
-    ))
 
     // 5) Build LeadWithMeta list
     let merged: LeadWithMeta[] = baseLeads.map((l) => {
@@ -294,9 +269,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-
-      {/* Funnel */}
-      <LeadsFunnel stats={funnelStats} totalBookings={totalBookings} />
 
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-4 mb-6">
