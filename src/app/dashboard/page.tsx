@@ -8,10 +8,6 @@ import LeadModal from '@/components/LeadModal'
 import InfoTooltip from '@/components/metricas/InfoTooltip'
 import { computeCapturaStats } from '@/lib/capturaStats'
 
-export function statCardShowsTooltip(helpText: string | undefined): boolean {
-  return typeof helpText === 'string' && helpText.trim().length > 0
-}
-
 const statusOptions: Array<'Todos' | ConsultoriaStatus> = ['Todos', 'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
 
 const statusChip: Record<string, { active: string; idle: string }> = {

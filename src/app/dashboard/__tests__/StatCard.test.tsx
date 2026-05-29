@@ -8,7 +8,7 @@
  * StatCard is exported from page.tsx so it can be imported here.
  */
 import { describe, it, expect } from 'vitest'
-import { statCardShowsTooltip } from '../page'
+import { statCardShowsTooltip } from '@/lib/capturaStats'
 
 describe('StatCard — tooltip visibility predicate', () => {
   it('returns true when helpText is a non-empty string', () => {

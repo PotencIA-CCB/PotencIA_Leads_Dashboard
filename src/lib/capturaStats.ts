@@ -54,3 +54,7 @@ export function computeCapturaStats(
 
   return { caso1, enSeguimiento, resuelto, escalar }
 }
+
+export function statCardShowsTooltip(helpText: string | undefined): boolean {
+  return typeof helpText === 'string' && helpText.trim().length > 0
+}
