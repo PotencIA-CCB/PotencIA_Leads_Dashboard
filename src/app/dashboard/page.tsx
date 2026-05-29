@@ -28,6 +28,14 @@ export default function DashboardPage() {
   const [filterDateTo, setFilterDateTo] = useState('')
   const [pendientesMas5, setPendientesMas5] = useState(false)
   const [rol, setRol] = useState('')
+  const [totalRegistrosSesion, setTotalRegistrosSesion] = useState<number>(0)
+  const [globalStats, setGlobalStats] = useState({
+    uniqueNits: 0,
+    caso1: 0,
+    caso2: 0,
+    caso3: 0,
+    caso4: 0,
+  })
 
   const fetchData = async () => {
     setLoading(true)
@@ -82,21 +90,27 @@ export default function DashboardPage() {
     const consultoriaByLead: Record<string, LeadCardConsultoria> = {}
     const allConsultorIds: string[] = []
     const allConsultoriaIds: string[] = []
+    const consultoriaCountByLead: Record<string, number> = {}
+    const consultoriaIdsByLead: Record<string, string[]> = {}
     if (consultoriasData) {
       for (const c of consultoriasData) {
         if (!consultoriaByLead[c.id_lead]) consultoriaByLead[c.id_lead] = c as LeadCardConsultoria
         if (c.id_consultor) allConsultorIds.push(c.id_consultor)
         if (c.id) allConsultoriaIds.push(c.id)
+        consultoriaCountByLead[c.id_lead] = (consultoriaCountByLead[c.id_lead] ?? 0) + 1
+        if (c.id) (consultoriaIdsByLead[c.id_lead] ??= []).push(c.id)
       }
     }
 
     // 4) Fetch consultores + registro_sesion (parallel — independent)
-    const [consRes, sesionRes] = await Promise.all([
+    const [consRes, sesionRes, totalSesionRes] = await Promise.all([
       supabase.from('consultores').select('id, nombre, email, rol, created_at'),
       allConsultoriaIds.length > 0
         ? supabase.from('registro_sesion').select('id_consultoria, estado_inicial, acciones_realizadas, resultado_final').in('id_consultoria', allConsultoriaIds)
         : Promise.resolve({ data: [] as Array<{ id_consultoria: string; estado_inicial: string | null; acciones_realizadas: string | null; resultado_final: string | null }> }),
+      supabase.from('registro_sesion').select('*', { count: 'exact', head: true }),
     ])
+    setTotalRegistrosSesion(totalSesionRes.count ?? 0)
 
     const allConsultores = (consRes.data as Consultor[]) || []
     if (consultor.rol === 'admin') setConsultores(allConsultores)
@@ -114,6 +128,19 @@ export default function DashboardPage() {
         }
       }
     }
+
+    // 5a) Global stats — computed over baseLeads BEFORE role filter
+    const uniqueNits = new Set(baseLeads.filter((l) => l.nit).map((l) => l.nit!)).size
+    let caso1 = 0, caso2 = 0, caso3 = 0, caso4 = 0
+    for (const l of baseLeads) {
+      const ids = consultoriaIdsByLead[l.id] ?? []
+      const hasSesion = ids.some((id) => sesionByConsultoria[id])
+      if (l.origen === 'ambos' && hasSesion) caso1++
+      if (l.origen === 'landing') caso2++
+      if (l.origen === 'booking') caso3++
+      if ((consultoriaCountByLead[l.id] ?? 0) >= 2) caso4++
+    }
+    setGlobalStats({ uniqueNits, caso1, caso2, caso3, caso4 })
 
     // 5) Build LeadWithMeta list
     let merged: LeadWithMeta[] = baseLeads.map((l) => {
@@ -277,13 +304,36 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats — funnel activo */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <StatCard label="Total activos" value={stats.total} accent="text-[#003087]" />
-        <StatCard label="Pendientes" value={stats.pendientes} accent="text-amber-600" />
-        <StatCard label="Agendados" value={stats.agendados} accent="text-sky-600" />
-        <StatCard label="En seguimiento" value={stats.enSeguimiento} accent="text-indigo-600" />
-        <StatCard label="Resueltos" value={stats.resueltos} accent="text-emerald-600" />
+      {/* Stats — indicadores */}
+      <div className="space-y-4 mb-6">
+        {/* Row 1 — Overview */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <StatCard label="Total activos" value={stats.total} accent="text-[#003087]" />
+          <StatCard label="Total Consultorias" value={totalRegistrosSesion} accent="text-[#00C8FF]" />
+          <StatCard label="NITs Unicos" value={globalStats.uniqueNits} accent="text-violet-600" />
+        </div>
+
+        {/* Row 2 — Estado del Pipeline */}
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Estado del Pipeline</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard label="Pendientes" value={stats.pendientes} accent="text-amber-600" />
+            <StatCard label="Agendados" value={stats.agendados} accent="text-sky-600" />
+            <StatCard label="En seguimiento" value={stats.enSeguimiento} accent="text-indigo-600" />
+            <StatCard label="Resueltos" value={stats.resueltos} accent="text-emerald-600" />
+          </div>
+        </div>
+
+        {/* Row 3 — Captura de Leads */}
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Captura de Leads</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard label="Landing + Booking + Sesion" value={globalStats.caso1} accent="text-emerald-600" />
+            <StatCard label="Landing sin agendar" value={globalStats.caso2} accent="text-amber-600" />
+            <StatCard label="Solo Booking" value={globalStats.caso3} accent="text-sky-600" />
+            <StatCard label="Reagendado por consultor" value={globalStats.caso4} accent="text-indigo-600" />
+          </div>
+        </div>
       </div>
 
       {/* Filter Bar */}
