@@ -5,8 +5,8 @@ import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
 import { Lead, ConsultoriaStatus, Consultor, leadFullName } from '@/types'
 import LeadCard, { effectiveStatus, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
 import LeadModal from '@/components/LeadModal'
-import InfoTooltip from '@/components/metricas/InfoTooltip'
 import { computeCapturaStats } from '@/lib/capturaStats'
+import { StatCard } from '@/components/dashboard/StatCard'
 
 const statusOptions: Array<'Todos' | ConsultoriaStatus> = ['Todos', 'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
 
@@ -490,19 +490,6 @@ export default function DashboardPage() {
   )
 }
 
-export function StatCard({ label, value, accent, helpText }: { label: string; value: number; accent: string; helpText?: string }) {
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] px-5 py-4">
-      <div className="flex items-center gap-1.5">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
-        {helpText && <InfoTooltip helpText={helpText} />}
-      </div>
-      <p className={`text-3xl font-extrabold ${accent} mt-1`} style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-        {value}
-      </p>
-    </div>
-  )
-}
 
 function SkeletonGrid() {
   return (

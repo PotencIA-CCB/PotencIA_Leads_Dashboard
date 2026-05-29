@@ -1,11 +1,5 @@
 /**
- * Tests for StatCard tooltip behavior.
- *
- * Strategy: Export a pure helper `statCardShowsTooltip(helpText?)` from page.tsx
- * that mirrors the conditional `{helpText && <InfoTooltip ... />}`. Test the
- * predicate in node env (no DOM needed — matches project convention).
- *
- * StatCard is exported from page.tsx so it can be imported here.
+ * Tests for StatCard tooltip behavior via the statCardShowsTooltip predicate.
  */
 import { describe, it, expect } from 'vitest'
 import { statCardShowsTooltip } from '@/lib/capturaStats'
