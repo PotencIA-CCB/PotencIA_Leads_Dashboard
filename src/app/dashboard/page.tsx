@@ -5,6 +5,12 @@ import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
 import { Lead, ConsultoriaStatus, Consultor, leadFullName } from '@/types'
 import LeadCard, { effectiveStatus, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
 import LeadModal from '@/components/LeadModal'
+import InfoTooltip from '@/components/metricas/InfoTooltip'
+import { computeCapturaStats } from '@/lib/capturaStats'
+
+export function statCardShowsTooltip(helpText: string | undefined): boolean {
+  return typeof helpText === 'string' && helpText.trim().length > 0
+}
 
 const statusOptions: Array<'Todos' | ConsultoriaStatus> = ['Todos', 'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
 
@@ -35,6 +41,9 @@ export default function DashboardPage() {
     caso2: 0,
     caso3: 0,
     caso4: 0,
+    enSeguimiento: 0,
+    resuelto: 0,
+    escalar: 0,
   })
 
   const fetchData = async () => {
@@ -106,8 +115,8 @@ export default function DashboardPage() {
     const [consRes, sesionRes, totalSesionRes] = await Promise.all([
       supabase.from('consultores').select('id, nombre, email, rol, created_at'),
       allConsultoriaIds.length > 0
-        ? supabase.from('registro_sesion').select('id_consultoria, estado_inicial, acciones_realizadas, resultado_final').in('id_consultoria', allConsultoriaIds)
-        : Promise.resolve({ data: [] as Array<{ id_consultoria: string; estado_inicial: string | null; acciones_realizadas: string | null; resultado_final: string | null }> }),
+        ? supabase.from('registro_sesion').select('id_consultoria, estado_inicial, acciones_realizadas, resultado_final, resultado').in('id_consultoria', allConsultoriaIds)
+        : Promise.resolve({ data: [] as Array<{ id_consultoria: string; estado_inicial: string | null; acciones_realizadas: string | null; resultado_final: string | null; resultado: string | null }> }),
       supabase.from('registro_sesion').select('*', { count: 'exact', head: true }),
     ])
     setTotalRegistrosSesion(totalSesionRes.count ?? 0)
@@ -131,16 +140,28 @@ export default function DashboardPage() {
 
     // 5a) Global stats — computed over baseLeads BEFORE role filter
     const uniqueNits = new Set(baseLeads.filter((l) => l.nit).map((l) => l.nit!)).size
-    let caso1 = 0, caso2 = 0, caso3 = 0, caso4 = 0
+    let caso2 = 0, caso3 = 0, caso4 = 0
     for (const l of baseLeads) {
-      const ids = consultoriaIdsByLead[l.id] ?? []
-      const hasSesion = ids.some((id) => sesionByConsultoria[id])
-      if (l.origen === 'ambos' && hasSesion) caso1++
       if (l.origen === 'landing') caso2++
       if (l.origen === 'booking') caso3++
       if ((consultoriaCountByLead[l.id] ?? 0) >= 2) caso4++
     }
-    setGlobalStats({ uniqueNits, caso1, caso2, caso3, caso4 })
+    const capturaStats = computeCapturaStats(
+      baseLeads,
+      formulariosData ?? [],
+      consultoriasData ?? [],
+      sesionRes.data ?? [],
+    )
+    setGlobalStats({
+      uniqueNits,
+      caso1: capturaStats.caso1,
+      caso2,
+      caso3,
+      caso4,
+      enSeguimiento: capturaStats.enSeguimiento,
+      resuelto: capturaStats.resuelto,
+      escalar: capturaStats.escalar,
+    })
 
     // 5) Build LeadWithMeta list
     let merged: LeadWithMeta[] = baseLeads.map((l) => {
@@ -328,10 +349,48 @@ export default function DashboardPage() {
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Captura de Leads</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Landing + Booking + Sesion" value={globalStats.caso1} accent="text-emerald-600" />
-            <StatCard label="Landing sin agendar" value={globalStats.caso2} accent="text-amber-600" />
-            <StatCard label="Solo Booking" value={globalStats.caso3} accent="text-sky-600" />
-            <StatCard label="Reagendado por consultor" value={globalStats.caso4} accent="text-indigo-600" />
+            <StatCard
+              label="Landing + Booking + Sesion"
+              value={globalStats.caso1}
+              accent="text-emerald-600"
+              helpText="Leads con registro en formulario landing, consultoría y al menos una sesión. Fuente: formularios_landing + consultorias + registro_sesion"
+            />
+            <StatCard
+              label="Landing sin agendar"
+              value={globalStats.caso2}
+              accent="text-amber-600"
+              helpText="Leads cuyo origen es solo landing (sin booking). Fuente: leads.origen"
+            />
+            <StatCard
+              label="Solo Booking"
+              value={globalStats.caso3}
+              accent="text-sky-600"
+              helpText="Leads cuyo origen es solo Microsoft Bookings. Fuente: leads.origen"
+            />
+            <StatCard
+              label="Reagendado por consultor"
+              value={globalStats.caso4}
+              accent="text-indigo-600"
+              helpText="Leads con 2 o más consultorías registradas. Fuente: consultorias (conteo por id_lead)"
+            />
+            <StatCard
+              label="En seguimiento"
+              value={globalStats.enSeguimiento}
+              accent="text-indigo-600"
+              helpText="Sesiones con resultado En seguimiento. Fuente: registro_sesion.resultado"
+            />
+            <StatCard
+              label="Resuelto"
+              value={globalStats.resuelto}
+              accent="text-emerald-600"
+              helpText="Sesiones con resultado Resuelto. Fuente: registro_sesion.resultado"
+            />
+            <StatCard
+              label="Escalar"
+              value={globalStats.escalar}
+              accent="text-rose-600"
+              helpText="Sesiones con resultado Escalar. Fuente: registro_sesion.resultado"
+            />
           </div>
         </div>
       </div>
@@ -435,10 +494,13 @@ export default function DashboardPage() {
   )
 }
 
-function StatCard({ label, value, accent }: { label: string; value: number; accent: string }) {
+export function StatCard({ label, value, accent, helpText }: { label: string; value: number; accent: string; helpText?: string }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] px-5 py-4">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
+      <div className="flex items-center gap-1.5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
+        {helpText && <InfoTooltip helpText={helpText} />}
+      </div>
       <p className={`text-3xl font-extrabold ${accent} mt-1`} style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
         {value}
       </p>
