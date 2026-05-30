@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
         .select('fecha, status, servicio, duracion_minutos, categoria_caso, categoria_caso_uso'),
       supabase
         .from('novedades')
-        .select('tipo, titulo, contenido')
+        .select('tipo, titulo, contenido, fecha_inicio, fecha_fin')
         .order('created_at', { ascending: false })
         .limit(20),
       buildImpactContext(supabase),
@@ -177,7 +177,12 @@ export async function POST(req: NextRequest) {
     }).length
     const growth7dPct = conPrev7 > 0 ? Math.round(((conLast7 - conPrev7) / conPrev7) * 100) : null
 
-    const novedadesCtx = (novedades || []).slice(0, 10).map((n) => `[${n.tipo}] ${n.titulo}: ${n.contenido?.slice(0, 150)}`).join('\n')
+    const novedadesCtx = (novedades || []).slice(0, 10).map((n) => {
+      const rango = n.fecha_inicio
+        ? ` (${n.fecha_inicio}${n.fecha_fin && n.fecha_fin !== n.fecha_inicio ? ` a ${n.fecha_fin}` : ''})`
+        : ''
+      return `[${n.tipo}]${rango} ${n.titulo}: ${n.contenido?.slice(0, 150)}`
+    }).join('\n')
 
     const prompt = `Eres un analista de negocios experto de la Cámara de Comercio de Barranquilla.
 Analiza los siguientes datos del dashboard de consultoría PotencIA y genera insights accionables en español, usando un tono ejecutivo.
@@ -186,6 +191,7 @@ REGLAS:
 - Cada insight debe citar al menos 1 número o distribución.
 - Cada recomendación debe ser accionable (qué hacer + por qué + en cuánto tiempo).
 - Incluye indicadores cualitativos basados en las novedades de consultores si están disponibles.
+- Las novedades de tipo "evento" o "ausencia" con fecha indican períodos en que un consultor no estuvo disponible; úsalas como contexto para explicar caídas o desvíos en las consultorías, no como un dato negativo del consultor.
 
 DATOS:
 - Total de consultorías: ${total}
@@ -197,7 +203,7 @@ DATOS:
 IMPACTO ENTREGADO:
 ${impactContext || 'Sin datos de impacto disponibles.'}
 
-NOVEDADES DE CONSULTORES:
+NOVEDADES Y EVENTOS DE CONSULTORES:
 ${novedadesCtx || 'Sin novedades registradas.'}
 
 Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional:

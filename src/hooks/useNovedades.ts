@@ -36,6 +36,8 @@ export async function createNovedad(payload: {
   titulo: string
   contenido: string
   tipo: NovedadTipo
+  fecha_inicio?: string | null
+  fecha_fin?: string | null
   id_lead?: string | null
   id_consultoria?: string | null
   indicadores?: Record<string, unknown>
@@ -49,6 +51,8 @@ export async function createNovedad(payload: {
     titulo: payload.titulo,
     contenido: payload.contenido,
     tipo: payload.tipo,
+    fecha_inicio: payload.fecha_inicio ?? null,
+    fecha_fin: payload.fecha_fin ?? null,
     id_lead: payload.id_lead ?? null,
     id_consultoria: payload.id_consultoria ?? null,
     indicadores: payload.indicadores ?? {},
@@ -58,8 +62,24 @@ export async function createNovedad(payload: {
   return data as Novedad
 }
 
-export async function updateNovedad(id: string, updates: { titulo?: string; contenido?: string; tipo?: NovedadTipo }) {
+export async function updateNovedad(
+  id: string,
+  updates: {
+    titulo?: string
+    contenido?: string
+    tipo?: NovedadTipo
+    fecha_inicio?: string | null
+    fecha_fin?: string | null
+  },
+) {
   const supabase = createClient()
   const { error } = await supabase.from('novedades').update(updates).eq('id', id)
+  if (error) throw error
+}
+
+/** Borra una novedad. La RLS solo permite borrar las propias (o admin). */
+export async function deleteNovedad(id: string) {
+  const supabase = createClient()
+  const { error } = await supabase.from('novedades').delete().eq('id', id)
   if (error) throw error
 }

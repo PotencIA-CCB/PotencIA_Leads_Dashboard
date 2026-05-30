@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { useNovedades, createNovedad, updateNovedad } from '@/hooks/useNovedades'
-import type { NovedadTipo } from '@/types'
+import { useEffect, useState } from 'react'
+import { useNovedades, createNovedad, updateNovedad, deleteNovedad } from '@/hooks/useNovedades'
+import { getCurrentConsultor } from '@/lib/supabase-browser'
+import type { Novedad, NovedadTipo } from '@/types'
 
 const TIPOS: { value: NovedadTipo; label: string; color: string }[] = [
   { value: 'caso_de_uso', label: 'Caso de uso', color: 'bg-emerald-100 text-emerald-700' },
@@ -10,8 +11,21 @@ const TIPOS: { value: NovedadTipo; label: string; color: string }[] = [
   { value: 'incidencia', label: 'Incidencia', color: 'bg-red-100 text-red-700' },
   { value: 'logro', label: 'Logro', color: 'bg-amber-100 text-amber-700' },
   { value: 'sugerencia', label: 'Sugerencia', color: 'bg-violet-100 text-violet-700' },
+  { value: 'evento', label: 'Evento', color: 'bg-indigo-100 text-indigo-700' },
+  { value: 'ausencia', label: 'Ausencia', color: 'bg-orange-100 text-orange-700' },
   { value: 'otro', label: 'Otro', color: 'bg-slate-100 text-slate-600' },
 ]
+
+/** Tipos con fecha relevante: eventos/ausencias que afectan la disponibilidad. */
+const TIPOS_CON_FECHA: NovedadTipo[] = ['evento', 'ausencia']
+
+function formatRangoFecha(inicio: string | null, fin: string | null): string | null {
+  if (!inicio) return null
+  const fmt = (d: string) =>
+    new Date(`${d}T00:00:00`).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+  if (fin && fin !== inicio) return `${fmt(inicio)} → ${fmt(fin)}`
+  return fmt(inicio)
+}
 
 export default function NovedadesPage() {
   const { novedades, loading, refetch } = useNovedades()
@@ -21,12 +35,32 @@ export default function NovedadesPage() {
   const [titulo, setTitulo] = useState('')
   const [contenido, setContenido] = useState('')
   const [tipo, setTipo] = useState<NovedadTipo>('caso_de_uso')
+  const [fechaInicio, setFechaInicio] = useState('')
+  const [fechaFin, setFechaFin] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const [filtroTipo, setFiltroTipo] = useState<NovedadTipo | 'todas'>('todas')
+
+  const [myId, setMyId] = useState<string | null>(null)
+  const [myRol, setMyRol] = useState<string | null>(null)
+
+  useEffect(() => {
+    getCurrentConsultor().then((me) => {
+      if (me) {
+        setMyId(me.id)
+        setMyRol(me.rol)
+      }
+    })
+  }, [])
+
+  const puedeGestionar = (n: Novedad) => myRol === 'admin' || n.id_consultor === myId
 
   function resetForm() {
     setTitulo('')
     setContenido('')
     setTipo('caso_de_uso')
+    setFechaInicio('')
+    setFechaFin('')
     setShowForm(false)
     setEditingId(null)
   }
@@ -36,10 +70,14 @@ export default function NovedadesPage() {
     if (!titulo.trim() || !contenido.trim()) return
     setSaving(true)
     try {
+      const fechas = {
+        fecha_inicio: fechaInicio || null,
+        fecha_fin: fechaFin || null,
+      }
       if (editingId) {
-        await updateNovedad(editingId, { titulo: titulo.trim(), contenido: contenido.trim(), tipo })
+        await updateNovedad(editingId, { titulo: titulo.trim(), contenido: contenido.trim(), tipo, ...fechas })
       } else {
-        await createNovedad({ titulo: titulo.trim(), contenido: contenido.trim(), tipo })
+        await createNovedad({ titulo: titulo.trim(), contenido: contenido.trim(), tipo, ...fechas })
       }
       refetch()
       resetForm()
@@ -49,13 +87,28 @@ export default function NovedadesPage() {
     setSaving(false)
   }
 
-  function handleEdit(n: { id: string; titulo: string; contenido: string; tipo: NovedadTipo }) {
+  function handleEdit(n: Novedad) {
     setEditingId(n.id)
     setTitulo(n.titulo)
     setContenido(n.contenido)
     setTipo(n.tipo)
+    setFechaInicio(n.fecha_inicio ?? '')
+    setFechaFin(n.fecha_fin ?? '')
     setShowForm(true)
   }
+
+  async function handleDelete(n: Novedad) {
+    if (!window.confirm(`¿Eliminar la novedad "${n.titulo}"? Esta acción no se puede deshacer.`)) return
+    try {
+      await deleteNovedad(n.id)
+      refetch()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const novedadesFiltradas =
+    filtroTipo === 'todas' ? novedades : novedades.filter((n) => n.tipo === filtroTipo)
 
   return (
     <>
@@ -84,7 +137,7 @@ export default function NovedadesPage() {
           </button>
         </div>
         <p className="text-sm text-slate-500 mt-1">
-          Publicaciones del equipo sobre casos de uso implementados, mejoras, logros y sugerencias.
+          Publicaciones del equipo: casos de uso, mejoras, logros, sugerencias y eventos o ausencias que afectan las estadísticas.
         </p>
       </div>
 
@@ -112,7 +165,7 @@ export default function NovedadesPage() {
                 onChange={(e) => setContenido(e.target.value)}
                 rows={4}
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 resize-none"
-                placeholder="Describe el caso de uso, mejora o logro..."
+                placeholder="Describe el caso de uso, mejora, logro o el evento que afecta tu disponibilidad..."
                 required
               />
             </div>
@@ -135,6 +188,41 @@ export default function NovedadesPage() {
                 ))}
               </div>
             </div>
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+                Fecha {TIPOS_CON_FECHA.includes(tipo) ? '(recomendado)' : '(opcional)'}
+              </label>
+              <p className="text-[11px] text-slate-400 mb-2">
+                Para eventos o ausencias que afecten tu disponibilidad (ej: una feria el martes). Dejá el fin vacío si es un solo día.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="date"
+                  value={fechaInicio}
+                  onChange={(e) => setFechaInicio(e.target.value)}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30"
+                  aria-label="Fecha de inicio"
+                />
+                <span className="text-slate-400 text-sm">→</span>
+                <input
+                  type="date"
+                  value={fechaFin}
+                  min={fechaInicio || undefined}
+                  onChange={(e) => setFechaFin(e.target.value)}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30"
+                  aria-label="Fecha de fin"
+                />
+                {(fechaInicio || fechaFin) && (
+                  <button
+                    type="button"
+                    onClick={() => { setFechaInicio(''); setFechaFin('') }}
+                    className="text-[11px] text-slate-400 hover:text-slate-600 cursor-pointer underline"
+                  >
+                    Limpiar fechas
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="flex items-center gap-3 pt-2">
               <button
                 type="submit"
@@ -155,6 +243,33 @@ export default function NovedadesPage() {
         </div>
       )}
 
+      {/* Filtro por tipo */}
+      {!loading && novedades.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-5">
+          <button
+            type="button"
+            onClick={() => setFiltroTipo('todas')}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer border ${
+              filtroTipo === 'todas' ? 'bg-[#003087] text-white border-[#003087]' : 'bg-white text-slate-500 border-slate-200'
+            }`}
+          >
+            Todas
+          </button>
+          {TIPOS.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setFiltroTipo(t.value)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer border ${
+                filtroTipo === t.value ? `${t.color} border-current` : 'bg-white text-slate-500 border-slate-200'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Feed */}
       {loading ? (
         <div className="flex items-center justify-center h-32">
@@ -170,10 +285,15 @@ export default function NovedadesPage() {
           </h3>
           <p className="text-sm text-slate-500 mt-1">Publicá la primera novedad para empezar a registrar la actividad del equipo.</p>
         </div>
+      ) : novedadesFiltradas.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-8 text-center">
+          <p className="text-sm text-slate-500">No hay novedades de este tipo.</p>
+        </div>
       ) : (
         <div className="space-y-4">
-          {novedades.map((n) => {
+          {novedadesFiltradas.map((n) => {
             const t = TIPOS.find((x) => x.value === n.tipo)
+            const rango = formatRangoFecha(n.fecha_inicio, n.fecha_fin)
             return (
               <article key={n.id} className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-4 sm:p-6">
                 <div className="flex items-start gap-3">
@@ -188,18 +308,35 @@ export default function NovedadesPage() {
                         {new Date(n.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </span>
                     </div>
+                    {rango && (
+                      <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 rounded-md px-2 py-0.5 mb-1.5">
+                        <span className="material-symbols-outlined text-[14px]" aria-hidden="true">event</span>
+                        {rango}
+                      </div>
+                    )}
                     <h3 className="text-base font-bold text-[#001d59] mb-1" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
                       {n.titulo}
                     </h3>
                     <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{n.contenido}</p>
                   </div>
-                  <button
-                    onClick={() => handleEdit(n)}
-                    className="shrink-0 w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
-                    title="Editar"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">edit</span>
-                  </button>
+                  {puedeGestionar(n) && (
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        onClick={() => handleEdit(n)}
+                        className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+                        title="Editar"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(n)}
+                        className="w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 flex items-center justify-center cursor-pointer"
+                        title="Eliminar"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </article>
             )

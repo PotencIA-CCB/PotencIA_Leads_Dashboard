@@ -466,3 +466,78 @@ describe('POST /api/insights — defensive insert', () => {
     expect(json.detail).toBeDefined()
   })
 })
+
+// ─── novedades event dates injected into the AI prompt ──────────────────────
+
+describe('POST /api/insights — novedades event dates in prompt', () => {
+  beforeEach(() => {
+    setEnv()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function mockNovedades(rows: Record<string, unknown>[]) {
+    mockFrom.mockImplementation((table: string) => {
+      const chain = {
+        select: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        gte: vi.fn().mockReturnThis(),
+        gt: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        then: (resolve: (v: unknown) => void) =>
+          resolve({ data: table === 'novedades' ? rows : [], error: null }),
+      }
+      return chain
+    })
+  }
+
+  function captureFetchBody() {
+    const ref: { body: string | null } = { body: null }
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: RequestInit) => {
+      ref.body = opts.body as string
+      return Promise.resolve(makeFetchResponse(makeAiResponse(JSON.stringify({
+        insights: ['i1'], recomendaciones: ['r1'], alertas: ['a1'],
+      }))))
+    }))
+    return ref
+  }
+
+  it('formats a multi-day event with "(inicio a fin)" in the prompt', async () => {
+    mockNovedades([
+      { tipo: 'evento', titulo: 'Feria BIZ', contenido: 'No atiendo consultorías', fecha_inicio: '2026-06-02', fecha_fin: '2026-06-04' },
+    ])
+    const ref = captureFetchBody()
+
+    await POST(makeRequest() as never)
+
+    expect(ref.body).toContain('[evento] (2026-06-02 a 2026-06-04) Feria BIZ')
+  })
+
+  it('formats a single-day absence with just "(fecha)" when fecha_fin is null', async () => {
+    mockNovedades([
+      { tipo: 'ausencia', titulo: 'Cita', contenido: 'No disponible', fecha_inicio: '2026-06-10', fecha_fin: null },
+    ])
+    const ref = captureFetchBody()
+
+    await POST(makeRequest() as never)
+
+    expect(ref.body).toContain('[ausencia] (2026-06-10) Cita')
+  })
+
+  it('omits the date parenthetical for novedades without fecha_inicio', async () => {
+    mockNovedades([
+      { tipo: 'caso_de_uso', titulo: 'RAG', contenido: 'Implementé RAG', fecha_inicio: null, fecha_fin: null },
+    ])
+    const ref = captureFetchBody()
+
+    await POST(makeRequest() as never)
+
+    expect(ref.body).toContain('[caso_de_uso] RAG:')
+    expect(ref.body).not.toContain('[caso_de_uso] (')
+  })
+})

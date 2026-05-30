@@ -114,7 +114,15 @@ export interface RegistroSesion {
   confirmo_no_automatizacion: boolean | null
 }
 
-export type NovedadTipo = 'caso_de_uso' | 'mejora' | 'incidencia' | 'logro' | 'sugerencia' | 'otro'
+export type NovedadTipo =
+  | 'caso_de_uso'
+  | 'mejora'
+  | 'incidencia'
+  | 'logro'
+  | 'sugerencia'
+  | 'otro'
+  | 'evento'
+  | 'ausencia'
 
 export interface Novedad {
   id: string
@@ -126,6 +134,10 @@ export interface Novedad {
   titulo: string
   contenido: string
   tipo: NovedadTipo
+  /** Fecha del evento/ausencia (null para publicaciones sin fecha). */
+  fecha_inicio: string | null
+  /** Fin del rango, para eventos de varios días (null si es un solo día o sin fecha). */
+  fecha_fin: string | null
   indicadores: Record<string, unknown>
 }
 
