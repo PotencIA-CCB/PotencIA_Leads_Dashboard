@@ -1,5 +1,45 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 
+type SessionRecord = {
+  estado_inicial: string | null
+  acciones_realizadas: string | null
+  resultado_final: string | null
+  estimacion_impacto: string | null
+}
+
+/**
+ * Reads all registro_sesion records with the four analytical fields and returns
+ * a numbered list string ready to be embedded in an LLM prompt.
+ * Capped at 200 records to avoid token overflow.
+ */
+export async function buildSessionDataset(supabase: SupabaseClient): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from('registro_sesion')
+      .select('estado_inicial, acciones_realizadas, resultado_final, estimacion_impacto')
+      .not('estado_inicial', 'is', null)
+      .order('id', { ascending: false })
+      .limit(200)
+
+    if (!data || data.length === 0) return ''
+
+    const rows = (data as SessionRecord[]).map((r, i) => {
+      const parts: string[] = [`[${i + 1}]`]
+      if (r.estado_inicial) parts.push(`estado_inicial: ${r.estado_inicial.slice(0, 400)}`)
+      if (r.acciones_realizadas) parts.push(`acciones: ${r.acciones_realizadas.slice(0, 400)}`)
+      if (r.resultado_final) parts.push(`resultado: ${r.resultado_final.slice(0, 400)}`)
+      if (r.estimacion_impacto !== null && r.estimacion_impacto !== '') {
+        parts.push(`impacto_horas_mes: ${r.estimacion_impacto}`)
+      }
+      return parts.join(' | ')
+    })
+
+    return `REGISTROS DE SESIÓN (${data.length} registros):\n${rows.join('\n')}`
+  } catch {
+    return ''
+  }
+}
+
 export async function buildImpactContext(supabase: SupabaseClient): Promise<string> {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)

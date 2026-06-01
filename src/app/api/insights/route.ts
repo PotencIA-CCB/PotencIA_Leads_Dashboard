@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { buildImpactContext } from '@/lib/insights-context'
+import { buildImpactContext, buildSessionDataset } from '@/lib/insights-context'
 
 export const dynamic = 'force-dynamic'
 
@@ -112,6 +112,7 @@ export async function POST(req: NextRequest) {
       consultoriasRes,
       novedadesRes,
       impactContext,
+      sessionDataset,
     ] = await Promise.all([
       supabase
         .from('insights')
@@ -128,6 +129,7 @@ export async function POST(req: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(20),
       buildImpactContext(supabase),
+      buildSessionDataset(supabase),
     ])
 
     const lastInsight = lastInsightRes.data
@@ -184,44 +186,45 @@ export async function POST(req: NextRequest) {
       return `[${n.tipo}]${rango} ${n.titulo}: ${n.contenido?.slice(0, 150)}`
     }).join('\n')
 
-    const prompt = `Eres un analista de negocios experto de la Cámara de Comercio de Barranquilla.
-Analiza los siguientes datos del dashboard de consultoría PotencIA y genera insights accionables en español, usando un tono ejecutivo.
+    const prompt = `Eres un analista de datos especializado en consultoría de IA. Analiza los registros del programa PotencIA y genera dos bloques de análisis en español con tono ejecutivo. Nunca inventes datos; si un campo está vacío márcalo como "sin clasificar".
 
-REGLAS:
-- Cada insight debe citar al menos 1 número o distribución.
-- Cada recomendación debe ser accionable (qué hacer + por qué + en cuánto tiempo).
-- Incluye indicadores cualitativos basados en las novedades de consultores si están disponibles.
-- Las novedades de tipo "evento" o "ausencia" con fecha indican períodos en que un consultor no estuvo disponible; úsalas como contexto para explicar caídas o desvíos en las consultorías, no como un dato negativo del consultor.
+# FUENTE DE DATOS
+${sessionDataset || 'Sin registros disponibles.'}
 
-DATOS:
-- Total de consultorías: ${total}
-- Tasa de conversión: ${tasaConversion}%
-- Consultorías por estado: ${JSON.stringify(estadoMap)}
-- Servicios más solicitados: ${JSON.stringify(servicioMap)}
-- Consultorías últimos 7 días: ${conLast7}${growth7dPct === null ? '' : ` (vs semana anterior: ${growth7dPct >= 0 ? '+' : ''}${growth7dPct}%)`}
+CONTEXTO OPERACIONAL (últimos 30 días):
+${impactContext || 'Sin datos adicionales.'}
 
-IMPACTO ENTREGADO:
-${impactContext || 'Sin datos de impacto disponibles.'}
-
-NOVEDADES Y EVENTOS DE CONSULTORES:
+NOVEDADES DE CONSULTORES:
 ${novedadesCtx || 'Sin novedades registradas.'}
 
-Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional:
+# BLOQUE 1 — PATRONES (estado_inicial → resultado_final)
+1. Clasifica cada estado_inicial en UNA categoría: Reportería/informes | Análisis y gestión de datos | Atención al cliente/leads | Inventario/operaciones | Propuestas comerciales/ventas | Otro.
+2. Clasifica cada resultado_final en: Asistente GPT personalizado | Dashboard | Landing/Web con WhatsApp | Agente/Automatización | Documento/Plantilla | Otro.
+3. Identifica los 3 caminos problema→solución más frecuentes con conteo y %.
+
+# BLOQUE 2 — QUÉ FUNCIONA (acciones_realizadas × estimacion_impacto)
+1. Extrae herramientas de acciones_realizadas normalizando: chatgpt/gpt→ChatGPT; Claude; Gemini; Copilot; n8n; Make; Power Automate; Zoho; otras.
+2. Por herramienta: número de sesiones, suma y promedio de horas/mes (estimacion_impacto, solo casos > 0).
+3. Top 3 casos por estimacion_impacto: estado_inicial resumido, herramienta principal, horas/mes.
+4. Métricas globales: total horas/mes, anualizado (×12), casos con impacto 0.
+
+# INSTRUCCIÓN DE SALIDA
+Responde ÚNICAMENTE con JSON sin texto adicional:
 {
   "insights": [
-    "insight 1 basado en los datos",
-    "insight 2 basado en los datos",
-    "insight 3 basado en los datos"
+    "Patrón 1: categoría de problema más frecuente con conteo, %, y solución más común asociada",
+    "Patrón 2: segundo camino problema→solución más frecuente con cifras",
+    "Patrón 3: hallazgo relevante de la matriz (solución inesperada, concentración, etc.)"
   ],
   "recomendaciones": [
-    "recomendación 1 accionable",
-    "recomendación 2 accionable",
-    "recomendación 3 accionable"
+    "Qué funciona 1: herramienta con mayor impacto promedio (horas/mes) y en qué tipo de caso",
+    "Qué funciona 2: métricas globales — total horas/mes, proyección anual, top caso",
+    "Qué funciona 3: comparación entre categorías de solución por horas ahorradas promedio"
   ],
   "alertas": [
-    "alerta 1 sobre riesgo o problema detectado",
-    "alerta 2 sobre riesgo o problema detectado",
-    "alerta 3 sobre riesgo o problema detectado"
+    "Hallazgo accionable 1: qué replicar con evidencia numérica",
+    "Hallazgo accionable 2: qué corregir o dónde hay oportunidad",
+    "Hallazgo accionable 3: riesgo o patrón que requiere atención"
   ]
 }`
 
@@ -239,7 +242,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta, sin texto adicional
         model: openAiModel,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        max_tokens: 700,
+        max_tokens: 1500,
         response_format: { type: 'json_object' },
       }),
     }).finally(() => clearTimeout(timeoutId))

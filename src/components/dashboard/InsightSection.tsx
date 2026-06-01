@@ -232,9 +232,9 @@ export default function InsightSection({
       )}
       {insights && !loadingInsights && (
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-          <InsightColumn title="Insights" items={insights.insights} />
-          <InsightColumn title="Recomendaciones" items={insights.recomendaciones} />
-          <InsightColumn title="Atención" items={insights.alertas} />
+          <InsightColumn title="Patrones" items={insights.insights} />
+          <InsightColumn title="Qué Funciona" items={insights.recomendaciones} />
+          <InsightColumn title="Hallazgos" items={insights.alertas} />
         </div>
       )}
     </section>
