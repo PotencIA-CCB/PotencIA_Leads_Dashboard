@@ -337,7 +337,7 @@ Responde ÚNICAMENTE con JSON sin texto adicional:
       } else {
         console.error('insights: no JSON object found in content', { cleaned: cleaned.slice(0, 500) })
         return NextResponse.json(
-          { error: 'No se encontró un objeto JSON en la respuesta', reason: 'no_json_match' },
+          { error: 'No se encontró un objeto JSON en la respuesta', reason: 'no_json_match', debug: cleaned.slice(0, 600) },
           { status: 422 },
         )
       }
