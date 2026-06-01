@@ -237,6 +237,8 @@ Responde ÚNICAMENTE con JSON sin texto adicional:
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${openAiKey}`,
+        'HTTP-Referer': 'https://potencia.ccc.org.co',
+        'X-Title': 'PotencIA Dashboard',
       },
       body: JSON.stringify({
         model: openAiModel,
