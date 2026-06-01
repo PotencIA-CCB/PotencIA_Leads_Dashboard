@@ -71,9 +71,11 @@ function makeFetchResponse(body: unknown, ok = true, status = 200): Response {
 function setEnv() {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
-  process.env.OPENCODE_API_KEY = 'test-opencode-key'
-  process.env.OPENCODE_API_BASE_URL = 'https://api.test.com'
-  process.env.OPENCODE_MODEL = 'test-model'
+  // Route reads OPENROUTER_* (renamed from the old OPENCODE_* in commit fde8d05).
+  process.env.OPENROUTER_API_KEY = 'test-openrouter-key'
+  process.env.OPENROUTER_API_URL = 'https://api.test.com'
+  // Model must be on the response_format allowlist (openai/ | anthropic/ | google/gemini | moonshotai/).
+  process.env.OPENROUTER_MODEL = 'moonshotai/kimi-k2.6:free'
 }
 
 // ─── Supabase chain helper ─────────────────────────────────────────────────
@@ -163,7 +165,7 @@ describe('POST /api/insights — parallelized pre-queries', () => {
     promiseAllSpy.mockRestore()
   })
 
-  it('sends max_tokens: 700 in the DeepSeek fetch body', async () => {
+  it('sends max_tokens: 1500 in the OpenRouter fetch body', async () => {
     setupSupabaseMock()
 
     let capturedBody: Record<string, unknown> | null = null
@@ -178,10 +180,10 @@ describe('POST /api/insights — parallelized pre-queries', () => {
     await POST(makeRequest() as never)
 
     expect(capturedBody).not.toBeNull()
-    expect(capturedBody!['max_tokens']).toBe(700)
+    expect(capturedBody!['max_tokens']).toBe(1500)
   })
 
-  it('includes response_format: json_object in the DeepSeek fetch body', async () => {
+  it('includes response_format: json_object in the OpenRouter fetch body', async () => {
     setupSupabaseMock()
 
     let capturedBody: Record<string, unknown> | null = null
