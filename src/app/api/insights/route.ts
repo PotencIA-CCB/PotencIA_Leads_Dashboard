@@ -242,9 +242,13 @@ Responde ÚNICAMENTE con JSON sin texto adicional:
       },
       body: JSON.stringify({
         model: openAiModel,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
+        messages: [
+          { role: 'system', content: 'You are a data analyst. Always respond with valid JSON only. No markdown, no explanations, no text outside the JSON object.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.3,
         max_tokens: 1500,
+        response_format: { type: 'json_object' },
       }),
     }).finally(() => clearTimeout(timeoutId))
 
