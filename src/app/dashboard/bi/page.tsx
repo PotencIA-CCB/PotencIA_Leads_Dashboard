@@ -4,7 +4,6 @@ import { useBusinessIntelligence } from '@/hooks/useBusinessIntelligence'
 import { StatCard } from '@/components/dashboard/StatCard'
 import LeadsFunnel from '@/components/dashboard/LeadsFunnel'
 import InsightSection from '@/components/dashboard/InsightSection'
-import SessionInsightsSection from '@/components/dashboard/SessionInsightsSection'
 import type { FunnelStats } from '@/lib/capturaStats'
 
 const emptyFunnelStats: FunnelStats = {
@@ -19,7 +18,7 @@ const emptyFunnelStats: FunnelStats = {
 }
 
 export default function BIPage() {
-  const { biStats, funnelStats, totalBookings, sessionInsights, loading } = useBusinessIntelligence()
+  const { biStats, funnelStats, totalBookings, loading } = useBusinessIntelligence()
 
   return (
     <>
@@ -134,17 +133,6 @@ export default function BIPage() {
         <InsightSection ready={!loading} />
       </section>
 
-      {/* Section 4 — Session Insights */}
-      <section aria-labelledby="session-insights-heading" className="mt-8">
-        <h3
-          id="session-insights-heading"
-          className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4"
-          style={{ fontFamily: 'Space Grotesk, sans-serif' }}
-        >
-          Insights de Sesiones
-        </h3>
-        <SessionInsightsSection sessions={sessionInsights} loading={loading} />
-      </section>
     </>
   )
 }

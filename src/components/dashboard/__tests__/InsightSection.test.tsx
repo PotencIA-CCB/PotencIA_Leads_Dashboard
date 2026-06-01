@@ -170,7 +170,7 @@ describe('InsightSection — static render (ready=false)', () => {
 
   it('renders the section heading text', () => {
     const html = renderToStaticMarkup(createElement(InsightSection, { ready: false }))
-    expect(html).toContain('Insights')
+    expect(html).toContain('Análisis con IA')
   })
 
   it('renders an "Actualizar" button', () => {
