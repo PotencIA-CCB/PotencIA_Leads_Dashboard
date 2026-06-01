@@ -1,7 +1,7 @@
 // Required env vars:
 // OPENROUTER_API_KEY — OpenRouter API key
-// OPENROUTER_API_URL — OpenRouter base URL (https://openrouter.ai/api/v1)
-// OPENROUTER_MODEL   — Model ID (e.g. google/gemini-flash-1.5:free)
+// OPENROUTER_API_URL — https://openrouter.ai/api/v1
+// OPENROUTER_MODEL   — e.g. moonshotai/kimi-k2.6:free | nvidia/nemotron-3-super-120b-a12b:free | google/gemma-4-31b-it:free
 // INSIGHTS_MIN_NEW_RECORDS — Min new consultorias before regenerating (default: 20)
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -248,7 +248,7 @@ Responde ÚNICAMENTE con JSON sin texto adicional:
         ],
         temperature: 0.3,
         max_tokens: 1500,
-        ...(openAiModel.startsWith('openai/') || openAiModel.startsWith('anthropic/') || openAiModel.startsWith('google/gemini')
+        ...(openAiModel.startsWith('openai/') || openAiModel.startsWith('anthropic/') || openAiModel.startsWith('google/gemini') || openAiModel.startsWith('moonshotai/')
           ? { response_format: { type: 'json_object' } }
           : {}),
       }),
