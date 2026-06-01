@@ -1,6 +1,7 @@
 'use client'
 
 // TASK-08: Replaced Treemap with BarChart layout="vertical" for casos más solicitados.
+// bi-section-redesign: Duración → true vertical bars; Casos → inline donut.
 import {
   BarChart,
   Bar,
@@ -11,11 +12,13 @@ import {
   Legend,
   ResponsiveContainer,
   Cell,
+  PieChart,
+  Pie,
 } from 'recharts'
 import { type MetricasGlobales } from '@/lib/metricas'
 import { MetricaChartCard } from './MetricaChartCard'
 import { useWindowWidth } from '@/hooks/useWindowWidth'
-import EstadoConsultoriasDonut from './EstadoConsultoriasDonut'
+import EstadoConsultoriasDonut, { DONUT_COLORS } from './EstadoConsultoriasDonut'
 
 interface ProductividadKPIsProps {
   metricas: MetricasGlobales
@@ -130,20 +133,22 @@ export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsPr
         ) : (
           <ResponsiveContainer width="100%" height={260}>
             <BarChart
-              layout="vertical"
               data={metricas.duracionPorConsultor}
-              margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
+              margin={{ top: 0, right: 16, left: 0, bottom: 60 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-              <YAxis
-                type="category"
+              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+              <XAxis
                 dataKey="consultor"
+                type="category"
+                angle={-35}
+                textAnchor="end"
+                interval={0}
+                height={70}
                 tick={{ fontSize: 10 }}
-                width={calcLeftWidth(metricas.duracionPorConsultor.map((d) => d.consultor))}
               />
+              <YAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="avg" radius={[0, 4, 4, 0]}>
+              <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
                 {metricas.duracionPorConsultor.map((_, i) => (
                   <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
                 ))}
@@ -183,33 +188,46 @@ export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsPr
         )}
       </MetricaChartCard>
 
-      {/* 4 — Casos más solicitados (TASK-08: replaced Treemap with vertical BarChart) */}
+      {/* 4 — Casos más solicitados (bi-section-redesign: replaced BarChart with inline donut) */}
       <MetricaChartCard title="Casos más solicitados">
         {metricas.porCasoUso.length === 0 ? (
           <EmptyState />
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart
-              layout="vertical"
-              data={metricas.porCasoUso}
-              margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-              <YAxis
-                type="category"
-                dataKey="caso"
-                tick={{ fontSize: 10 }}
-                width={calcLeftWidth(metricas.porCasoUso.map((d) => d.caso))}
-              />
-              <Tooltip formatter={(value) => [value, 'Consultas']} />
-              <Bar dataKey="total" radius={[0, 4, 4, 0]}>
-                {metricas.porCasoUso.map((_, i) => (
-                  <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="flex-1 flex flex-col sm:flex-row items-center gap-4">
+            <div className="w-full sm:w-[200px] h-[200px] shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={metricas.porCasoUso}
+                    dataKey="total"
+                    nameKey="caso"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={80}
+                  >
+                    {metricas.porCasoUso.map((_, i) => (
+                      <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value, name) => [value, name]} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex flex-col gap-3">
+              {metricas.porCasoUso.map((e, i) => (
+                <div key={e.caso} className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }}
+                  />
+                  <span className="text-xs text-slate-600 font-medium">
+                    {e.caso} ({e.total})
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </MetricaChartCard>
 

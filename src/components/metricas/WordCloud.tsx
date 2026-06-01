@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { filterByAiTerms } from '@/lib/wordcloud-filter'
 
 // Most common Spanish stop words to filter out
 const SPANISH_STOP_WORDS = new Set([
@@ -75,12 +76,12 @@ interface WordCloudProps {
 }
 
 export default function WordCloud({ sentences }: WordCloudProps) {
-  const words = useMemo(() => processText(sentences), [sentences])
+  const words = useMemo(() => filterByAiTerms(processText(sentences)), [sentences])
 
   if (words.length === 0) {
     return (
       <div className="flex items-center justify-center h-48 text-sm text-slate-400">
-        Sin datos de preguntas para mostrar.
+        Sin términos AI encontrados
       </div>
     )
   }
