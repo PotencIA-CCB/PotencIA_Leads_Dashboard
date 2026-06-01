@@ -74,7 +74,7 @@ export default function BIPage() {
             <StatCard
               label="NITs Únicos"
               value={biStats?.nitsUnicos ?? 0}
-              accent="text-sky-600"
+              accent="text-[#003087]"
               helpText="NITs distintos y no nulos registrados en leads"
               icon="tag"
               subtitle="NITs distintos y no nulos"
@@ -82,7 +82,7 @@ export default function BIPage() {
             <StatCard
               label="NITs Válidos"
               value={biStats?.nitsValidos ?? 0}
-              accent="text-emerald-600"
+              accent="text-[#003087]"
               helpText="NITs validados manualmente en cámara de comercio (RUES)"
               icon="verified"
               subtitle="Validados en RUES (cámara)"
@@ -90,7 +90,7 @@ export default function BIPage() {
             <StatCard
               label="Empresas Registradas"
               value={biStats?.empresasRegistradas ?? 0}
-              accent="text-indigo-600"
+              accent="text-[#003087]"
               helpText="Leads con nombre de empresa registrado"
               icon="apartment"
               subtitle="Leads con empresa registrada"
@@ -98,7 +98,7 @@ export default function BIPage() {
             <StatCard
               label="Empresas Registradas y Renovadas"
               value={biStats?.empresasRenovadas ?? 0}
-              accent="text-amber-600"
+              accent="text-[#003087]"
               helpText="Empresas validadas en RUES con renovación activa en 2026"
               icon="autorenew"
               subtitle="Renovación activa en 2026"

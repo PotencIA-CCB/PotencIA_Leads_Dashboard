@@ -31,36 +31,28 @@ function render(stats: FunnelStats = defaultStats, totalBookings = 20): string {
 }
 
 describe('LeadsFunnel component', () => {
-  // T-C01: renders correct number of stage cards (9 stages in the grid)
-  it('T-C01: renders the correct number of stage cards', () => {
-    const html = render()
-    // 9 stage cards — each has bg-cyan-50 for the icon container
-    // Count by looking at the card label headings (uppercase tracking-widest)
-    // Each StageCard has the text-[10px] font-bold uppercase label
-    const labelMatches = html.match(/text-\[10px\] font-bold uppercase tracking-widest text-slate-400(?!.*mb-4)/g) ?? []
-    // Simpler: count InfoTooltip trigger icons ("help" material symbol)
-    // Each StageCard has exactly one InfoTooltip
-    const helpIconMatches = html.match(/>help<\/span>/g) ?? []
-    expect(helpIconMatches.length).toBe(9)
-  })
-
-  // T-C02: each stage card shows the stage label and value
-  it('T-C02: stage card shows totalLandingLeads value with correct label', () => {
+  // T-C01: renders landing tree root with value and label
+  it('T-C01: renders totalLandingLeads at the tree root', () => {
     const html = render({ ...defaultStats, totalLandingLeads: 325 })
     expect(html).toContain('325')
-    expect(html).toContain('Registrados en Landing')
+    expect(html).toContain('se registraron en landing')
   })
 
-  // T-C03: InfoTooltip renders with helpText for stage cards
-  it('T-C03: InfoTooltip renders with helpText for at least one stage card', () => {
-    const html = render()
-    // InfoTooltip renders when helpText is non-empty — it renders the "help" icon
-    expect(html).toContain('material-symbols-outlined')
-    // The tooltip container has aria-label="Información del indicador"
-    expect(html).toContain('Información del indicador')
+  // T-C02: renders landingNeverBooked with its label
+  it('T-C02: renders landingNeverBooked with label', () => {
+    const html = render({ ...defaultStats, landingNeverBooked: 118 })
+    expect(html).toContain('118')
+    expect(html).toContain('nunca agendaron')
   })
 
-  // T-C04: all 9 stage values are present in the output
+  // T-C03: renders totalBookings tree root
+  it('T-C03: renders totalBookings at the bookings tree root', () => {
+    const html = render(defaultStats, 351)
+    expect(html).toContain('351')
+    expect(html).toContain('bookings totales')
+  })
+
+  // T-C04: all funnel stat values appear in the rendered output
   it('T-C04: all funnel stat values appear in the rendered output', () => {
     const html = render(defaultStats, 20)
     expect(html).toContain('10') // totalLandingLeads
@@ -74,8 +66,8 @@ describe('LeadsFunnel component', () => {
     expect(html).toContain('1')  // asistieronSinLandingNiBooking
   })
 
-  // T-C05: percentage note is shown for landingNeverBooked card
-  it('T-C05: percentage note appears on the landingNeverBooked card', () => {
+  // T-C05: percentage note appears in the summary table for landingNeverBooked
+  it('T-C05: percentage note appears for landingNeverBooked', () => {
     const html = render({ ...defaultStats, landingNeverBooked: 118, totalLandingLeads: 325 })
     expect(html).toMatch(/\d+\.?\d*% de landing/)
   })
