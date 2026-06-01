@@ -19,15 +19,15 @@ export async function buildSessionDataset(supabase: SupabaseClient): Promise<str
       .select('estado_inicial, acciones_realizadas, resultado_final, estimacion_impacto')
       .not('estado_inicial', 'is', null)
       .order('id', { ascending: false })
-      .limit(200)
+      .limit(80)
 
     if (!data || data.length === 0) return ''
 
     const rows = (data as SessionRecord[]).map((r, i) => {
       const parts: string[] = [`[${i + 1}]`]
-      if (r.estado_inicial) parts.push(`estado_inicial: ${r.estado_inicial.slice(0, 400)}`)
-      if (r.acciones_realizadas) parts.push(`acciones: ${r.acciones_realizadas.slice(0, 400)}`)
-      if (r.resultado_final) parts.push(`resultado: ${r.resultado_final.slice(0, 400)}`)
+      if (r.estado_inicial) parts.push(`estado_inicial: ${r.estado_inicial.slice(0, 200)}`)
+      if (r.acciones_realizadas) parts.push(`acciones: ${r.acciones_realizadas.slice(0, 200)}`)
+      if (r.resultado_final) parts.push(`resultado: ${r.resultado_final.slice(0, 200)}`)
       if (r.estimacion_impacto !== null && r.estimacion_impacto !== '') {
         parts.push(`impacto_horas_mes: ${r.estimacion_impacto}`)
       }
