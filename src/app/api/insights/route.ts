@@ -1,7 +1,7 @@
 // Required env vars:
-// OPENCODE_API_KEY      — API key for Opencode Go
-// OPENCODE_API_BASE_URL — Base URL for Opencode Go API
-// OPENCODE_MODEL        — Model ID to use
+// OPENROUTER_API_KEY — OpenRouter API key
+// OPENROUTER_API_URL — OpenRouter base URL (https://openrouter.ai/api/v1)
+// OPENROUTER_MODEL   — Model ID (e.g. google/gemini-flash-1.5:free)
 // INSIGHTS_MIN_NEW_RECORDS — Min new consultorias before regenerating (default: 20)
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -98,11 +98,11 @@ export async function POST(req: NextRequest) {
     if (!Number.isFinite(minNew) || minNew < 0) minNew = 20
     if (minNew > 1000) minNew = 1000
 
-    const openAiKey = process.env.OPENCODE_API_KEY
-    const openAiBase = process.env.OPENCODE_API_BASE_URL
-    const openAiModel = process.env.OPENCODE_MODEL
+    const openAiKey = process.env.OPENROUTER_API_KEY
+    const openAiBase = process.env.OPENROUTER_API_URL
+    const openAiModel = process.env.OPENROUTER_MODEL
     if (!openAiKey || !openAiBase || !openAiModel) {
-      const missing = ['OPENCODE_API_KEY', 'OPENCODE_API_BASE_URL', 'OPENCODE_MODEL'].filter((k) => !process.env[k])
+      const missing = ['OPENROUTER_API_KEY', 'OPENROUTER_API_URL', 'OPENROUTER_MODEL'].filter((k) => !process.env[k])
       return NextResponse.json({ skipped: true, reason: 'config_missing', details: { missing } })
     }
 
@@ -248,7 +248,9 @@ Responde ÚNICAMENTE con JSON sin texto adicional:
         ],
         temperature: 0.3,
         max_tokens: 1500,
-        response_format: { type: 'json_object' },
+        ...(openAiModel.startsWith('openai/') || openAiModel.startsWith('anthropic/') || openAiModel.startsWith('google/gemini')
+          ? { response_format: { type: 'json_object' } }
+          : {}),
       }),
     }).finally(() => clearTimeout(timeoutId))
 
