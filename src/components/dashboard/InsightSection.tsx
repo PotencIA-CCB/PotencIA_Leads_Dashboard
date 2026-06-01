@@ -133,7 +133,8 @@ export default function InsightSection({
             `No hay suficientes datos nuevos para generar insights (se necesitan ${data.details?.threshold} nuevas consultorías).`,
           )
         } else if (data.reason === 'config_missing') {
-          setInsightsError('Configuración incompleta. Verificá las variables de entorno.')
+          const missing = data.details?.missing?.join(', ') ?? ''
+          setInsightsError(`Configuración incompleta. Faltan: ${missing || 'variables de entorno'}`)
         } else {
           setInsightsError('No se pudieron generar insights.')
         }
