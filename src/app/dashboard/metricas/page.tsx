@@ -21,20 +21,23 @@ export default function MetricasPage() {
   } | null>(null)
   const [wordCloudSentences, setWordCloudSentences] = useState<string[]>([])
 
-  // Fetch pregunta text from registro_sesion for word cloud
+  // Fetch descripcion text from formularios_landing for the AI-filtered word cloud
   useEffect(() => {
-    async function cargarPreguntas() {
+    async function cargarDescripciones() {
       const supabase = createClient()
       const { data } = await supabase
-        .from('registro_sesion')
-        .select('pregunta')
-        .not('pregunta', 'is', null)
+        .from('formularios_landing')
+        .select('descripcion')
+        .not('descripcion', 'is', null)
         .limit(200)
       if (data) {
-        setWordCloudSentences(data.map((r: { pregunta: string }) => r.pregunta))
+        const sentences = (data as { descripcion: string | null }[])
+          .map((r) => r.descripcion)
+          .filter((d): d is string => d !== null)
+        setWordCloudSentences(sentences)
       }
     }
-    cargarPreguntas()
+    cargarDescripciones()
   }, [])
 
   if (loading)
