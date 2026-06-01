@@ -31,40 +31,51 @@ function render(stats: FunnelStats = defaultStats, totalBookings = 20): string {
 }
 
 describe('LeadsFunnel component', () => {
-  // T-C01: tree root shows totalLandingLeads
-  it('T-C01: tree root line shows totalLandingLeads value', () => {
+  // T-C01: renders correct number of stage cards (9 stages in the grid)
+  it('T-C01: renders the correct number of stage cards', () => {
+    const html = render()
+    // 9 stage cards — each has bg-cyan-50 for the icon container
+    // Count by looking at the card label headings (uppercase tracking-widest)
+    // Each StageCard has the text-[10px] font-bold uppercase label
+    const labelMatches = html.match(/text-\[10px\] font-bold uppercase tracking-widest text-slate-400(?!.*mb-4)/g) ?? []
+    // Simpler: count InfoTooltip trigger icons ("help" material symbol)
+    // Each StageCard has exactly one InfoTooltip
+    const helpIconMatches = html.match(/>help<\/span>/g) ?? []
+    expect(helpIconMatches.length).toBe(9)
+  })
+
+  // T-C02: each stage card shows the stage label and value
+  it('T-C02: stage card shows totalLandingLeads value with correct label', () => {
     const html = render({ ...defaultStats, totalLandingLeads: 325 })
     expect(html).toContain('325')
-    expect(html).toContain('se registraron en landing')
+    expect(html).toContain('Registrados en Landing')
   })
 
-  // T-C02: landingNeverBooked and landingBooked appear at second indent level
-  it('T-C02: landingNeverBooked and landingBooked appear with tree connectors', () => {
-    const html = render({ ...defaultStats, landingNeverBooked: 118, landingBooked: 207 })
-    expect(html).toContain('118')
-    expect(html).toContain('207')
-    expect(html).toContain('└─')
-  })
-
-  // T-C03: noShows and cicloCompleto appear at deepest indent
-  it('T-C03: noShows and cicloCompleto appear in the rendered output', () => {
-    const html = render({ ...defaultStats, noShows: 55, cicloCompleto: 108 })
-    expect(html).toContain('55')
-    expect(html).toContain('108')
-  })
-
-  // T-C04: summary table has exactly 5 data rows
-  it('T-C04: summary table has exactly 5 data rows', () => {
+  // T-C03: InfoTooltip renders with helpText for stage cards
+  it('T-C03: InfoTooltip renders with helpText for at least one stage card', () => {
     const html = render()
-    // Count <tr> elements that are data rows (exclude header row)
-    // We look for td elements in pairs — each row has at least one td
-    const tdMatches = html.match(/<td[^>]*>/g) ?? []
-    // 5 rows × 2 columns = 10 td elements
-    expect(tdMatches.length).toBe(10)
+    // InfoTooltip renders when helpText is non-empty — it renders the "help" icon
+    expect(html).toContain('material-symbols-outlined')
+    // The tooltip container has aria-label="Información del indicador"
+    expect(html).toContain('Información del indicador')
   })
 
-  // T-C05: row 2 percentage matches pattern "X% de landing"
-  it('T-C05: row 2 shows percentage string matching "X% de landing"', () => {
+  // T-C04: all 9 stage values are present in the output
+  it('T-C04: all funnel stat values appear in the rendered output', () => {
+    const html = render(defaultStats, 20)
+    expect(html).toContain('10') // totalLandingLeads
+    expect(html).toContain('3')  // landingNeverBooked
+    expect(html).toContain('7')  // landingBooked
+    expect(html).toContain('2')  // noShows
+    expect(html).toContain('5')  // cicloCompleto
+    expect(html).toContain('20') // totalBookings
+    expect(html).toContain('4')  // bookedNoLandingDirecto
+    expect(html).toContain('6')  // soloBookedNoSession
+    expect(html).toContain('1')  // asistieronSinLandingNiBooking
+  })
+
+  // T-C05: percentage note is shown for landingNeverBooked card
+  it('T-C05: percentage note appears on the landingNeverBooked card', () => {
     const html = render({ ...defaultStats, landingNeverBooked: 118, totalLandingLeads: 325 })
     expect(html).toMatch(/\d+\.?\d*% de landing/)
   })

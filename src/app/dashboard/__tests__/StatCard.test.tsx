@@ -38,3 +38,42 @@ describe('StatCard — value rendering', () => {
     expect(html).toContain('font-extrabold')
   })
 })
+
+describe('StatCard — icon / iconAccent / subtitle props', () => {
+  it('renders material-symbols-outlined span with icon name when icon prop provided', () => {
+    const html = renderToStaticMarkup(
+      createElement(StatCard, { label: 'Total', value: 5, accent: 'text-blue-600', icon: 'calendar_month' })
+    )
+    expect(html).toContain('material-symbols-outlined')
+    expect(html).toContain('calendar_month')
+  })
+
+  it('renders subtitle text when subtitle prop provided', () => {
+    const html = renderToStaticMarkup(
+      createElement(StatCard, { label: 'Total', value: 5, accent: 'text-blue-600', subtitle: 'Total registradas' })
+    )
+    expect(html).toContain('Total registradas')
+  })
+
+  it('does NOT render icon span when icon prop is omitted', () => {
+    const html = renderToStaticMarkup(
+      createElement(StatCard, { label: 'Total', value: 5, accent: 'text-blue-600' })
+    )
+    expect(html).not.toContain('calendar_month')
+    expect(html).not.toContain('material-symbols-outlined')
+  })
+
+  it('applies default text-[#00C8FF] when icon provided without iconAccent', () => {
+    const html = renderToStaticMarkup(
+      createElement(StatCard, { label: 'Total', value: 5, accent: 'text-blue-600', icon: 'groups' })
+    )
+    expect(html).toContain('text-[#00C8FF]')
+  })
+
+  it('applies custom iconAccent class when provided', () => {
+    const html = renderToStaticMarkup(
+      createElement(StatCard, { label: 'Total', value: 5, accent: 'text-blue-600', icon: 'verified', iconAccent: 'text-emerald-600' })
+    )
+    expect(html).toContain('text-emerald-600')
+  })
+})

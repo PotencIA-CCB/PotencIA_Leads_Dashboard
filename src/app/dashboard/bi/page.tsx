@@ -4,6 +4,7 @@ import { useBusinessIntelligence } from '@/hooks/useBusinessIntelligence'
 import { StatCard } from '@/components/dashboard/StatCard'
 import LeadsFunnel from '@/components/dashboard/LeadsFunnel'
 import InsightSection from '@/components/dashboard/InsightSection'
+import SessionInsightsSection from '@/components/dashboard/SessionInsightsSection'
 import type { FunnelStats } from '@/lib/capturaStats'
 
 const emptyFunnelStats: FunnelStats = {
@@ -18,7 +19,7 @@ const emptyFunnelStats: FunnelStats = {
 }
 
 export default function BIPage() {
-  const { biStats, funnelStats, totalBookings, loading } = useBusinessIntelligence()
+  const { biStats, funnelStats, totalBookings, sessionInsights, loading } = useBusinessIntelligence()
 
   return (
     <>
@@ -67,30 +68,40 @@ export default function BIPage() {
               value={biStats?.sesionesTotales ?? 0}
               accent="text-[#003087]"
               helpText="Total de sesiones de consultoría registradas"
+              icon="event_available"
+              subtitle="Sesiones de consultoría registradas"
             />
             <StatCard
               label="NITs Únicos"
               value={biStats?.nitsUnicos ?? 0}
               accent="text-sky-600"
               helpText="NITs distintos y no nulos registrados en leads"
+              icon="tag"
+              subtitle="NITs distintos y no nulos"
             />
             <StatCard
               label="NITs Válidos"
               value={biStats?.nitsValidos ?? 0}
               accent="text-emerald-600"
               helpText="NITs validados manualmente en cámara de comercio (RUES)"
+              icon="verified"
+              subtitle="Validados en RUES (cámara)"
             />
             <StatCard
               label="Empresas Registradas"
               value={biStats?.empresasRegistradas ?? 0}
               accent="text-indigo-600"
               helpText="Leads con nombre de empresa registrado"
+              icon="apartment"
+              subtitle="Leads con empresa registrada"
             />
             <StatCard
               label="Empresas Registradas y Renovadas"
               value={biStats?.empresasRenovadas ?? 0}
               accent="text-amber-600"
               helpText="Empresas validadas en RUES con renovación activa en 2026"
+              icon="autorenew"
+              subtitle="Renovación activa en 2026"
             />
           </div>
         )}
@@ -112,7 +123,7 @@ export default function BIPage() {
       </section>
 
       {/* Section 3 — Insights con IA */}
-      <section aria-labelledby="insights-heading">
+      <section aria-labelledby="insights-heading" className="mb-8">
         <h3
           id="insights-heading"
           className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4"
@@ -121,6 +132,18 @@ export default function BIPage() {
           Resumen Ejecutivo
         </h3>
         <InsightSection ready={!loading} />
+      </section>
+
+      {/* Section 4 — Session Insights */}
+      <section aria-labelledby="session-insights-heading" className="mt-8">
+        <h3
+          id="session-insights-heading"
+          className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4"
+          style={{ fontFamily: 'Space Grotesk, sans-serif' }}
+        >
+          Insights de Sesiones
+        </h3>
+        <SessionInsightsSection sessions={sessionInsights} loading={loading} />
       </section>
     </>
   )
@@ -134,8 +157,12 @@ function SkeletonIndicators() {
           key={i}
           className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] px-5 py-4 animate-pulse"
         >
-          <div className="h-2.5 bg-slate-200 rounded w-3/4 mb-3" />
-          <div className="h-8 bg-slate-200 rounded w-1/2" />
+          <div className="flex items-start justify-between">
+            <div className="h-2.5 bg-slate-200 rounded w-3/4" />
+            <div className="h-8 w-8 bg-slate-200 rounded-lg" />
+          </div>
+          <div className="h-8 bg-slate-200 rounded w-1/2 mt-3" />
+          <div className="h-2 bg-slate-200 rounded w-2/3 mt-2" />
         </div>
       ))}
     </div>

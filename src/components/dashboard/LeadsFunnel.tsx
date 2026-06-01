@@ -1,4 +1,5 @@
 import type { FunnelStats } from '@/lib/capturaStats'
+import InfoTooltip from '@/components/metricas/InfoTooltip'
 
 interface LeadsFunnelProps {
   stats: FunnelStats
@@ -8,6 +9,40 @@ interface LeadsFunnelProps {
 function pct(numerator: number, denominator: number): string {
   if (denominator === 0) return '0'
   return String(Math.round((numerator / denominator) * 100 * 10) / 10)
+}
+
+interface StageCardProps {
+  label: string
+  value: number
+  icon: string
+  helpText: string
+  accent?: string
+  note?: string
+}
+
+function StageCard({ label, value, icon, helpText, accent = 'text-slate-700', note }: StageCardProps) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] px-5 py-4 flex flex-col">
+      {/* Top row */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
+          <InfoTooltip helpText={helpText} />
+        </div>
+        <span className="inline-flex items-center justify-center rounded-lg bg-cyan-50 w-8 h-8 shrink-0">
+          <span className="material-symbols-outlined text-[#00C8FF] text-2xl" aria-hidden="true">
+            {icon}
+          </span>
+        </span>
+      </div>
+      {/* Value */}
+      <p className={`text-3xl font-extrabold ${accent} mt-2`} style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+        {value}
+      </p>
+      {/* Note / rate */}
+      {note && <p className="text-xs text-slate-400 mt-1 leading-snug">{note}</p>}
+    </div>
+  )
 }
 
 export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) {
@@ -23,6 +58,75 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
   } = stats
 
   const landingPct = pct(landingNeverBooked, totalLandingLeads)
+  const cicloCompletoPct = pct(cicloCompleto, totalLandingLeads)
+
+  const stages = [
+    {
+      label: 'Registrados en Landing',
+      value: totalLandingLeads,
+      icon: 'ads_click',
+      helpText: 'Total de leads que entraron al embudo de captura a través del landing page.',
+      accent: 'text-[#003087]',
+    },
+    {
+      label: 'Nunca Agendaron',
+      value: landingNeverBooked,
+      icon: 'event_busy',
+      helpText: 'Leads registrados en landing que nunca agendaron una consultoría — leads perdidos.',
+      accent: 'text-amber-600',
+      note: `${landingPct}% de landing`,
+    },
+    {
+      label: 'Sí Agendaron',
+      value: landingBooked,
+      icon: 'event_available',
+      helpText: 'Leads del landing que sí agendaron al menos una consultoría.',
+      accent: 'text-sky-600',
+    },
+    {
+      label: 'No-Shows',
+      value: noShows,
+      icon: 'person_off',
+      helpText: 'Leads que agendaron pero no asistieron a la consultoría.',
+      accent: 'text-rose-500',
+    },
+    {
+      label: 'Ciclo Completo',
+      value: cicloCompleto,
+      icon: 'verified',
+      helpText: 'Leads que completaron todo el ciclo: landing, booking y asistencia a consultoría.',
+      accent: 'text-emerald-600',
+      note: `${cicloCompletoPct}% de landing`,
+    },
+    {
+      label: 'Bookings Totales',
+      value: totalBookings,
+      icon: 'calendar_month',
+      helpText: 'Total de bookings registrados en el sistema, independientemente del origen.',
+      accent: 'text-indigo-600',
+    },
+    {
+      label: 'Canal Directo',
+      value: bookedNoLandingDirecto,
+      icon: 'person_pin',
+      helpText: 'Leads que agendaron y asistieron sin haber pasado por el landing page.',
+      accent: 'text-sky-600',
+    },
+    {
+      label: 'Solo Agendaron',
+      value: soloBookedNoSession,
+      icon: 'event_note',
+      helpText: 'Leads que solo agendaron (sin landing, sin asistencia registrada).',
+      accent: 'text-slate-600',
+    },
+    {
+      label: 'Sin Origen Conocido',
+      value: asistieronSinLandingNiBooking,
+      icon: 'help_outline',
+      helpText: 'Leads que asistieron a una sesión sin landing ni booking conocido en el sistema.',
+      accent: 'text-slate-400',
+    },
+  ]
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] px-6 py-5 mb-6">
@@ -33,89 +137,18 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
         Embudo de captura
       </h3>
 
-      {/* Landing tree block */}
-      <div className="font-mono text-sm whitespace-pre mb-5">
-        <div className="text-slate-700 font-semibold">
-          {totalLandingLeads} <span className="font-normal text-slate-500">se registraron en landing</span>
-        </div>
-        <div className="pl-4 text-amber-600">
-          {'└─ '}
-          <span className="font-semibold">{landingNeverBooked}</span>
-          <span className="text-slate-500 font-normal"> nunca agendaron</span>
-          <span className="ml-2 text-xs text-amber-500">→ leads perdidos</span>
-        </div>
-        <div className="pl-4 text-slate-700">
-          {'└─ '}
-          <span className="font-semibold">{landingBooked}</span>
-          <span className="text-slate-500 font-normal"> sí agendaron</span>
-        </div>
-        <div className="pl-8 text-rose-500">
-          {'└─ '}
-          <span className="font-semibold">{noShows}</span>
-          <span className="text-slate-500 font-normal"> agendaron pero no asistieron</span>
-          <span className="ml-2 text-xs text-rose-400">→ no-shows</span>
-        </div>
-        <div className="pl-8 text-emerald-600">
-          {'└─ '}
-          <span className="font-semibold">{cicloCompleto}</span>
-          <span className="text-slate-500 font-normal"> completaron todo el ciclo</span>
-          <span className="ml-2">✅</span>
-        </div>
-      </div>
-
-      {/* Bookings tree block */}
-      <div className="font-mono text-sm whitespace-pre mb-5">
-        <div className="text-slate-700 font-semibold">
-          {totalBookings} <span className="font-normal text-slate-500">bookings totales</span>
-        </div>
-        <div className="pl-4 text-slate-600">
-          {'└─ '}
-          <span className="font-semibold">{soloBookedNoSession}</span>
-          <span className="text-slate-500 font-normal"> solo agendaron (sin landing, sin asistencia)</span>
-        </div>
-        <div className="pl-4 text-sky-600">
-          {'└─ '}
-          <span className="font-semibold">{bookedNoLandingDirecto}</span>
-          <span className="text-slate-500 font-normal"> agendaron y asistieron pero sin landing</span>
-          <span className="ml-2 text-xs text-sky-400">→ canal directo</span>
-        </div>
-      </div>
-
-      {/* Summary table */}
-      <div className="border-t border-slate-100 pt-4">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Resumen ejecutivo</p>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              <th className="text-left pb-2 pr-4 font-bold">Segmento</th>
-              <th className="text-right pb-2 font-bold">Emails</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-t border-slate-50">
-              <td className="py-1.5 pr-4 text-slate-600">Ciclo completo (landing + booking + asistencia)</td>
-              <td className="py-1.5 text-right font-semibold text-emerald-600">{cicloCompleto}</td>
-            </tr>
-            <tr className="border-t border-slate-50">
-              <td className="py-1.5 pr-4 text-slate-600">Registrados pero nunca agendaron</td>
-              <td className="py-1.5 text-right font-semibold text-amber-600">
-                {landingNeverBooked} ({landingPct}% de landing)
-              </td>
-            </tr>
-            <tr className="border-t border-slate-50">
-              <td className="py-1.5 pr-4 text-slate-600">Agendaron pero no asistieron (no-shows)</td>
-              <td className="py-1.5 text-right font-semibold text-rose-500">{noShows}</td>
-            </tr>
-            <tr className="border-t border-slate-50">
-              <td className="py-1.5 pr-4 text-slate-600">Asistieron sin landing ni booking conocido</td>
-              <td className="py-1.5 text-right font-semibold text-slate-600">{asistieronSinLandingNiBooking}</td>
-            </tr>
-            <tr className="border-t border-slate-50">
-              <td className="py-1.5 pr-4 text-slate-600">Bookings sin landing ni asistencia</td>
-              <td className="py-1.5 text-right font-semibold text-sky-600">{soloBookedNoSession}</td>
-            </tr>
-          </tbody>
-        </table>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {stages.map((stage) => (
+          <StageCard
+            key={stage.label}
+            label={stage.label}
+            value={stage.value}
+            icon={stage.icon}
+            helpText={stage.helpText}
+            accent={stage.accent}
+            note={stage.note}
+          />
+        ))}
       </div>
     </div>
   )

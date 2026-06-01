@@ -20,10 +20,12 @@ import { describe, it, expect } from 'vitest'
 import {
   computeBiStats,
   buildInitialState,
+  deriveSessionInsights,
   type BiStats,
   type HookState,
 } from '../useBusinessIntelligence'
 import type { FunnelStats } from '@/lib/capturaStats'
+import type { RegistroSesion } from '@/types'
 
 // ---------------------------------------------------------------------------
 // computeBiStats
@@ -148,6 +150,7 @@ describe('HookState after fetch resolves', () => {
       biStats,
       funnelStats: null,
       totalBookings: 5,
+      sessionInsights: [],
       loading: false,
     }
 
@@ -166,6 +169,7 @@ describe('HookState after fetch resolves', () => {
       biStats,
       funnelStats: null,
       totalBookings: 0,
+      sessionInsights: [],
       loading: false,
     }
     expect(state.loading).toBe(false)
@@ -192,6 +196,7 @@ describe('HookState after fetch resolves', () => {
       biStats: computeBiStats([], []),
       funnelStats: sampleFunnelStats,
       totalBookings: 20,
+      sessionInsights: [],
       loading: false,
     }
     expect(state.funnelStats).not.toBeNull()
@@ -251,5 +256,74 @@ describe('ignore flag cleanup pattern', () => {
     await asyncOp
 
     expect(stateUpdated).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// deriveSessionInsights
+// ---------------------------------------------------------------------------
+
+function makeSessionRow(overrides: Partial<RegistroSesion> = {}): RegistroSesion {
+  return {
+    id: 'r1',
+    created_at: '2026-01-01T00:00:00Z',
+    id_consultoria: 'c1',
+    pregunta: null,
+    motivo_consulta: null,
+    estado_inicial: null,
+    acciones_realizadas: null,
+    resultado_final: null,
+    estimacion_impacto: null,
+    entregables: null,
+    resultado: null,
+    cantidad_productos: 0,
+    sesion_grabada: false,
+    enlace_grabacion: null,
+    adjuntar_evidencia: null,
+    confirmo_no_automatizacion: null,
+    ...overrides,
+  }
+}
+
+describe('deriveSessionInsights', () => {
+  it('filters out rows where all 4 target fields are null or empty', () => {
+    const rows = [
+      makeSessionRow({ id: 'r1', estado_inicial: null, acciones_realizadas: null, resultado_final: null, estimacion_impacto: null }),
+      makeSessionRow({ id: 'r2', estado_inicial: '', acciones_realizadas: '  ', resultado_final: null, estimacion_impacto: null }),
+    ]
+    const result = deriveSessionInsights(rows)
+    expect(result).toHaveLength(0)
+  })
+
+  it('keeps a row that has only one non-empty target field', () => {
+    const rows = [
+      makeSessionRow({ id: 'r1', estado_inicial: 'Activo', acciones_realizadas: null, resultado_final: null, estimacion_impacto: null }),
+    ]
+    const result = deriveSessionInsights(rows)
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('r1')
+  })
+
+  it('caps result at 10 when more than 10 rows qualify', () => {
+    const rows = Array.from({ length: 15 }, (_, i) =>
+      makeSessionRow({ id: `r${i}`, estado_inicial: `Estado ${i}` })
+    )
+    const result = deriveSessionInsights(rows)
+    expect(result).toHaveLength(10)
+  })
+
+  it('returns empty array for empty input', () => {
+    expect(deriveSessionInsights([])).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// buildInitialState — sessionInsights
+// ---------------------------------------------------------------------------
+
+describe('buildInitialState — sessionInsights', () => {
+  it('returns sessionInsights: [] in initial state', () => {
+    const state = buildInitialState()
+    expect(state.sessionInsights).toEqual([])
   })
 })

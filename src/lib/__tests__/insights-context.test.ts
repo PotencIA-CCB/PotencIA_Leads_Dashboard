@@ -56,6 +56,7 @@ function makeSesionRow(overrides: Record<string, unknown> = {}) {
     resultado_final: 'Interesado',
     pregunta: null,
     motivo_consulta: null,
+    estimacion_impacto: null,
     ...overrides,
   }
 }
@@ -325,10 +326,103 @@ describe('buildImpactContext — pregunta and motivo_consulta enrichment', () =>
     const result = await buildImpactContext(supabase as never)
 
     // Count occurrences of "  - " (sample prefix) in the session section
-    const sessionStart = result.indexOf('DATOS DE SESIÓN')
+    const sessionStart = result.indexOf('DADOS DE SESIÓN') !== -1
+      ? result.indexOf('DADOS DE SESIÓN')
+      : result.indexOf('DATOS DE SESIÓN')
     const sessionSection = result.slice(sessionStart)
     const sampleCount = (sessionSection.match(/  - /g) ?? []).length
 
+    expect(sampleCount).toBeLessThanOrEqual(30)
+  })
+})
+
+describe('buildImpactContext — estimacion_impacto enrichment', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('includes "IMPACTO ESTIMADO (muestra):" when a row has non-empty estimacion_impacto', async () => {
+    const sesionRows = [
+      makeSesionRow({ id_consultoria: 'c1', estimacion_impacto: 'Ahorro de 20 horas semanales' }),
+    ]
+    const consulRows = [makeConsultoriaRow({ id: 'c1' })]
+    const supabase = makeMockSupabase({
+      consultorias: consulRows,
+      consultas_por_semana: [],
+      registro_sesion: sesionRows,
+    })
+
+    const result = await buildImpactContext(supabase as never)
+
+    expect(result).toContain('IMPACTO ESTIMADO (muestra):')
+  })
+
+  it('includes the truncated estimacion_impacto value in the output', async () => {
+    const sesionRows = [
+      makeSesionRow({ id_consultoria: 'c1', estimacion_impacto: 'Reducción del 30% en costos operativos' }),
+    ]
+    const consulRows = [makeConsultoriaRow({ id: 'c1' })]
+    const supabase = makeMockSupabase({
+      consultorias: consulRows,
+      consultas_por_semana: [],
+      registro_sesion: sesionRows,
+    })
+
+    const result = await buildImpactContext(supabase as never)
+
+    expect(result).toContain('Reducción del 30% en costos operativos')
+  })
+
+  it('does NOT include "IMPACTO ESTIMADO (muestra):" when all estimacion_impacto are null', async () => {
+    const sesionRows = [
+      makeSesionRow({ id_consultoria: 'c1', estimacion_impacto: null, acciones_realizadas: null, estado_inicial: null, resultado_final: null }),
+      makeSesionRow({ id_consultoria: 'c2', estimacion_impacto: null, acciones_realizadas: null, estado_inicial: null, resultado_final: null }),
+    ]
+    const consulRows = [
+      makeConsultoriaRow({ id: 'c1' }),
+      makeConsultoriaRow({ id: 'c2' }),
+    ]
+    const supabase = makeMockSupabase({
+      consultorias: consulRows,
+      consultas_por_semana: [],
+      registro_sesion: sesionRows,
+    })
+
+    const result = await buildImpactContext(supabase as never)
+
+    expect(result).not.toContain('IMPACTO ESTIMADO (muestra):')
+  })
+
+  it('total sample count stays ≤ 30 when all four categories are populated', async () => {
+    const sesionRows = Array.from({ length: 40 }, (_, i) =>
+      makeSesionRow({
+        id_consultoria: `c${i}`,
+        acciones_realizadas: `Accion ${i}`,
+        pregunta: `Pregunta ${i}`,
+        motivo_consulta: `Motivo ${i}`,
+        estimacion_impacto: `Impacto ${i}`,
+        estado_inicial: null,
+        resultado_final: null,
+      }),
+    )
+    const consulRows = sesionRows.map((s) =>
+      makeConsultoriaRow({ id: s.id_consultoria }),
+    )
+    const supabase = makeMockSupabase({
+      consultorias: consulRows,
+      consultas_por_semana: [],
+      registro_sesion: sesionRows,
+    })
+
+    const result = await buildImpactContext(supabase as never)
+
+    const sessionStart = result.indexOf('DATOS DE SESIÓN')
+    const sessionSection = sessionStart !== -1 ? result.slice(sessionStart) : result
+    const sampleCount = (sessionSection.match(/  - /g) ?? []).length
     expect(sampleCount).toBeLessThanOrEqual(30)
   })
 })

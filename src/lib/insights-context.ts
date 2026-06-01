@@ -30,15 +30,17 @@ export async function buildImpactContext(supabase: SupabaseClient): Promise<stri
       resultado_final: string | null
       pregunta: string | null
       motivo_consulta: string | null
+      estimacion_impacto: string | null
     }
     const { data: sesionData } = ids.length > 0
-      ? await supabase.from('registro_sesion').select('id_consultoria, cantidad_productos, acciones_realizadas, estado_inicial, resultado_final, pregunta, motivo_consulta').in('id_consultoria', ids)
+      ? await supabase.from('registro_sesion').select('id_consultoria, cantidad_productos, acciones_realizadas, estado_inicial, resultado_final, pregunta, motivo_consulta, estimacion_impacto').in('id_consultoria', ids)
       : { data: [] as SesionRow[] }
 
     const prodByConsultoria: Record<string, number> = {}
     const sesionSamples: string[] = []
     const preguntaSamples: string[] = []
     const motivoSamples: string[] = []
+    const impactoSamples: string[] = []
 
     /** Truncate free-text to maxLen chars, appending "..." if truncated */
     function truncateText(text: string, maxLen: number): string {
@@ -62,6 +64,9 @@ export async function buildImpactContext(supabase: SupabaseClient): Promise<stri
       }
       if (s.motivo_consulta?.trim()) {
         motivoSamples.push(`  - ${truncateText(s.motivo_consulta, 200)}`)
+      }
+      if (s.estimacion_impacto?.trim()) {
+        impactoSamples.push(`  - Impacto: ${truncateText(s.estimacion_impacto, 200)}`)
       }
     }
 
@@ -99,8 +104,9 @@ export async function buildImpactContext(supabase: SupabaseClient): Promise<stri
     const hasActions = sesionSamples.length > 0
     const hasPreguntas = preguntaSamples.length > 0
     const hasMotivos = motivoSamples.length > 0
+    const hasImpacto = impactoSamples.length > 0
 
-    if (hasActions || hasPreguntas || hasMotivos) {
+    if (hasActions || hasPreguntas || hasMotivos || hasImpacto) {
       const sessionLines: string[] = ['DATOS DE SESIÓN (últ. 30 días):']
       let sampleBudget = 30
 
@@ -123,6 +129,13 @@ export async function buildImpactContext(supabase: SupabaseClient): Promise<stri
         const motivoSlice = motivoSamples.slice(0, sampleBudget)
         sessionLines.push(...motivoSlice)
         sampleBudget -= motivoSlice.length
+      }
+
+      if (hasImpacto && sampleBudget > 0) {
+        sessionLines.push('IMPACTO ESTIMADO (muestra):')
+        const impactoSlice = impactoSamples.slice(0, sampleBudget)
+        sessionLines.push(...impactoSlice)
+        sampleBudget -= impactoSlice.length
       }
 
       parts.push(sessionLines.join('\n'))
