@@ -228,31 +228,44 @@ Responde ÚNICAMENTE con JSON sin texto adicional:
   ]
 }`
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 55_000)
+    const requestBody = JSON.stringify({
+      model: openAiModel,
+      messages: [
+        { role: 'system', content: 'You are a data analyst. Always respond with valid JSON only. No markdown, no explanations, no text outside the JSON object.' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.3,
+      max_tokens: 1500,
+      ...(openAiModel.startsWith('openai/') || openAiModel.startsWith('anthropic/') || openAiModel.startsWith('google/gemini') || openAiModel.startsWith('moonshotai/')
+        ? { response_format: { type: 'json_object' } }
+        : {}),
+    })
 
-    const response = await fetch(`${openAiBase}/chat/completions`, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openAiKey}`,
-        'HTTP-Referer': 'https://potencia.ccc.org.co',
-        'X-Title': 'PotencIA Dashboard',
-      },
-      body: JSON.stringify({
-        model: openAiModel,
-        messages: [
-          { role: 'system', content: 'You are a data analyst. Always respond with valid JSON only. No markdown, no explanations, no text outside the JSON object.' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 1500,
-        ...(openAiModel.startsWith('openai/') || openAiModel.startsWith('anthropic/') || openAiModel.startsWith('google/gemini') || openAiModel.startsWith('moonshotai/')
-          ? { response_format: { type: 'json_object' } }
-          : {}),
-      }),
-    }).finally(() => clearTimeout(timeoutId))
+    const requestHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openAiKey}`,
+      'HTTP-Referer': 'https://potencia.ccc.org.co',
+      'X-Title': 'PotencIA Dashboard',
+    }
+
+    async function callLLM(): Promise<Response> {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 55_000)
+      return fetch(`${openAiBase}/chat/completions`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: requestHeaders,
+        body: requestBody,
+      }).finally(() => clearTimeout(timeoutId))
+    }
+
+    let response = await callLLM()
+
+    // Retry once on 429 after a short pause
+    if (response.status === 429) {
+      await new Promise((r) => setTimeout(r, 8_000))
+      response = await callLLM()
+    }
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => '')
