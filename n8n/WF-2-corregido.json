@@ -1,0 +1,311 @@
+{
+  "name": "WF-2 — TSV Bookings → leads + consultorias",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Subir Bookings TSV",
+        "formDescription": "Subí el archivo .tsv exportado de Microsoft Bookings",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "archivo",
+              "fieldType": "file",
+              "fieldName": "archivo",
+              "acceptFileTypes": ".tsv,.txt,.csv",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "eb798c7a-5f2f-4784-a5a1-ab2254f8f34b",
+      "name": "Upload TSV Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        180,
+        300
+      ],
+      "webhookId": "16523485-3365-4245-8d14-6bb9e4978929"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsea TSV directo: tabs, sin quotes. Fila 0 = headers.\nconst items = $input.all();\nif (!items.length) return [];\n\nconst raw = await this.helpers.getBinaryDataBuffer(0, 'archivo');\nconst text = raw.toString('utf-8');\n\nconst lines = text.split(/\\r?\\n/).filter(l => l.trim());\nif (lines.length < 2) return [];\n\nconst headers = lines[0].split('\\t');\n\nreturn lines.slice(1).map(line => {\n  const values = line.split('\\t');\n  const obj = {};\n  headers.forEach((h, i) => {\n    obj[h.trim()] = values[i]?.trim() ?? '';\n  });\n  return { json: obj };\n});"
+      },
+      "id": "eb08243e-03e5-4a85-9c5f-b6338b470488",
+      "name": "Parse TSV Direct",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// TSV real de MS Bookings (export Colombia):\n// Date Time (DD/MM/YYYY H:MM), Customer Name, Customer Email,\n// Customer Phone, Staff Name, Staff Email, Service,\n// Duration (mins.), Booking Id, Custom Fields\nconst items = $input.all();\n\nconst pad2 = n => String(n).padStart(2, '0');\n\nfunction parseDateTime(str) {\n  if (!str) return { fecha: null, hora: null };\n  const match = str.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})\\s+(\\d{1,2}):(\\d{2})$/);\n  if (!match) return { fecha: null, hora: null };\n  const [, day, month, year, hour, minute] = match;\n  return {\n    fecha: `${year}-${pad2(month)}-${pad2(day)}`,\n    hora:  `${pad2(hour)}:${pad2(minute)}`\n  };\n}\n\nfunction parseDuration(str) {\n  if (!str) return null;\n  const n = parseInt(str, 10);\n  return isNaN(n) ? null : n;\n}\n\nfunction calcEndTime(startStr, durationMins) {\n  if (!startStr || !durationMins) return null;\n  const match = startStr.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})\\s+(\\d{1,2}):(\\d{2})$/);\n  if (!match) return null;\n  const [, day, month, year, hour, minute] = match;\n  const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));\n  d.setMinutes(d.getMinutes() + durationMins);\n  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;\n}\n\nfunction extractModalidad(customFields) {\n  if (!customFields) return 'Virtual';\n  try {\n    const obj = typeof customFields === 'string' ? JSON.parse(customFields) : customFields;\n    const val = obj['Selecciona la Modalidad de tu sesión'] || '';\n    if (/presencial/i.test(val)) return 'Presencial';\n    return 'Virtual';\n  } catch (_e) { return 'Virtual'; }\n}\n\nreturn items\n  .filter(i => i.json['Customer Email'])\n  .map(i => {\n    const r = i.json;\n    const start = parseDateTime(r['Date Time']);\n    const durationMins = parseDuration(r['Duration (mins.)']);\n    const hora_fin = calcEndTime(r['Date Time'], durationMins);\n    const modalidad = extractModalidad(r['Custom Fields']);\n    return { json: {\n      p_email:               (r['Customer Email'] || '').trim().toLowerCase(),\n      p_booking_email:       (r['Customer Email'] || '').trim().toLowerCase(),\n      p_full_name:           (r['Customer Name']  || '').trim(),\n      p_phone:               r['Customer Phone'] || null,\n      p_city:                null,\n      p_booking_customer_id: r['Booking Id'] || null,\n      p_origen:              'booking',\n      _staff_name:   (r['Staff Name'] || r['Staff'] || '').trim() || null,\n      _staff_email:  (r['Staff Email'] || '').trim().toLowerCase() || null,\n      _service:      r['Service'] || null,\n      _duration:     durationMins,\n      _fecha_sesion: start.fecha,\n      _hora_inicio:  start.hora,\n      _hora_fin:     hora_fin,\n      _modalidad:    modalidad,\n      _booking_id:   r['Booking Id'] || null\n    }};\n  });"
+      },
+      "id": "e6e7c84b-c3ad-4220-84f6-7d63c1ae4ca1",
+      "name": "Transform Bookings Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        620,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://scydyevwjmbhtohoncuy.supabase.co/rest/v1/rpc/match_or_create_lead",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ p_email: $json.p_email, p_full_name: $json.p_full_name, p_phone: $json.p_phone, p_city: $json.p_city, p_booking_email: $json.p_booking_email, p_booking_customer_id: $json.p_booking_customer_id, p_origen: $json.p_origen }) }}",
+        "options": {}
+      },
+      "id": "c10c3e79-f46a-41d8-86cf-b411965b6e80",
+      "name": "RPC match_or_create_lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge the RPC response (lead_id) with booking session data\n// $input.all() = output from RPC (has lead_id, matched_by)\n// $('Transform Bookings Row').all() = booking data with _staff_email\nconst rpcItems = $input.all();\nconst bookingItems = $('Transform Bookings Row').all();\n\nreturn rpcItems.map((rpcItem, index) => {\n  const booking = bookingItems[index]?.json || {};\n  return {\n    json: {\n      lead_id:       rpcItem.json?.lead_id || null,\n      matched_by:    rpcItem.json?.matched_by || null,\n      _staff_email:  booking._staff_email || null,\n      _staff_name:   booking._staff_name  || null,\n      _fecha_sesion: booking._fecha_sesion || null,\n      _hora_inicio:  booking._hora_inicio  || null,\n      _hora_fin:     booking._hora_fin     || null,\n      _modalidad:    booking._modalidad    || 'Virtual',\n      _service:      booking._service      || null,\n      _booking_id:   booking._booking_id   || null,\n      _duration:     booking._duration     || null\n    }\n  };\n});"
+      },
+      "id": "3e18f934-a79a-4a93-9743-423ce7660a97",
+      "name": "Merge Session Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1060,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {},
+        "batchSize": 1
+      },
+      "id": "loop-1by1-booking-01",
+      "name": "Loop One by One",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://scydyevwjmbhtohoncuy.supabase.co/rest/v1/consultores?email_institucional=eq.{{ $json._staff_email }}&select=id,nombre",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "lookup-consultor-01",
+      "name": "Lookup Consultor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1280,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://scydyevwjmbhtohoncuy.supabase.co/rest/v1/consultorias",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ id_lead: $('Merge Session Data').item.json.lead_id, id_consultor: $json[0]?.id || null, booking_id: $('Merge Session Data').item.json._booking_id, fecha: $('Merge Session Data').item.json._fecha_sesion, hora_inicio: $('Merge Session Data').item.json._hora_inicio, hora_fin: $('Merge Session Data').item.json._hora_fin, duracion_minutos: $('Merge Session Data').item.json._duration, modalidad: $('Merge Session Data').item.json._modalidad === 'Presencial' ? 'Presencial' : 'Virtual', servicio: $('Merge Session Data').item.json._service, staff_name: $('Merge Session Data').item.json._staff_name, staff_email: $('Merge Session Data').item.json._staff_email, status: 'Agendado' }) }}",
+        "options": {},
+        "continueOnFail": true
+      },
+      "id": "7ea4118a-c17a-4b29-b6b3-2860b266014d",
+      "name": "Insert consultoria",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "done-collector-01",
+      "name": "Loop Complete",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        1700,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Upload TSV Form": {
+      "main": [
+        [
+          {
+            "node": "Parse TSV Direct",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse TSV Direct": {
+      "main": [
+        [
+          {
+            "node": "Transform Bookings Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Bookings Row": {
+      "main": [
+        [
+          {
+            "node": "RPC match_or_create_lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RPC match_or_create_lead": {
+      "main": [
+        [
+          {
+            "node": "Merge Session Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Session Data": {
+      "main": [
+        [
+          {
+            "node": "Loop One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop One by One": {
+      "main": [
+        [
+          {
+            "node": "Loop Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lookup Consultor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Consultor": {
+      "main": [
+        [
+          {
+            "node": "Insert consultoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert consultoria": {
+      "main": [
+        [
+          {
+            "node": "Loop One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "RYEhYWuTyUFvZhUO",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

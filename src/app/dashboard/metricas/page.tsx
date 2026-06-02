@@ -83,20 +83,18 @@ export default function MetricasPage() {
       {/* KPI Cards — 8 tiles */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6 mb-8">
         {[
-          { label: 'Total Consultorías', value: metricas.totalConsultorias, icon: 'event', sub: 'Resueltas + En seguimiento', helpText: 'Total de sesiones con estado Resuelto o En seguimiento. Fuente: consultorias.status' },
+          { label: 'Total Consultorías', value: metricas.totalConsultorias, icon: 'event', sub: 'Sesiones efectivas realizadas', helpText: 'Cantidad de sesiones efectivas realizadas. Fuente: registro_sesion (count of rows).' },
           { label: 'Resueltas', value: metricas.consultoriasResueltas, icon: 'task_alt', sub: 'Estado Resuelto', helpText: 'Sesiones con estado Resuelto. Fuente: consultorias.status' },
           { label: 'En Seguimiento', value: metricas.consultoriasEnSeguimientoAtendidas, icon: 'monitoring', sub: 'Consultorías atendidas en seguimiento', helpText: 'Consultorías atendidas con estado "En seguimiento". Fuente: consultorias.status filtrado por registro_sesion' },
-          { label: '% Conversión', value: `${metricas.tasaConversion}%`, icon: 'trending_up', sub: 'Consultorías → Resuelto', helpText: 'Porcentaje de consultorías resueltas respecto al total. Fórmula: (Resuelto / Total) × 100. Fuente: consultorias.status' },
+          { label: '% Conversión', value: `${metricas.tasaConversion.toFixed(2)}%`, icon: 'trending_up', sub: 'Sesiones / reservas únicas', helpText: 'Sesiones efectivas / reservas únicas (booking_id distintos). Fórmula: registro_sesion.count / DISTINCT consultorias.booking_id × 100.' },
           { label: 'Productos generados', value: metricas.totalProductos, icon: 'inventory_2', sub: 'Total productos creados', helpText: 'Suma de cantidad_productos en registro_sesion. Fuente: registro_sesion.cantidad_productos' },
           {
             label: 'Horas de consultoría',
             value: metricas.totalMinutos === 0 ? '0 h' : `${(metricas.totalMinutos / 60).toFixed(1)} h`,
             icon: 'schedule',
             sub: 'Tiempo total de sesiones',
-            helpText: 'Suma de duracion_minutos de todas las consultorías, expresado en horas. Fuente: consultorias.duracion_minutos',
+            helpText: 'Suma de duracion_sesion_minutos de las sesiones registradas, expresado en horas. Fuente: registro_sesion.duracion_sesion_minutos. Muestra 0 hasta que WF-3 cargue las duraciones.',
           },
-          { label: 'Eficiencia', value: metricas.eficiencia, icon: 'speed', sub: 'Productos por lead atendido', helpText: 'Productos totales dividido por leads únicos atendidos (Resuelto + En seguimiento). Fuente: registro_sesion.cantidad_productos / leads.id' },
-          { label: 'Escalamientos', value: `${metricas.tasaEscalamiento}%`, icon: 'escalator_warning', sub: 'Sesiones escaladas', helpText: 'Porcentaje de consultorías con estado Escalar respecto al total. Fórmula: (Escalar / Total) × 100. Fuente: consultorias.status' },
         ].map((kpi) => (
           <div
             key={kpi.label}

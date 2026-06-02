@@ -11,6 +11,8 @@ import {
   computeMetricasFromConsultorias,
   tiempoPromedioPorRol,
   computeConsultorMetrics,
+  computeWeeklyBuckets,
+  monthWeekLabel,
   type ConsultoriaForMetricas,
   type RegistroSesionForMetricas,
 } from '../metricas'
@@ -32,6 +34,7 @@ function makeConsultoria(
     id_lead: 'lead-1',
     hora_inicio: null,
     modalidad: null,
+    booking_id: null,
     leads: {
       nombre: null,
       apellidos: null,
@@ -97,17 +100,17 @@ describe('groupByPeriod', () => {
     ])
   })
 
-  it('groups by semana (YYYY-Www) sorted ascending', () => {
+  it('groups by semana using Mon-SN display labels, sorted ascending by ISO key', () => {
     const data = [
-      makeConsultoria({ fecha: '2024-01-15' }), // W03
-      makeConsultoria({ fecha: '2024-01-08' }), // W02
-      makeConsultoria({ fecha: '2024-01-09' }), // W02
+      makeConsultoria({ fecha: '2024-01-15' }), // W03 → Ene S3 (day 15: floor(14/7)+1=3)
+      makeConsultoria({ fecha: '2024-01-08' }), // W02 → Ene S2 (day 8: floor(7/7)+1=2)
+      makeConsultoria({ fecha: '2024-01-09' }), // W02 → Ene S2
     ]
     const result = groupByPeriod(data, 'semana')
     expect(result).toHaveLength(2)
-    expect(result[0].label).toBe('2024-W02')
+    expect(result[0].label).toBe('Ene S2')
     expect(result[0].count).toBe(2)
-    expect(result[1].label).toBe('2024-W03')
+    expect(result[1].label).toBe('Ene S3')
     expect(result[1].count).toBe(1)
   })
 
@@ -362,12 +365,10 @@ describe('countByFranjaHoraria', () => {
   })
 })
 
-// ─── T-13: totalConsultorias filter ──────────────────────────────────────────
+// ─── T-13: totalConsultorias — updated: now sources from registro_sesion ─────
 
-describe('totalConsultorias — only Resuelto + En seguimiento', () => {
-  const noOp: import('../metricas').RegistroSesionForMetricas[] = []
-
-  it('counts only Resuelto and En seguimiento', () => {
+describe('totalConsultorias — sources registro_sesion (updated from old status-filter)', () => {
+  it('equals registroSesion.length regardless of consultoria status', () => {
     const data = [
       makeConsultoria({ status: 'Resuelto' }),
       makeConsultoria({ status: 'En seguimiento' }),
@@ -375,27 +376,34 @@ describe('totalConsultorias — only Resuelto + En seguimiento', () => {
       makeConsultoria({ status: 'Agendado' }),
       makeConsultoria({ status: 'Cancelado' }),
     ]
-    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: noOp })
+    const registros: import('../metricas').RegistroSesionForMetricas[] = [
+      { id_consultoria: 'r1', cantidad_productos: 0 },
+      { id_consultoria: 'r2', cantidad_productos: 0 },
+    ]
+    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: registros })
     expect(result.totalConsultorias).toBe(2)
   })
 
-  it('returns 0 when all rows are Pendiente', () => {
+  it('returns 0 when registroSesion is empty', () => {
     const data = [
       makeConsultoria({ status: 'Pendiente' }),
       makeConsultoria({ status: 'Pendiente' }),
     ]
-    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: noOp })
+    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: [] })
     expect(result.totalConsultorias).toBe(0)
   })
 
-  it('handles status variants via canonicalStatus normalization', () => {
+  it('counts all status variants — only registroSesion length matters', () => {
     const data = [
-      makeConsultoria({ status: 'completada' }),  // normalizes to Resuelto
-      makeConsultoria({ status: 'enseguimiento' }), // normalizes to En seguimiento
+      makeConsultoria({ status: 'completada' }),
+      makeConsultoria({ status: 'enseguimiento' }),
       makeConsultoria({ status: 'cancelado' }),
     ]
-    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: noOp })
-    expect(result.totalConsultorias).toBe(2)
+    const registros: import('../metricas').RegistroSesionForMetricas[] = [
+      { id_consultoria: 'r1', cantidad_productos: 0 },
+    ]
+    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: registros })
+    expect(result.totalConsultorias).toBe(1)
   })
 })
 
@@ -813,5 +821,241 @@ describe('consultoriasEnSeguimientoAtendidas', () => {
     expect(ana!.pctGrabadas).toBe(50)
     // Bob: c4 grabada=true, c5 grabada=null (falsy) → 1/2 = 50%
     expect(bob!.pctGrabadas).toBe(50)
+  })
+})
+
+// ─── monthWeekLabel ───────────────────────────────────────────────────────────
+
+describe('monthWeekLabel', () => {
+  it('day 1 of Jan → Ene S1', () => {
+    expect(monthWeekLabel(new Date('2024-01-01T00:00:00'))).toBe('Ene S1')
+  })
+
+  it('day 8 of Jan → Ene S2', () => {
+    expect(monthWeekLabel(new Date('2024-01-08T00:00:00'))).toBe('Ene S2')
+  })
+
+  it('day 29 of Jan → Ene S4 (floor((28)/7)+1=5 → capped at 4)', () => {
+    expect(monthWeekLabel(new Date('2024-01-29T00:00:00'))).toBe('Ene S4')
+  })
+
+  it('day 15 of Mar → Mar S3', () => {
+    expect(monthWeekLabel(new Date('2024-03-15T00:00:00'))).toBe('Mar S3')
+  })
+
+  it('day 1 of Dec → Dic S1', () => {
+    expect(monthWeekLabel(new Date('2024-12-01T00:00:00'))).toBe('Dic S1')
+  })
+})
+
+// ─── groupByPeriod — semana labels via monthWeekLabel ─────────────────────────
+
+describe('groupByPeriod semana — monthWeekLabel labels', () => {
+  it('returns Mon-SN label for period=semana', () => {
+    const data = [makeConsultoria({ fecha: '2024-01-01' })]
+    const result = groupByPeriod(data, 'semana')
+    expect(result).toHaveLength(1)
+    expect(result[0].label).toBe('Ene S1')
+  })
+
+  it('groups same week (Mon S label) into single bucket', () => {
+    const data = [
+      makeConsultoria({ fecha: '2024-01-01' }),
+      makeConsultoria({ fecha: '2024-01-03' }),
+    ]
+    const result = groupByPeriod(data, 'semana')
+    expect(result).toHaveLength(1)
+    expect(result[0].label).toBe('Ene S1')
+    expect(result[0].count).toBe(2)
+  })
+
+  it('orders buckets chronologically across months, not alphabetically by label', () => {
+    // Out-of-order input spanning Jan→Apr; alphabetical label sort would give Abr<Ene<Feb<Mar
+    const data = [
+      makeConsultoria({ fecha: '2024-04-02' }),
+      makeConsultoria({ fecha: '2024-01-02' }),
+      makeConsultoria({ fecha: '2024-03-05' }),
+      makeConsultoria({ fecha: '2024-02-06' }),
+    ]
+    const result = groupByPeriod(data, 'semana')
+    expect(result.map((d) => d.label)).toEqual(['Ene S1', 'Feb S1', 'Mar S1', 'Abr S1'])
+  })
+})
+
+// ─── computeWeeklyBuckets regression — Sem N labels unchanged ─────────────────
+
+describe('computeWeeklyBuckets — Sem N labels unchanged (regression)', () => {
+  it('still produces "Sem N" semana labels after monthWeekLabel is added', () => {
+    const data = [makeConsultoria({ fecha: '2024-01-08', status: 'Resuelto' })]
+    const result = computeWeeklyBuckets(data)
+    expect(result).toHaveLength(1)
+    expect(result[0].semana).toBe('Sem 2')
+    expect(result[0].total).toBe(1)
+  })
+})
+
+// ─── totalConsultorias — sources registro_sesion ──────────────────────────────
+
+describe('totalConsultorias — sources registro_sesion', () => {
+  it('GIVEN 3 consultorias (mixed status) AND 2 registros → totalConsultorias === 2', () => {
+    const data = [
+      makeConsultoria({ status: 'Resuelto' }),
+      makeConsultoria({ status: 'Agendado' }),
+      makeConsultoria({ status: 'Escalar' }),
+    ]
+    const registros: RegistroSesionForMetricas[] = [
+      { id_consultoria: 'r1', cantidad_productos: 0 },
+      { id_consultoria: 'r2', cantidad_productos: 0 },
+    ]
+    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: registros })
+    expect(result.totalConsultorias).toBe(2)
+  })
+
+  it('GIVEN 0 consultorias AND 0 registros → totalConsultorias === 0', () => {
+    const result = computeMetricasFromConsultorias({ consultorias: [], registroSesion: [] })
+    expect(result.totalConsultorias).toBe(0)
+  })
+
+  it('GIVEN 5 consultorias (all Agendado) AND 5 registros → totalConsultorias === 5', () => {
+    const data = Array.from({ length: 5 }, () => makeConsultoria({ status: 'Agendado' }))
+    const registros: RegistroSesionForMetricas[] = Array.from({ length: 5 }, (_, i) => ({
+      id_consultoria: `r${i}`,
+      cantidad_productos: 0,
+    }))
+    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: registros })
+    expect(result.totalConsultorias).toBe(5)
+  })
+})
+
+// ─── tasaConversion — distinct bookings denominator ───────────────────────────
+
+describe('tasaConversion — distinct bookings denominator', () => {
+  it('4 consultorias booking_id=[A,A,B,B] AND 3 registros → round(3/2*100)=150', () => {
+    const data = [
+      makeConsultoria({ booking_id: 'A' }),
+      makeConsultoria({ booking_id: 'A' }),
+      makeConsultoria({ booking_id: 'B' }),
+      makeConsultoria({ booking_id: 'B' }),
+    ]
+    const registros: RegistroSesionForMetricas[] = [
+      { id_consultoria: 'r1', cantidad_productos: 0 },
+      { id_consultoria: 'r2', cantidad_productos: 0 },
+      { id_consultoria: 'r3', cantidad_productos: 0 },
+    ]
+    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: registros })
+    expect(result.tasaConversion).toBe(Math.round(3 / 2 * 10000) / 100)
+  })
+
+  it('all booking_id=null AND 2 registros → tasaConversion === 0', () => {
+    const data = [
+      makeConsultoria({ booking_id: null }),
+      makeConsultoria({ booking_id: null }),
+    ]
+    const registros: RegistroSesionForMetricas[] = [
+      { id_consultoria: 'r1', cantidad_productos: 0 },
+      { id_consultoria: 'r2', cantidad_productos: 0 },
+    ]
+    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: registros })
+    expect(result.tasaConversion).toBe(0)
+  })
+
+  it('353 distinct booking_ids AND 217 registros → tasaConversion === 61.47 (2 decimals)', () => {
+    const data = Array.from({ length: 353 }, (_, i) => makeConsultoria({ booking_id: `bk-${i}` }))
+    const registros: RegistroSesionForMetricas[] = Array.from({ length: 217 }, (_, i) => ({
+      id_consultoria: `r${i}`,
+      cantidad_productos: 0,
+    }))
+    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: registros })
+    expect(result.tasaConversion).toBe(Math.round(217 / 353 * 10000) / 100)
+    expect(result.tasaConversion).toBe(61.47)
+  })
+})
+
+// ─── totalMinutos — sources registro_sesion ───────────────────────────────────
+
+describe('totalMinutos — sources registro_sesion', () => {
+  it('SUM registro.duracion; consultorias.duracion_minutos ignored', () => {
+    const data = [
+      makeConsultoria({ duracion_minutos: 120 }),
+      makeConsultoria({ duracion_minutos: 120 }),
+      makeConsultoria({ duracion_minutos: 120 }),
+    ]
+    const registros: RegistroSesionForMetricas[] = [
+      { id_consultoria: 'r1', cantidad_productos: 0, duracion_sesion_minutos: 60 },
+      { id_consultoria: 'r2', cantidad_productos: 0, duracion_sesion_minutos: 90 },
+      { id_consultoria: 'r3', cantidad_productos: 0, duracion_sesion_minutos: null },
+    ]
+    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: registros })
+    expect(result.totalMinutos).toBe(150)
+  })
+
+  it('all duracion_sesion_minutos null → totalMinutos === 0 (not NaN)', () => {
+    const data = [makeConsultoria({ duracion_minutos: 120 })]
+    const registros: RegistroSesionForMetricas[] = [
+      { id_consultoria: 'r1', cantidad_productos: 0, duracion_sesion_minutos: null },
+    ]
+    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: registros })
+    expect(result.totalMinutos).toBe(0)
+    expect(Number.isNaN(result.totalMinutos)).toBe(false)
+  })
+})
+
+// ─── avgDuracionByConsultor — registro priority ───────────────────────────────
+
+describe('avgDuracionByConsultor — registro priority (new 2-arg form)', () => {
+  it('uses registro.duracion_sesion_minutos over consultoria.duracion_minutos', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', id_consultor: 'x', duracion_minutos: 120, consultores: { nombre: 'Ana' } }),
+      makeConsultoria({ id: 'c2', id_consultor: 'x', duracion_minutos: 120, consultores: { nombre: 'Ana' } }),
+    ]
+    const registros: RegistroSesionForMetricas[] = [
+      { id_consultoria: 'c1', cantidad_productos: 0, duracion_sesion_minutos: 45 },
+      { id_consultoria: 'c2', cantidad_productos: 0, duracion_sesion_minutos: 75 },
+    ]
+    const result = avgDuracionByConsultor(data, registros)
+    expect(result).toEqual([{ consultor: 'Ana', avg: 60 }])
+  })
+
+  it('falls back to consultoria.duracion_minutos when registroSesion=[]', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', id_consultor: 'x', duracion_minutos: 90, consultores: { nombre: 'Ana' } }),
+    ]
+    const result = avgDuracionByConsultor(data, [])
+    expect(result).toEqual([{ consultor: 'Ana', avg: 90 }])
+  })
+
+  it('excludes entry when both registro.duracion and c.duracion are null', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', id_consultor: 'x', duracion_minutos: null, consultores: { nombre: 'Ana' } }),
+    ]
+    const registros: RegistroSesionForMetricas[] = [
+      { id_consultoria: 'c1', cantidad_productos: 0, duracion_sesion_minutos: null },
+    ]
+    const result = avgDuracionByConsultor(data, registros)
+    expect(result).toEqual([])
+  })
+
+  it('still works with 1-arg call (backward compat)', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', id_consultor: 'x', duracion_minutos: 60, consultores: { nombre: 'Ana' } }),
+    ]
+    const result = avgDuracionByConsultor(data)
+    expect(result).toEqual([{ consultor: 'Ana', avg: 60 }])
+  })
+})
+
+// ─── computeMetricasFromConsultorias — duracionPorConsultor uses registro ──────
+
+describe('computeMetricasFromConsultorias — duracionPorConsultor uses registro priority', () => {
+  it('duracionPorConsultor entries use registro values, not consultorias.duracion_minutos', () => {
+    const data = [
+      makeConsultoria({ id: 'c1', id_consultor: 'x', duracion_minutos: 120, consultores: { nombre: 'Ana' } }),
+    ]
+    const registros: RegistroSesionForMetricas[] = [
+      { id_consultoria: 'c1', cantidad_productos: 0, duracion_sesion_minutos: 45 },
+    ]
+    const result = computeMetricasFromConsultorias({ consultorias: data, registroSesion: registros })
+    const ana = result.duracionPorConsultor.find((r) => r.consultor === 'Ana')
+    expect(ana?.avg).toBe(45)
   })
 })
