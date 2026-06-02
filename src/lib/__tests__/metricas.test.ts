@@ -23,6 +23,7 @@ function makeConsultoria(
   overrides: Partial<ConsultoriaForMetricas> = {},
 ): ConsultoriaForMetricas {
   return {
+    id: `c-${Math.random().toString(36).slice(2, 9)}`,
     fecha: '2024-01-15',
     status: 'Resuelto',
     servicio: null,
@@ -54,12 +55,13 @@ function makeConsultoria(
 
 describe('countUniqueNit', () => {
   it('returns 0 for empty array', () => {
-    expect(countUniqueNit([])).toBe(0)
+    expect(countUniqueNit([], [])).toBe(0)
   })
 
   it('returns 0 when all nit values are null', () => {
     const data = [makeConsultoria(), makeConsultoria()]
-    expect(countUniqueNit(data)).toBe(0)
+    const regs = [{ id_consultoria: data[0].id }, { id_consultoria: data[1].id }] as any[]
+    expect(countUniqueNit(data, regs)).toBe(0)
   })
 
   it('counts unique non-null nit values', () => {
@@ -69,12 +71,14 @@ describe('countUniqueNit', () => {
       makeConsultoria({ leads: { city: null, company_role_level: null, origen: null, sector: null, company_role_area: null, nit: '123' } }),
       makeConsultoria({ leads: null }),
     ]
-    expect(countUniqueNit(data)).toBe(2)
+    const regs = data[2] ? [{ id_consultoria: data[0].id }, { id_consultoria: data[1].id }, { id_consultoria: data[2].id }] as any[] : [] as any[]
+    expect(countUniqueNit(data, regs)).toBe(2)
   })
 
   it('handles null leads object', () => {
     const data = [makeConsultoria({ leads: null })]
-    expect(countUniqueNit(data)).toBe(0)
+    const regs = [{ id_consultoria: data[0].id }] as any[]
+    expect(countUniqueNit(data, regs)).toBe(0)
   })
 })
 

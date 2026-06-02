@@ -17,7 +17,7 @@ export function buildAttendedSet(registros: RegistroSesionForMetricas[]): Set<st
   return set
 }
 
-export type Granularidad = 'dia' | 'semana' | 'mes'
+export type Granularidad = 'dia' | 'semana' | 'mes' | 'año'
 
 export interface MetricasGlobales {
   /** All consultorias (no status filter) */
@@ -367,11 +367,15 @@ const TOP_N = 6
 
 // ─── Phase D compute functions ────────────────────────────────────────────────
 
-/** Count distinct non-null nit values across all leads. */
-export function countUniqueNit(consultorias: ConsultoriaForMetricas[]): number {
+/** Count distinct non-null nit values across leads with registro_sesion. */
+export function countUniqueNit(
+  consultorias: ConsultoriaForMetricas[],
+  registroSesion: RegistroSesionForMetricas[],
+): number {
+  const attendedIds = new Set(registroSesion.map(r => r.id_consultoria))
   const seen = new Set<string>()
   for (const c of consultorias) {
-    if (c.leads?.nit != null) seen.add(c.leads.nit)
+    if (c.id && attendedIds.has(c.id) && c.leads?.nit != null) seen.add(c.leads.nit)
   }
   return seen.size
 }
@@ -410,6 +414,9 @@ export function groupByPeriod(
       const { isoYear, isoWeek } = isoWeekParts(d)
       sortKey = `${isoYear}-W${String(isoWeek).padStart(2, '0')}`
       displayLabel = monthWeekLabel(d)
+    } else if (period === 'año') {
+      sortKey = c.fecha.slice(0, 4)
+      displayLabel = sortKey
     } else {
       sortKey = c.fecha.slice(0, 7)
       displayLabel = sortKey
@@ -1030,7 +1037,7 @@ export function computeMetricasFromConsultorias({
   const origenStatusBreakdown = computeOrigenStatusBreakdown(consultorias)
 
   // Phase D: new KPI compute functions
-  const nitUnicos = countUniqueNit(consultorias)
+  const nitUnicos = countUniqueNit(consultorias, registroSesion)
   const porPeriodo = groupByPeriod(consultorias, period)
   const duracionPorConsultor = avgDuracionByConsultor(consultorias, registroSesion)
   // TASK-12/13: pass attendedIds for join-based attended filter when available
