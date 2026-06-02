@@ -99,8 +99,8 @@ describe('groupByPeriod', () => {
     ]
     const result = groupByPeriod(data, 'dia')
     expect(result).toEqual([
-      { label: '2024-01-15', count: 2 },
-      { label: '2024-01-20', count: 1 },
+      { key: '2024-01-15', label: '2024-01-15', count: 2 },
+      { key: '2024-01-20', label: '2024-01-20', count: 1 },
     ])
   })
 
@@ -126,8 +126,8 @@ describe('groupByPeriod', () => {
     ]
     const result = groupByPeriod(data, 'mes')
     expect(result).toEqual([
-      { label: '2024-01', count: 2 },
-      { label: '2024-03', count: 1 },
+      { key: '2024-01', label: '2024-01', count: 2 },
+      { key: '2024-03', label: '2024-03', count: 1 },
     ])
   })
 
@@ -136,7 +136,7 @@ describe('groupByPeriod', () => {
       makeConsultoria({ fecha: '' }),
       makeConsultoria({ fecha: '2024-01-15' }),
     ]
-    expect(groupByPeriod(data, 'dia')).toEqual([{ label: '2024-01-15', count: 1 }])
+    expect(groupByPeriod(data, 'dia')).toEqual([{ key: '2024-01-15', label: '2024-01-15', count: 1 }])
   })
 })
 
