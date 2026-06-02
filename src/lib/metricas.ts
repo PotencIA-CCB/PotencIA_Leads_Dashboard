@@ -383,13 +383,13 @@ export function countUniqueNit(
 const MONTH_ABBR_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 /**
- * Returns a display label for a date in the format "Mon SN" where N = week-within-month (1–4, capped).
- * Week-within-month formula: Math.min(4, Math.floor((dayOfMonth - 1) / 7) + 1).
- * Examples: 2024-01-01 → "Ene S1", 2024-01-29 → "Ene S4", 2024-03-15 → "Mar S3".
+ * Returns a display label for a date in the format "Mon SN" where N = week-within-month (1–5).
+ * Week-within-month formula: Math.floor((dayOfMonth - 1) / 7) + 1.
+ * Examples: 2024-01-01 → "Ene S1", 2024-01-29 → "Ene S5", 2024-03-15 → "Mar S3".
  */
 export function monthWeekLabel(d: Date): string {
   const month = MONTH_ABBR_ES[d.getMonth()]
-  const week = Math.min(4, Math.floor((d.getDate() - 1) / 7) + 1)
+  const week = Math.floor((d.getDate() - 1) / 7) + 1
   return `${month} S${week}`
 }
 
