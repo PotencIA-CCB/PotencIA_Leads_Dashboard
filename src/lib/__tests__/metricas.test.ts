@@ -839,8 +839,8 @@ describe('monthWeekLabel', () => {
     expect(monthWeekLabel(new Date('2024-01-08T00:00:00'))).toBe('Ene S2')
   })
 
-  it('day 29 of Jan → Ene S4 (floor((28)/7)+1=5 → capped at 4)', () => {
-    expect(monthWeekLabel(new Date('2024-01-29T00:00:00'))).toBe('Ene S4')
+  it('day 29 of Jan → Ene S5 (floor((28)/7)+1=5)', () => {
+    expect(monthWeekLabel(new Date('2024-01-29T00:00:00'))).toBe('Ene S5')
   })
 
   it('day 15 of Mar → Mar S3', () => {
