@@ -31,6 +31,12 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+/** Format a YYYY-MM-DD label as DD/MM for readability. */
+function dayLabel(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}`
+}
+
 export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
   const [period, setPeriod] = useState<Granularidad>('mes')
   const [range, setRange] = useState<{ start: string; end: string }>(() => ({
@@ -54,19 +60,14 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
       filtered.filter(c => canonicalStatus(c.status) === 'Resuelto'),
       period,
     )
-    // programadas = ALL consultorias in range (every status), so programadas >= resueltas always holds
-    const programadasRaw = groupByPeriod(filtered, period)
+    const agendadasRaw = groupByPeriod(filtered, period)
 
-    // programadasRaw (all statuses) is a superset of resueltoRaw's periods and is
-    // already chronologically ordered by groupByPeriod. Map over it to preserve that
-    // order — re-sorting by display label breaks chronology for the 'semana' view
-    // (e.g. "Abr S1" < "Ene S1" alphabetically).
     const resueltoMap = new Map(resueltoRaw.map(d => [d.label, d.count]))
 
-    return programadasRaw.map(d => ({
-      label: d.label,
+    return agendadasRaw.map(d => ({
+      label: period === 'dia' ? dayLabel(d.label) : d.label,
+      agendadas: d.count,
       resuelto: resueltoMap.get(d.label) ?? 0,
-      programadas: d.count,
     }))
   }, [filtered, period])
 
@@ -86,7 +87,7 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
         <div>
           <div className="flex items-center gap-1.5">
             <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Empresas únicas</p>
-            <InfoTooltip helpText="Cantidad de NIT únicos entre los leads con consultoría. Fuente: leads.nit" />
+            <InfoTooltip helpText="Cantidad de NIT únicos entre los leads con sesiones registradas. Fuente: registro_sesion → leads.nit" />
           </div>
           <p className="text-2xl font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             {metricas.nitUnicos}
@@ -148,28 +149,39 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 10 }}
+              interval={period === 'dia' ? 'preserveStartEnd' : 0}
+            />
             <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-            <Tooltip />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Tooltip
+              contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #E5E7EB' }}
+              labelStyle={{ fontWeight: 600, fontSize: 12, color: '#003087' }}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: 11 }}
+              formatter={(value: string) => value === 'agendadas' ? 'Agendadas' : 'Resueltas'}
+            />
             <Area
               type="monotone"
-              dataKey="programadas"
-              name="Agendadas"
+              dataKey="agendadas"
+              name="agendadas"
               stroke="#00C8FF"
-              fill="#E0F9FF"
-              fillOpacity={0.4}
-              stackId="1"
+              fill="url(#colorAgendado)"
               strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 3, strokeWidth: 0 }}
             />
             <Area
               type="monotone"
               dataKey="resuelto"
+              name="resuelto"
               stroke="#003087"
-              fill="#C7D9FF"
-              fillOpacity={0.6}
-              stackId="1"
+              fill="url(#colorResuelto)"
               strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 3, strokeWidth: 0 }}
             />
           </AreaChart>
         </ResponsiveContainer>

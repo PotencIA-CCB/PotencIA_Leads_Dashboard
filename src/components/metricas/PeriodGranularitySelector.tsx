@@ -9,6 +9,7 @@ const OPTIONS: { label: string; value: Granularidad }[] = [
   { label: 'Día', value: 'dia' },
   { label: 'Semana', value: 'semana' },
   { label: 'Mes', value: 'mes' },
+  { label: 'Año', value: 'año' },
 ]
 
 export function PeriodGranularitySelector({ value, onChange }: PeriodGranularidadSelectorProps) {
