@@ -16,7 +16,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const loopItem = $('Loop One by One').item.json;\nconst leadId = loopItem.lead_id;\nconst cons = loopItem._consultoria || {};\nconst reg = loopItem._registro || {};\n\nconst API_KEY = '{{$env.SUPABASE_SERVICE_ROLE_KEY}}';\nconst BASE = 'https://scydyevwjmbhtohoncuy.supabase.co/rest/v1';\nconst h = { apikey: API_KEY, Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' };\n\n// 1. Lookup consultor by institutional email\nlet consultorId = null;\nif (cons.staff_email) {\n  const res = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${BASE}/consultores?email_institucional=eq.${encodeURIComponent(cons.staff_email)}&select=id`,\n    headers: h,\n  });\n  if (Array.isArray(res) && res.length > 0) consultorId = res[0].id;\n}\n\n// 2. Find existing consultoria — id_externo first (handles WF-3 re-runs),\n// then fall back to WF-2 booking row by (lead, date).\nlet existingId = null;\nif (reg.id_externo) {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${BASE}/consultorias?id_externo=eq.${encodeURIComponent(reg.id_externo)}&select=id&limit=1`,\n    headers: h,\n  });\n  if (Array.isArray(rows) && rows.length > 0) existingId = rows[0].id;\n}\nif (!existingId && leadId && cons.fecha) {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${BASE}/consultorias?id_lead=eq.${leadId}&fecha=eq.${cons.fecha}&booking_id=not.is.null&select=id&limit=1`,\n    headers: h,\n  });\n  if (Array.isArray(rows) && rows.length > 0) existingId = rows[0].id;\n}\n\nconst fields = {};\nif (leadId) fields.id_lead = leadId;\nif (reg.id_externo) fields.id_externo = reg.id_externo;\nif (consultorId) fields.id_consultor = consultorId;\nif (cons.fecha) fields.fecha = cons.fecha;\nif (cons.hora_inicio) fields.hora_inicio = cons.hora_inicio;\nif (cons.hora_fin) fields.hora_fin = cons.hora_fin;\nif (cons.duracion_minutos) fields.duracion_minutos = cons.duracion_minutos;\nif (cons.modalidad) fields.modalidad = cons.modalidad;\nif (cons.staff_name) fields.staff_name = cons.staff_name;\nif (cons.staff_email) fields.staff_email = cons.staff_email;\nif (cons.nivel_potencia) fields.nivel_potencia = cons.nivel_potencia;\nif (cons.categoria_caso) fields.categoria_caso = cons.categoria_caso;\nif (cons.categoria_caso_uso) fields.categoria_caso_uso = cons.categoria_caso_uso;\nif (cons.status) fields.status = cons.status;\n\nlet row;\nif (existingId) {\n  const res = await this.helpers.httpRequest({\n    method: 'PATCH',\n    url: `${BASE}/consultorias?id=eq.${existingId}`,\n    headers: { ...h, Prefer: 'return=representation' },\n    body: JSON.stringify(fields),\n  });\n  row = Array.isArray(res) ? res[0] : res;\n} else {\n  const res = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${BASE}/consultorias`,\n    headers: { ...h, Prefer: 'return=representation' },\n    body: JSON.stringify(fields),\n  });\n  row = Array.isArray(res) ? res[0] : res;\n}\n\nif (!row?.id) return [];\nreturn [{ json: { ...row, _registro: reg } }];"
+        "jsCode": "const loopItem = $('Loop One by One').item.json;\nconst leadId = loopItem.lead_id;\nconst cons = loopItem._consultoria || {};\nconst reg = loopItem._registro || {};\n\nconst API_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\nconst BASE = 'https://scydyevwjmbhtohoncuy.supabase.co/rest/v1';\nconst h = { apikey: API_KEY, Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' };\n\n// 1. Lookup consultor by institutional email\nlet consultorId = null;\nif (cons.staff_email) {\n  const res = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${BASE}/consultores?email_institucional=eq.${encodeURIComponent(cons.staff_email)}&select=id`,\n    headers: h,\n  });\n  if (Array.isArray(res) && res.length > 0) consultorId = res[0].id;\n}\n\n// 2. Find existing consultoria — id_externo first (handles WF-3 re-runs),\n// then fall back to WF-2 booking row by (lead, date).\nlet existingId = null;\nif (reg.id_externo) {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${BASE}/consultorias?id_externo=eq.${encodeURIComponent(reg.id_externo)}&select=id&limit=1`,\n    headers: h,\n  });\n  if (Array.isArray(rows) && rows.length > 0) existingId = rows[0].id;\n}\nif (!existingId && leadId && cons.fecha) {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${BASE}/consultorias?id_lead=eq.${leadId}&fecha=eq.${cons.fecha}&booking_id=not.is.null&select=id&limit=1`,\n    headers: h,\n  });\n  if (Array.isArray(rows) && rows.length > 0) existingId = rows[0].id;\n}\n\nconst fields = {};\nif (leadId) fields.id_lead = leadId;\nif (reg.id_externo) fields.id_externo = reg.id_externo;\nif (consultorId) fields.id_consultor = consultorId;\nif (cons.fecha) fields.fecha = cons.fecha;\nif (cons.hora_inicio) fields.hora_inicio = cons.hora_inicio;\nif (cons.hora_fin) fields.hora_fin = cons.hora_fin;\nif (cons.duracion_minutos) fields.duracion_minutos = cons.duracion_minutos;\nif (cons.modalidad) fields.modalidad = cons.modalidad;\nif (cons.staff_name) fields.staff_name = cons.staff_name;\nif (cons.staff_email) fields.staff_email = cons.staff_email;\nif (cons.nivel_potencia) fields.nivel_potencia = cons.nivel_potencia;\nif (cons.categoria_caso) fields.categoria_caso = cons.categoria_caso;\nif (cons.categoria_caso_uso) fields.categoria_caso_uso = cons.categoria_caso_uso;\nif (cons.status) fields.status = cons.status;\n\nlet row;\nif (existingId) {\n  const res = await this.helpers.httpRequest({\n    method: 'PATCH',\n    url: `${BASE}/consultorias?id=eq.${existingId}`,\n    headers: { ...h, Prefer: 'return=representation' },\n    body: JSON.stringify(fields),\n  });\n  row = Array.isArray(res) ? res[0] : res;\n} else {\n  const res = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${BASE}/consultorias`,\n    headers: { ...h, Prefer: 'return=representation' },\n    body: JSON.stringify(fields),\n  });\n  row = Array.isArray(res) ? res[0] : res;\n}\n\nif (!row?.id) return [];\nreturn [{ json: { ...row, _registro: reg } }];"
       },
       "id": "ba90af6c-4856-41a7-bee4-13dd632f334b",
       "name": "Upsert consultorias",
@@ -77,11 +77,11 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
             },
             {
               "name": "Authorization",
-              "value": "Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
             },
             {
               "name": "Content-Type",
@@ -149,11 +149,11 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
             },
             {
               "name": "Authorization",
-              "value": "Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
             },
             {
               "name": "Content-Type",
@@ -208,11 +208,11 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
             },
             {
               "name": "Authorization",
-              "value": "Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
             },
             {
               "name": "Content-Type",
