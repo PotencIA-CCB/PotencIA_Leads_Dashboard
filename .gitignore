@@ -61,3 +61,6 @@ next-env.d.ts
 !.dev.vars.example
 
 !.env.example
+
+# n8n flow copies with real secrets injected (service_role key) — never commit
+n8n/*.local.json
