@@ -39,8 +39,6 @@ export interface MetricasGlobales {
   porOrigen: { origen: string; total: number }[]
   totalProductos: number
   totalMinutos: number
-  /** totalProductos / totalLeadsAtendidos rounded to 2 decimals; '—' when denominator is 0 */
-  eficiencia: string
   // Track C (PR 4) additions
   topConsultores: { id_consultor: string; nombre: string; total: number }[]
   origenStatusBreakdown: {
@@ -75,8 +73,6 @@ export interface MetricasGlobales {
   leadsSinConsultoria: number
   /** COUNT DISTINCT id_lead en el dataset */
   leadsConConsultoria: number
-  /** % status Escalar / total */
-  tasaEscalamiento: number
   /** % sesion_grabada=true en registro_sesion */
   tasaSesionesGrabadas: number
   /** % leads con 2+ consultorias vs leads con ≥1 */
@@ -110,6 +106,8 @@ export interface ConsultoriaForMetricas {
   id_lead: string
   hora_inicio: string | null
   modalidad: string | null
+  /** Booking reference from MS Bookings. Null when row was created by WF-3 with no matching WF-2 booking. */
+  booking_id?: string | null
   leads: {
     nombre?: string | null
     apellidos?: string | null
@@ -378,49 +376,81 @@ export function countUniqueNit(consultorias: ConsultoriaForMetricas[]): number {
   return seen.size
 }
 
+const MONTH_ABBR_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+/**
+ * Returns a display label for a date in the format "Mon SN" where N = week-within-month (1–4, capped).
+ * Week-within-month formula: Math.min(4, Math.floor((dayOfMonth - 1) / 7) + 1).
+ * Examples: 2024-01-01 → "Ene S1", 2024-01-29 → "Ene S4", 2024-03-15 → "Mar S3".
+ */
+export function monthWeekLabel(d: Date): string {
+  const month = MONTH_ABBR_ES[d.getMonth()]
+  const week = Math.min(4, Math.floor((d.getDate() - 1) / 7) + 1)
+  return `${month} S${week}`
+}
+
 /** Group consultorias by time period (dia/semana/mes), sorted ascending. */
 export function groupByPeriod(
   consultorias: ConsultoriaForMetricas[],
   period: Granularidad,
 ): { label: string; count: number }[] {
-  const buckets: Record<string, number> = {}
+  // For 'semana', use ISO key for sorting but monthWeekLabel for display
+  const buckets: Record<string, { label: string; count: number }> = {}
 
   for (const c of consultorias) {
     if (!c.fecha) continue
-    let label: string
+    let sortKey: string
+    let displayLabel: string
     if (period === 'dia') {
-      label = c.fecha.slice(0, 10)
+      sortKey = c.fecha.slice(0, 10)
+      displayLabel = sortKey
     } else if (period === 'semana') {
       const d = new Date(c.fecha + 'T00:00:00')
       if (isNaN(d.getTime())) continue
       const { isoYear, isoWeek } = isoWeekParts(d)
-      label = `${isoYear}-W${String(isoWeek).padStart(2, '0')}`
+      sortKey = `${isoYear}-W${String(isoWeek).padStart(2, '0')}`
+      displayLabel = monthWeekLabel(d)
     } else {
-      label = c.fecha.slice(0, 7)
+      sortKey = c.fecha.slice(0, 7)
+      displayLabel = sortKey
     }
-    buckets[label] = (buckets[label] ?? 0) + 1
+    if (!buckets[sortKey]) {
+      buckets[sortKey] = { label: displayLabel, count: 0 }
+    }
+    buckets[sortKey].count++
   }
 
   return Object.entries(buckets)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([label, count]) => ({ label, count }))
+    .map(([, { label, count }]) => ({ label, count }))
 }
 
-/** Average duracion_minutos per consultor, sorted by avg descending. */
+/**
+ * Average duration per consultor, sorted by avg descending.
+ * When registroSesion is provided, prefers registro.duracion_sesion_minutos over
+ * consultoria.duracion_minutos for each session (same priority as computeConsultorMetrics).
+ * The registroSesion param is OPTIONAL — existing 1-arg call sites remain valid.
+ */
 export function avgDuracionByConsultor(
   consultorias: ConsultoriaForMetricas[],
+  registroSesion?: RegistroSesionForMetricas[],
 ): { consultor: string; avg: number }[] {
+  const registroMap = new Map<string, RegistroSesionForMetricas>(
+    registroSesion?.map((r) => [r.id_consultoria, r]) ?? [],
+  )
   const map = new Map<string, { sum: number; count: number }>()
 
   for (const c of consultorias) {
     if (!c.id_consultor) continue
-    if (c.duracion_minutos == null) continue
+    const registro = c.id != null ? registroMap.get(c.id) : undefined
+    const duracion = registro?.duracion_sesion_minutos ?? c.duracion_minutos
+    if (duracion == null) continue
     const key = c.consultores?.nombre ?? 'Sin consultor'
     const entry = map.get(key)
     if (!entry) {
-      map.set(key, { sum: c.duracion_minutos, count: 1 })
+      map.set(key, { sum: duracion, count: 1 })
     } else {
-      entry.sum += c.duracion_minutos
+      entry.sum += duracion
       entry.count++
     }
   }
@@ -887,11 +917,8 @@ export function computeMetricasFromConsultorias({
   /** TASK-12: Set of id_consultoria values from registro_sesion. Used for join-based attended filter. */
   attendedIds?: Set<string>
 }): MetricasGlobales {
-  // Counts only attended sessions (status Resuelto | En seguimiento)
-  const totalConsultorias = consultorias.filter((c) => {
-    const s = canonicalStatus(c.status)
-    return s === 'Resuelto' || s === 'En seguimiento'
-  }).length
+  // Count of rows in registro_sesion (effective sessions held)
+  const totalConsultorias = registroSesion.length
   const consultoriasResueltas = consultorias.filter(
     (c) => canonicalStatus(c.status) === 'Resuelto',
   ).length
@@ -903,17 +930,8 @@ export function computeMetricasFromConsultorias({
   ).length
 
   const totalProductos = registroSesion.reduce((sum, r) => sum + (r.cantidad_productos ?? 0), 0)
-  const totalMinutos = consultorias.reduce((sum, c) => sum + (c.duracion_minutos ?? 0), 0)
-
-  // Eficiencia: productos / leads atendidos
-  const leadsAtendidosSet = new Set(
-    consultorias
-      .filter(c => ['Resuelto', 'En seguimiento'].includes(canonicalStatus(c.status)))
-      .map(c => c.id_lead)
-  )
-  const eficiencia = leadsAtendidosSet.size === 0
-    ? '—'
-    : (totalProductos / leadsAtendidosSet.size).toFixed(2)
+  /** Sum of registro_sesion.duracion_sesion_minutos in minutes. Zero until WF-3 loads duration data. */
+  const totalMinutos = registroSesion.reduce((sum, r) => sum + (r.duracion_sesion_minutos ?? 0), 0)
 
   const estadoMap: Record<string, number> = {}
   const servicioMap: Record<string, number> = {}
@@ -975,9 +993,14 @@ export function computeMetricasFromConsultorias({
   const consultoriasEnSeguimientoAtendidas =
     porEstadoAtendidas.find((e) => e.status === 'En seguimiento')?.total ?? 0
 
-  const resueltos = estadoMap['Resuelto'] || 0
   const totalAll = consultorias.length
-  const tasaConversion = totalAll > 0 ? Math.round((resueltos / totalAll) * 100) : 0
+  // Sesiones efectivas / reservas únicas (booking_id distintos)
+  const distinctBookings = new Set(
+    consultorias.map((c) => c.booking_id).filter((b): b is string => b != null),
+  ).size
+  const tasaConversion = distinctBookings > 0
+    ? Math.round((registroSesion.length / distinctBookings) * 10000) / 100
+    : 0
 
   // TASK-04: porCasoUso now sources from categoria_caso with normalization
   const porCasoUso = countByCategoriaCaso(consultorias)
@@ -1009,7 +1032,7 @@ export function computeMetricasFromConsultorias({
   // Phase D: new KPI compute functions
   const nitUnicos = countUniqueNit(consultorias)
   const porPeriodo = groupByPeriod(consultorias, period)
-  const duracionPorConsultor = avgDuracionByConsultor(consultorias)
+  const duracionPorConsultor = avgDuracionByConsultor(consultorias, registroSesion)
   // TASK-12/13: pass attendedIds for join-based attended filter when available
   const consultasPorArea = countByArea(consultorias, attendedIds)
   const recuentoPorConsultor = countByConsultor(consultorias, attendedIds)
@@ -1033,10 +1056,6 @@ export function computeMetricasFromConsultorias({
   const tasaLeadConversion = leadsConConsultoria > 0
     ? Math.round((leadsConversionSet.size / leadsConConsultoria) * 100)
     : 0
-
-  // tasaEscalamiento: % status Escalar / total
-  const escalamientos = estadoMap['Escalar'] ?? 0
-  const tasaEscalamiento = totalAll > 0 ? Math.round((escalamientos / totalAll) * 100) : 0
 
   // tasaSesionesGrabadas: % sesion_grabada=true en registro_sesion
   const grabadas = registroSesion.filter(r => r.sesion_grabada === true).length
@@ -1107,7 +1126,6 @@ export function computeMetricasFromConsultorias({
     porOrigen,
     totalProductos,
     totalMinutos,
-    eficiencia,
     topConsultores,
     origenStatusBreakdown,
     nitUnicos,
@@ -1124,7 +1142,6 @@ export function computeMetricasFromConsultorias({
     tasaLeadConversion,
     leadsSinConsultoria,
     leadsConConsultoria,
-    tasaEscalamiento,
     tasaSesionesGrabadas,
     tasaRetorno,
     tasaDocumentacion,

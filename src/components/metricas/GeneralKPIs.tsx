@@ -54,25 +54,20 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
       filtered.filter(c => canonicalStatus(c.status) === 'Resuelto'),
       period,
     )
-    const agendadoRaw = groupByPeriod(
-      filtered.filter(c => canonicalStatus(c.status) === 'Agendado'),
-      period,
-    )
+    // programadas = ALL consultorias in range (every status), so programadas >= resueltas always holds
+    const programadasRaw = groupByPeriod(filtered, period)
 
-    const labelsSet = new Set<string>()
-    for (const d of resueltoRaw) labelsSet.add(d.label)
-    for (const d of agendadoRaw) labelsSet.add(d.label)
-
+    // programadasRaw (all statuses) is a superset of resueltoRaw's periods and is
+    // already chronologically ordered by groupByPeriod. Map over it to preserve that
+    // order — re-sorting by display label breaks chronology for the 'semana' view
+    // (e.g. "Abr S1" < "Ene S1" alphabetically).
     const resueltoMap = new Map(resueltoRaw.map(d => [d.label, d.count]))
-    const agendadoMap = new Map(agendadoRaw.map(d => [d.label, d.count]))
 
-    return Array.from(labelsSet)
-      .sort((a, b) => a.localeCompare(b))
-      .map(label => ({
-        label,
-        resuelto: resueltoMap.get(label) ?? 0,
-        agendado: agendadoMap.get(label) ?? 0,
-      }))
+    return programadasRaw.map(d => ({
+      label: d.label,
+      resuelto: resueltoMap.get(d.label) ?? 0,
+      programadas: d.count,
+    }))
   }, [filtered, period])
 
   return (
@@ -82,7 +77,7 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
         <div>
           <div className="flex items-center gap-1.5">
             <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Total sesiones</p>
-            <InfoTooltip helpText="Total de sesiones con estado Resuelto o En seguimiento. Fuente: consultorias.status" />
+            <InfoTooltip helpText="Cantidad de sesiones efectivas registradas. Fuente: registro_sesion (count of rows)." />
           </div>
           <p className="text-2xl font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             {metricas.totalConsultorias}
@@ -97,16 +92,6 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
             {metricas.nitUnicos}
           </p>
           <p className="text-[10px] text-slate-400 mt-0.5">(empresas con NIT registrado)</p>
-        </div>
-        <div>
-          <div className="flex items-center gap-1.5">
-            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Leads convertidos</p>
-            <InfoTooltip helpText="% de leads únicos con ≥1 sesión Resuelto o En seguimiento sobre el total de leads con consultoría. Fuente: consultorias.status + leads.id" />
-          </div>
-          <p className="text-2xl font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-            {metricas.tasaLeadConversion}%
-          </p>
-          <p className="text-[10px] text-slate-400 mt-0.5">leads con ≥1 sesión atendida</p>
         </div>
       </div>
 
@@ -169,7 +154,8 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <Area
               type="monotone"
-              dataKey="agendado"
+              dataKey="programadas"
+              name="Agendadas"
               stroke="#00C8FF"
               fill="#E0F9FF"
               fillOpacity={0.4}

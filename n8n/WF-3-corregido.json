@@ -1,0 +1,469 @@
+{
+  "name": "WF-3 — Excel Evidencias → sesiones",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nfunction norm(v) { return (v != null) ? String(v).trim() : null; }\nfunction toDate(v) { if (!v) return null; var s = String(v).trim(); if (/^\\d{4}-\\d{2}-\\d{2}/.test(s)) return s.slice(0, 10); if (/^\\d+$/.test(s)) { var n = parseInt(s, 10); var d = new Date(Date.UTC(1899, 11, 30) + n * 86400000); return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10); } var d = new Date(s); return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10); }\nfunction toTime(v) { if (!v) return null; var s = String(v).trim(); if (/^\\d{2}:\\d{2}/.test(s)) return s.slice(0, 5); if (/^0?\\.\\d+$/.test(s)) { var f = parseFloat(s); var ts = Math.round(f * 86400); var h = Math.floor(ts / 3600); var m = Math.floor((ts % 3600) / 60); return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); } return null; }\nfunction toInt(v) { if (!v) return null; var n = parseInt(String(v), 10); return isNaN(n) ? null : n; }\nfunction toBool(v) { if (v == null) return null; return ['si','sí','yes','true','1'].includes(String(v).toLowerCase()); }\nfunction col(r){var ks=Array.prototype.slice.call(arguments,1);var n=function(s){return String(s).trim().toLowerCase().replace(/[\\s\\u00a0]+/g,' ').replace(/[\\u2013\\u2014]/g,'-').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');};var rn={};Object.keys(r).forEach(function(k){if(r[k]!=null&&r[k]!=='')rn[n(k)]=r[k];});for(var j=0;j<ks.length;j++){if(r[ks[j]]!=null&&r[ks[j]]!=='')return r[ks[j]];var nk=n(ks[j]);if(rn[nk]!=null)return rn[nk];var rks=Object.keys(rn);for(var k=0;k<rks.length;k++){if(rks[k].startsWith(nk+' (')||rks[k].startsWith(nk+' -')||rks[k]===nk){return rn[rks[k]];}}};return null;}\n\nreturn items.map(function(item) {\n  var r = item.json;\n  var email = norm(r['Correo del Usuario Atendido'] || r['Correo electrónico'] || r['email']);\n  if (!email || !email.includes('@')) return null;\n  var fecha = toDate(r['Fecha de la Sesión'] || r['Fecha'] || r['fecha_sesion']);\n  if (!fecha) return null;\n\n  var resultadoRaw = norm(r['Resultado de la sesión'] || r['resultado']) || ''; var rl = resultadoRaw.toLowerCase().trim(); var statusVal = rl.includes('cancelado') ? 'Cancelado' : rl.includes('seguimiento') ? 'En seguimiento' : 'Resuelto';\n\n  var out = {};\n  Object.assign(out, { _rpc: { p_email: email, p_full_name: norm(r['Nombre del Usuario Atendido'] || r['Nombre'] || r['full_name']) || 'Sin nombre', p_phone: norm(r['Celular del usuario atendido'] || r['Celular'] || r['phone']), p_id_num: norm(r['Cedula del Usuario Atendido'] || r['Documento de identidad']), p_nit: norm(r['Nit de la Empresa'] || r['NIT']), p_city: norm(r['Municipio'] || r['city']), p_cargo: norm(r['Cargo del Usuario Atendido'] || r['cargo']), p_company_role_level: norm(r['Nivel del Cargo'] || r['company_role_level']), p_company_role_area: norm(r['Área del Usuario Atendido'] || r['company_role_area']), p_empresa: norm(r['Nombre de la empresa'] || r['empresa']), p_sexo: norm(r['Sexo Usuario Atendido'] || r['Sexo']), p_origen: 'sesion' } });\n  Object.assign(out, { _consultoria: { fecha: fecha, hora_inicio: toTime(r['Hora de inicio'] || r['hora_inicio']), hora_fin: toTime(r['Hora de finalización'] || r['hora_fin']), duracion_minutos: toInt(col(r,'Duración de la Sesión / Minutos','Duración de la sesión','duracion')), modalidad: norm(r['Modalidad de la Sesión'] || r['modalidad']) || 'Virtual', staff_name: norm(r['Consultor / Coder'] || r['staff_name']), staff_email: norm(r['Correo Institucional / Consultor'] || r['staff_email']), nivel_potencia: norm(col(r, 'Nivel de potencia', 'Nivel de Potencia')), categoria_caso: norm(r['Categoría del caso (Potencia)1'] || r['Categoría del Caso (Potencia)']), categoria_caso_uso: norm(r['Categoria del Caso de Uso'] || r['categoria_caso_uso']), status: statusVal } });\n  Object.assign(out, { _registro: { id_externo: norm(r['Id'] || r['id']), pregunta: norm(r['Pregunta'] || r['pregunta']), motivo_consulta: norm(col(r,'Motivo de la Consulta','Motivo Consulta','motivo_consulta')), estado_inicial: norm(col(r,'Estado Inicial – Situación Antes de la Intervención','Estado Inicial','estado_inicial')), acciones_realizadas: norm(col(r,'Acciones Realizadas Durante la Sesión (Describir paso a paso lo trabajado, incluyendo: Prompts utilizados  Herramientas de IA empleadas  Metodología aplicada) ','Acciones Realizadas Durante la Sesión','acciones_realizadas')), resultado_final: norm(col(r,'Resultado Final – Situación Después de la Intervención','Resultado Final','resultado_final')), estimacion_impacto: norm(col(r,'Estimación del Impacto Generado','Estimacion del Impacto Generado','estimacion_impacto')), entregables: norm(r['Entregables Producidos'] || r['entregables']), cantidad_productos: toInt(r['Cantidad de nuevos productos creados'] || r['cantidad_productos']) || 0, sesion_grabada: toBool(r['¿La sesión fue grabada?'] || r['sesion_grabada']) || false, enlace_grabacion: norm(r['Enlace de Grabación'] || r['enlace_grabacion']), adjuntar_evidencia: norm(r['Adjuntar Evidencia'] || r['adjuntar_evidencia']), confirmo_no_automatizacion: toBool(r['Confirmo que este caso NO corresponde a automatización o integración de sistemas complejos.'] || r['Confirmo que este caso NO corresponde a automatización'] || r['confirmo_no_automatizacion']), duracion_sesion_minutos: toInt(col(r,'Duración de la Sesión / Minutos','Duración de la sesión','duracion')), resultado: norm(r['Resultado de la sesión'] || r['resultado']) } });\n  return { json: out };\n}).filter(Boolean);"
+      },
+      "id": "31233fb5-b917-43df-9dca-dd3e3ad1f4ad",
+      "name": "Normalize Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7824,
+        6896
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const loopItem = $('Loop One by One').item.json;\nconst leadId = loopItem.lead_id;\nconst cons = loopItem._consultoria || {};\nconst reg = loopItem._registro || {};\n\nconst API_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\nconst BASE = 'https://scydyevwjmbhtohoncuy.supabase.co/rest/v1';\nconst h = { apikey: API_KEY, Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' };\n\n// 1. Lookup consultor by institutional email\nlet consultorId = null;\nif (cons.staff_email) {\n  const res = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${BASE}/consultores?email_institucional=eq.${encodeURIComponent(cons.staff_email)}&select=id`,\n    headers: h,\n  });\n  if (Array.isArray(res) && res.length > 0) consultorId = res[0].id;\n}\n\n// 2. Find existing consultoria — id_externo first (handles WF-3 re-runs),\n// then fall back to WF-2 booking row by (lead, date).\nlet existingId = null;\nif (reg.id_externo) {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${BASE}/consultorias?id_externo=eq.${encodeURIComponent(reg.id_externo)}&select=id&limit=1`,\n    headers: h,\n  });\n  if (Array.isArray(rows) && rows.length > 0) existingId = rows[0].id;\n}\nif (!existingId && leadId && cons.fecha) {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${BASE}/consultorias?id_lead=eq.${leadId}&fecha=eq.${cons.fecha}&booking_id=not.is.null&select=id&limit=1`,\n    headers: h,\n  });\n  if (Array.isArray(rows) && rows.length > 0) existingId = rows[0].id;\n}\n\nconst fields = {};\nif (leadId) fields.id_lead = leadId;\nif (reg.id_externo) fields.id_externo = reg.id_externo;\nif (consultorId) fields.id_consultor = consultorId;\nif (cons.fecha) fields.fecha = cons.fecha;\nif (cons.hora_inicio) fields.hora_inicio = cons.hora_inicio;\nif (cons.hora_fin) fields.hora_fin = cons.hora_fin;\nif (cons.duracion_minutos) fields.duracion_minutos = cons.duracion_minutos;\nif (cons.modalidad) fields.modalidad = cons.modalidad;\nif (cons.staff_name) fields.staff_name = cons.staff_name;\nif (cons.staff_email) fields.staff_email = cons.staff_email;\nif (cons.nivel_potencia) fields.nivel_potencia = cons.nivel_potencia;\nif (cons.categoria_caso) fields.categoria_caso = cons.categoria_caso;\nif (cons.categoria_caso_uso) fields.categoria_caso_uso = cons.categoria_caso_uso;\nif (cons.status) fields.status = cons.status;\n\nlet row;\nif (existingId) {\n  const res = await this.helpers.httpRequest({\n    method: 'PATCH',\n    url: `${BASE}/consultorias?id=eq.${existingId}`,\n    headers: { ...h, Prefer: 'return=representation' },\n    body: JSON.stringify(fields),\n  });\n  row = Array.isArray(res) ? res[0] : res;\n} else {\n  const res = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${BASE}/consultorias`,\n    headers: { ...h, Prefer: 'return=representation' },\n    body: JSON.stringify(fields),\n  });\n  row = Array.isArray(res) ? res[0] : res;\n}\n\nif (!row?.id) return [];\nreturn [{ json: { ...row, _registro: reg } }];"
+      },
+      "id": "ba90af6c-4856-41a7-bee4-13dd632f334b",
+      "name": "Upsert consultorias",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8752,
+        7056
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Subir Excel — Registro de Sesiones",
+        "formDescription": "Cargá el archivo .xlsx exportado del formulario de evidencias",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "archivo",
+              "fieldType": "file",
+              "fieldName": "archivo",
+              "acceptFileTypes": ".xlsx,.xls",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6fed82b2-c1a6-4b29-ae5d-1f701cf58897",
+      "name": "Upload Excel Sesiones",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        7344,
+        6896
+      ],
+      "webhookId": "7c8c367f-cb01-4349-9e21-1d87b118099e"
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "archivo",
+        "options": {}
+      },
+      "id": "cea31568-ad38-4fca-a940-b88185b6b3b7",
+      "name": "Parse Excel",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [
+        7600,
+        6896
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://scydyevwjmbhtohoncuy.supabase.co/rest/v1/rpc/match_or_create_lead",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json._rpc) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "bb960173-ca4b-41c5-9c26-b8c805f82a91",
+      "name": "RPC match_or_create_lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8080,
+        6896
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rpcItems = $input.all();\nconst normItems = $('Normalize Rows').all();\n\nreturn rpcItems.map((item, i) => {\n  const rpc = Array.isArray(item.json) ? item.json[0] : item.json;\n  const leadId = rpc?.lead_id || null;\n  const orig = normItems[item.pairedItem?.item ?? i]?.json || {};\n  return {\n    json: {\n      lead_id: leadId,\n      _consultoria: orig._consultoria || {},\n      _registro:    orig._registro    || {}\n    }\n  };\n});"
+      },
+      "id": "67f0a814-9869-4c93-be17-a7fea23fd268",
+      "name": "Merge Lead + Session",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8320,
+        6896
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map((item) => {\n  const d = item.json;\n  const reg = d._registro || {};\n  if (!d?.id) return null;\n  return {\n    json: {\n      id_consultoria:             d.id,\n      pregunta:                   reg.pregunta                  || null,\n      motivo_consulta:            reg.motivo_consulta           || null,\n      estado_inicial:             reg.estado_inicial            || null,\n      acciones_realizadas:        reg.acciones_realizadas       || null,\n      resultado_final:            reg.resultado_final           || null,\n      estimacion_impacto:         reg.estimacion_impacto        || null,\n      entregables:                reg.entregables               || null,\n      resultado:                  reg.resultado                 || null,\n      cantidad_productos:         reg.cantidad_productos        ?? 0,\n      sesion_grabada:             reg.sesion_grabada            ?? false,\n      enlace_grabacion:           reg.enlace_grabacion          || null,\n      adjuntar_evidencia:         reg.adjuntar_evidencia        || null,\n      confirmo_no_automatizacion: reg.confirmo_no_automatizacion ?? null,\n      duracion_sesion_minutos:     reg.duracion_sesion_minutos ?? null\n    }\n  };\n}).filter(Boolean);"
+      },
+      "id": "9cf7f15d-42b0-4be0-a3bd-4167065c2c5b",
+      "name": "Prep registro_sesion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8960,
+        7056
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://scydyevwjmbhtohoncuy.supabase.co/rest/v1/registro_sesion?on_conflict=id_consultoria",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "1424453a-a807-4486-9a0f-0cf49111541c",
+      "name": "Insert registro_sesion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9200,
+        7056
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst prepItems = $('Prep registro_sesion').all();\n\nconst STATUS_MAP = [\n  ['cancelado', 'Cancelado'],\n  ['en seguimiento', 'En seguimiento'],\n  ['seguimiento', 'En seguimiento'],\n  ['no asisti', 'No asistió'],\n  ['escalar', 'Escalar'],\n  ['resuelto', 'Resuelto'],\n];\n\nreturn items.map((item, i) => {\n  const reg = prepItems[item.pairedItem?.item ?? i]?.json || {};\n  const raw = (reg.resultado || '').toLowerCase().trim();\n\n  let status = null;\n  for (const [key, val] of STATUS_MAP) {\n    if (raw.includes(key)) { status = val; break; }\n  }\n  if (!reg.id_consultoria) return null;\n  return { json: { id_consultoria: reg.id_consultoria, status } };\n}).filter(Boolean);"
+      },
+      "id": "78debd93-aa79-4753-85c4-8baded87c226",
+      "name": "Map Session Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9440,
+        7056
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://scydyevwjmbhtohoncuy.supabase.co/rest/v1/consultorias?id=eq.' + $json.id_consultoria }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status: $json.status }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "e94f6d1d-a385-4964-b7dc-4dd2550c7340",
+      "name": "Update consultoria status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9920,
+        7056
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "04b841ec-0fa8-45ff-bd19-dd03a1fd3702",
+      "name": "Loop One by One",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        8544,
+        6976
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-status-not-null",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e20a010f-b8bf-4dfa-90cf-878d3e7562dc",
+      "name": "Has Status?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        9680,
+        7056
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "872fcdc6-8445-43b5-b447-e81bdf8acfad",
+      "name": "Loop Complete",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        8800,
+        6816
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Upload Excel Sesiones": {
+      "main": [
+        [
+          {
+            "node": "Parse Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Excel": {
+      "main": [
+        [
+          {
+            "node": "Normalize Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Rows": {
+      "main": [
+        [
+          {
+            "node": "RPC match_or_create_lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RPC match_or_create_lead": {
+      "main": [
+        [
+          {
+            "node": "Merge Lead + Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Lead + Session": {
+      "main": [
+        [
+          {
+            "node": "Loop One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop One by One": {
+      "main": [
+        [
+          {
+            "node": "Loop Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Upsert consultorias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert consultorias": {
+      "main": [
+        [
+          {
+            "node": "Prep registro_sesion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep registro_sesion": {
+      "main": [
+        [
+          {
+            "node": "Insert registro_sesion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert registro_sesion": {
+      "main": [
+        [
+          {
+            "node": "Map Session Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Session Status": {
+      "main": [
+        [
+          {
+            "node": "Has Status?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Status?": {
+      "main": [
+        [
+          {
+            "node": "Update consultoria status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update consultoria status": {
+      "main": [
+        [
+          {
+            "node": "Loop One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "RYEhYWuTyUFvZhUO",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "f354e2b6-445c-4d8e-8255-208275ec3ccc",
+  "meta": {
+    "instanceId": "b29e9c703efea486d7898609e8674fd11d3c4561de0c81c8ffa85248e6b49c19"
+  },
+  "id": "7Ewib6EOuEaUxqjw",
+  "tags": []
+}
