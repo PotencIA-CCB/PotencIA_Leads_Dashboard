@@ -62,12 +62,12 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
     )
     const agendadasRaw = groupByPeriod(filtered, period)
 
-    const resueltoMap = new Map(resueltoRaw.map(d => [d.label, d.count]))
+    const resueltoMap = new Map(resueltoRaw.map(d => [d.key, d.count]))
 
     return agendadasRaw.map(d => ({
       label: period === 'dia' ? dayLabel(d.label) : d.label,
       agendadas: d.count,
-      resuelto: resueltoMap.get(d.label) ?? 0,
+      resuelto: resueltoMap.get(d.key) ?? 0,
     }))
   }, [filtered, period])
 

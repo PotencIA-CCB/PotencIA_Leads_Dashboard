@@ -397,7 +397,7 @@ export function monthWeekLabel(d: Date): string {
 export function groupByPeriod(
   consultorias: ConsultoriaForMetricas[],
   period: Granularidad,
-): { label: string; count: number }[] {
+): { key: string; label: string; count: number }[] {
   // For 'semana', use ISO key for sorting but monthWeekLabel for display
   const buckets: Record<string, { label: string; count: number }> = {}
 
@@ -429,7 +429,7 @@ export function groupByPeriod(
 
   return Object.entries(buckets)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([, { label, count }]) => ({ label, count }))
+    .map(([key, { label, count }]) => ({ key, label, count }))
 }
 
 /**
