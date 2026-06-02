@@ -12,7 +12,6 @@ import {
   tiempoPromedioPorRol,
   computeConsultorMetrics,
   computeWeeklyBuckets,
-  monthWeekLabel,
   type ConsultoriaForMetricas,
   type RegistroSesionForMetricas,
 } from '../metricas'
@@ -104,17 +103,17 @@ describe('groupByPeriod', () => {
     ])
   })
 
-  it('groups by semana using Mon-SN display labels, sorted ascending by ISO key', () => {
+  it('groups by semana with sequential labels, sorted ascending by ISO key', () => {
     const data = [
-      makeConsultoria({ fecha: '2024-01-15' }), // W03 → Ene S3 (day 15: floor(14/7)+1=3)
-      makeConsultoria({ fecha: '2024-01-08' }), // W02 → Ene S2 (day 8: floor(7/7)+1=2)
-      makeConsultoria({ fecha: '2024-01-09' }), // W02 → Ene S2
+      makeConsultoria({ fecha: '2024-01-15' }), // W03
+      makeConsultoria({ fecha: '2024-01-08' }), // W02
+      makeConsultoria({ fecha: '2024-01-09' }), // W02
     ]
     const result = groupByPeriod(data, 'semana')
     expect(result).toHaveLength(2)
-    expect(result[0].label).toBe('Ene S2')
+    expect(result[0].label).toBe('Ene S1')
     expect(result[0].count).toBe(2)
-    expect(result[1].label).toBe('Ene S3')
+    expect(result[1].label).toBe('Ene S2')
     expect(result[1].count).toBe(1)
   })
 
@@ -828,61 +827,58 @@ describe('consultoriasEnSeguimientoAtendidas', () => {
   })
 })
 
-// ─── monthWeekLabel ───────────────────────────────────────────────────────────
+// ─── groupByPeriod — semana sequential labels via ISO Thursday ────────────────
 
-describe('monthWeekLabel', () => {
-  it('day 1 of Jan → Ene S1', () => {
-    expect(monthWeekLabel(new Date('2024-01-01T00:00:00'))).toBe('Ene S1')
-  })
-
-  it('day 8 of Jan → Ene S2', () => {
-    expect(monthWeekLabel(new Date('2024-01-08T00:00:00'))).toBe('Ene S2')
-  })
-
-  it('day 29 of Jan → Ene S5 (floor((28)/7)+1=5)', () => {
-    expect(monthWeekLabel(new Date('2024-01-29T00:00:00'))).toBe('Ene S5')
-  })
-
-  it('day 15 of Mar → Mar S3', () => {
-    expect(monthWeekLabel(new Date('2024-03-15T00:00:00'))).toBe('Mar S3')
-  })
-
-  it('day 1 of Dec → Dic S1', () => {
-    expect(monthWeekLabel(new Date('2024-12-01T00:00:00'))).toBe('Dic S1')
-  })
-})
-
-// ─── groupByPeriod — semana labels via monthWeekLabel ─────────────────────────
-
-describe('groupByPeriod semana — monthWeekLabel labels', () => {
-  it('returns Mon-SN label for period=semana', () => {
-    const data = [makeConsultoria({ fecha: '2024-01-01' })]
+describe('groupByPeriod semana — sequential week-in-month labels', () => {
+  it('W1 in month gets S1 label', () => {
+    // Jan 4 is always in ISO W1, Thursday = Jan 4 → Ene S1
+    const data = [makeConsultoria({ fecha: '2024-01-04' })]
     const result = groupByPeriod(data, 'semana')
-    expect(result).toHaveLength(1)
     expect(result[0].label).toBe('Ene S1')
   })
 
-  it('groups same week (Mon S label) into single bucket', () => {
+  it('sequential labels within same month', () => {
+    // W2 (Jan 8-14), W3 (Jan 15-21), both in January
     const data = [
-      makeConsultoria({ fecha: '2024-01-01' }),
-      makeConsultoria({ fecha: '2024-01-03' }),
+      makeConsultoria({ fecha: '2024-01-08' }),
+      makeConsultoria({ fecha: '2024-01-15' }),
     ]
     const result = groupByPeriod(data, 'semana')
-    expect(result).toHaveLength(1)
-    expect(result[0].label).toBe('Ene S1')
-    expect(result[0].count).toBe(2)
+    expect(result.map(d => d.label)).toEqual(['Ene S1', 'Ene S2'])
   })
 
-  it('orders buckets chronologically across months, not alphabetically by label', () => {
-    // Out-of-order input spanning Jan→Apr; alphabetical label sort would give Abr<Ene<Feb<Mar
+  it('cross-month week uses Thursday month', () => {
+    // W14 2026: Mar 30 - Apr 5, Thursday = Apr 2 → Abr
+    const data = [makeConsultoria({ fecha: '2026-03-31' })]
+    const result = groupByPeriod(data, 'semana')
+    expect(result[0].label).toBe('Abr S1')
+  })
+
+  it('sequential across months with no duplicates', () => {
+    // W10-W13 in March, then W14-W15 in April
     const data = [
-      makeConsultoria({ fecha: '2024-04-02' }),
-      makeConsultoria({ fecha: '2024-01-02' }),
-      makeConsultoria({ fecha: '2024-03-05' }),
-      makeConsultoria({ fecha: '2024-02-06' }),
+      makeConsultoria({ fecha: '2026-03-04' }), // W10 → Mar S1
+      makeConsultoria({ fecha: '2026-03-11' }), // W11 → Mar S2
+      makeConsultoria({ fecha: '2026-03-18' }), // W12 → Mar S3
+      makeConsultoria({ fecha: '2026-03-25' }), // W13 → Mar S4
+      makeConsultoria({ fecha: '2026-04-02' }), // W14 → Abr S1
+      makeConsultoria({ fecha: '2026-04-06' }), // W15 → Abr S2
     ]
     const result = groupByPeriod(data, 'semana')
-    expect(result.map((d) => d.label)).toEqual(['Ene S1', 'Feb S1', 'Mar S1', 'Abr S1'])
+    expect(result.map(d => d.label)).toEqual(['Mar S1', 'Mar S2', 'Mar S3', 'Mar S4', 'Abr S1', 'Abr S2'])
+  })
+
+  it('month with 5 ISO weeks gets S1-S5', () => {
+    // April 2026: W14, W15, W16, W17, W18 all have Thursdays in April
+    const data = [
+      makeConsultoria({ fecha: '2026-03-31' }), // W14 → Abr S1
+      makeConsultoria({ fecha: '2026-04-07' }), // W15 → Abr S2
+      makeConsultoria({ fecha: '2026-04-14' }), // W16 → Abr S3
+      makeConsultoria({ fecha: '2026-04-21' }), // W17 → Abr S4
+      makeConsultoria({ fecha: '2026-04-28' }), // W18 → Abr S5
+    ]
+    const result = groupByPeriod(data, 'semana')
+    expect(result.map(d => d.label)).toEqual(['Abr S1', 'Abr S2', 'Abr S3', 'Abr S4', 'Abr S5'])
   })
 })
 

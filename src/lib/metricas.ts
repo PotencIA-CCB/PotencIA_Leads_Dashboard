@@ -222,6 +222,17 @@ function isoWeekParts(d: Date): { isoYear: number; isoWeek: number } {
   return { isoYear, isoWeek }
 }
 
+/** Given an ISO year and week number, return the Thursday date of that week (ISO standard). */
+function isoWeekThursday(isoYear: number, isoWeek: number): Date {
+  const jan4 = new Date(isoYear, 0, 4)
+  const jan4Day = (jan4.getDay() + 6) % 7 // Mon=0
+  const mondayW1 = new Date(jan4)
+  mondayW1.setDate(jan4.getDate() - jan4Day)
+  const thursday = new Date(mondayW1)
+  thursday.setDate(mondayW1.getDate() + (isoWeek - 1) * 7 + 3)
+  return thursday
+}
+
 export function computeWeeklyBuckets(
   consultorias: ConsultoriaForMetricas[],
 ): { semana: string; total: number }[] {
@@ -382,54 +393,54 @@ export function countUniqueNit(
 
 const MONTH_ABBR_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
-/**
- * Returns a display label for a date in the format "Mon SN" where N = week-within-month (1–5).
- * Week-within-month formula: Math.floor((dayOfMonth - 1) / 7) + 1.
- * Examples: 2024-01-01 → "Ene S1", 2024-01-29 → "Ene S5", 2024-03-15 → "Mar S3".
- */
-export function monthWeekLabel(d: Date): string {
-  const month = MONTH_ABBR_ES[d.getMonth()]
-  const week = Math.floor((d.getDate() - 1) / 7) + 1
-  return `${month} S${week}`
-}
-
-/** Group consultorias by time period (dia/semana/mes), sorted ascending. */
+/** Group consultorias by time period (dia/semana/mes/año), sorted ascending. */
 export function groupByPeriod(
   consultorias: ConsultoriaForMetricas[],
   period: Granularidad,
 ): { key: string; label: string; count: number }[] {
-  // For 'semana', use ISO key for sorting but monthWeekLabel for display
-  const buckets: Record<string, { label: string; count: number }> = {}
+  const buckets: Record<string, { count: number }> = {}
 
   for (const c of consultorias) {
     if (!c.fecha) continue
     let sortKey: string
-    let displayLabel: string
     if (period === 'dia') {
       sortKey = c.fecha.slice(0, 10)
-      displayLabel = sortKey
     } else if (period === 'semana') {
       const d = new Date(c.fecha + 'T00:00:00')
       if (isNaN(d.getTime())) continue
       const { isoYear, isoWeek } = isoWeekParts(d)
       sortKey = `${isoYear}-W${String(isoWeek).padStart(2, '0')}`
-      displayLabel = monthWeekLabel(d)
     } else if (period === 'año') {
       sortKey = c.fecha.slice(0, 4)
-      displayLabel = sortKey
     } else {
       sortKey = c.fecha.slice(0, 7)
-      displayLabel = sortKey
     }
     if (!buckets[sortKey]) {
-      buckets[sortKey] = { label: displayLabel, count: 0 }
+      buckets[sortKey] = { count: 0 }
     }
     buckets[sortKey].count++
   }
 
-  return Object.entries(buckets)
+  const sorted = Object.entries(buckets)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, { label, count }]) => ({ key, label, count }))
+    .map(([key, { count }]) => ({ key, label: key, count }))
+
+  // Assign sequential week-in-month labels for 'semana' using ISO Thursday
+  if (period === 'semana') {
+    let currentMonth = ''
+    let weekInMonth = 0
+    for (const entry of sorted) {
+      const m = entry.key.match(/^(\d{4})-W(\d{2})$/)
+      if (!m) continue
+      const thu = isoWeekThursday(Number(m[1]), Number(m[2]))
+      const month = MONTH_ABBR_ES[thu.getMonth()]
+      weekInMonth = month !== currentMonth ? 1 : weekInMonth + 1
+      currentMonth = month
+      entry.label = `${month} S${weekInMonth}`
+    }
+  }
+
+  return sorted
 }
 
 /**
