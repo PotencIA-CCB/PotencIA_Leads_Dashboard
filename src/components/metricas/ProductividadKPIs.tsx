@@ -41,7 +41,7 @@ function calcLeftWidth(labels: string[]): number {
   return Math.min(120, Math.max(60, ...labels.map((l) => l.length * 6)))
 }
 
-function ConsultorTick({
+function ConsultorYTick({
   x,
   y,
   payload,
@@ -54,11 +54,18 @@ function ConsultorTick({
   const words = payload.value.split(' ')
   const line1 = words[0]
   const line2 = words.slice(1).join(' ')
+  const lh = 11
   return (
     <g transform={`translate(${x},${y})`}>
-      <text textAnchor="middle" fill="#64748b" fontSize={10}>
-        <tspan x={0} dy="0.8em">{line1}</tspan>
-        {line2 && <tspan x={0} dy="1.3em">{line2}</tspan>}
+      <text textAnchor="end" fill="#64748b" fontSize={10}>
+        {line2 ? (
+          <>
+            <tspan x={0} dy={-lh / 2}>{line1}</tspan>
+            <tspan x={0} dy={lh}>{line2}</tspan>
+          </>
+        ) : (
+          <tspan x={0} dy="0.35em">{line1}</tspan>
+        )}
       </text>
     </g>
   )
@@ -154,22 +161,25 @@ export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsPr
         {metricas.duracionPorConsultor.length === 0 ? (
           <EmptyState />
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer
+            width="100%"
+            height={Math.max(200, metricas.duracionPorConsultor.length * 40)}
+          >
             <BarChart
+              layout="vertical"
               data={metricas.duracionPorConsultor}
-              margin={{ top: 0, right: 16, left: 0, bottom: 10 }}
+              margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-              <XAxis
-                dataKey="consultor"
+              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+              <YAxis
                 type="category"
-                interval={0}
-                height={46}
-                tick={<ConsultorTick />}
+                dataKey="consultor"
+                tick={<ConsultorYTick />}
+                width={calcLeftWidth(metricas.duracionPorConsultor.map((d) => d.consultor))}
               />
-              <YAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
+              <Bar dataKey="avg" radius={[0, 4, 4, 0]}>
                 {metricas.duracionPorConsultor.map((_, i) => (
                   <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
                 ))}
