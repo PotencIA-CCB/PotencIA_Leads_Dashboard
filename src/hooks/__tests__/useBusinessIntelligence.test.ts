@@ -76,9 +76,9 @@ describe('computeBiStats', () => {
 
   it('counts nitsValidos correctly', () => {
     const leads = [
-      { nit: '1', empresa: null, nit_validado_rues: true, renovado_2026: false },
-      { nit: '2', empresa: null, nit_validado_rues: false, renovado_2026: false },
-      { nit: '3', empresa: null, nit_validado_rues: true, renovado_2026: false },
+      { id: '1', nit: '1', empresa: null, nit_validado_rues: true, renovado_2026: false },
+      { id: '2', nit: '2', empresa: null, nit_validado_rues: false, renovado_2026: false },
+      { id: '3', nit: '3', empresa: null, nit_validado_rues: true, renovado_2026: false },
     ]
     const result = computeBiStats(leads, [], [])
     expect(result.nitsValidos).toBe(2)
@@ -86,9 +86,9 @@ describe('computeBiStats', () => {
 
   it('counts empresasRegistradas correctly — excludes null and whitespace', () => {
     const leads = [
-      { nit: null, empresa: 'Acme', nit_validado_rues: false, renovado_2026: false },
-      { nit: null, empresa: null, nit_validado_rues: false, renovado_2026: false },
-      { nit: null, empresa: '   ', nit_validado_rues: false, renovado_2026: false },
+      { id: '1', nit: null, empresa: 'Acme', nit_validado_rues: false, renovado_2026: false },
+      { id: '2', nit: null, empresa: null, nit_validado_rues: false, renovado_2026: false },
+      { id: '3', nit: null, empresa: '   ', nit_validado_rues: false, renovado_2026: false },
     ]
     const result = computeBiStats(leads, [], [])
     expect(result.empresasRegistradas).toBe(1)
@@ -96,8 +96,8 @@ describe('computeBiStats', () => {
 
   it('counts empresasRenovadas correctly', () => {
     const leads = [
-      { nit: null, empresa: null, nit_validado_rues: false, renovado_2026: true },
-      { nit: null, empresa: null, nit_validado_rues: false, renovado_2026: false },
+      { id: '1', nit: null, empresa: null, nit_validado_rues: false, renovado_2026: true },
+      { id: '2', nit: null, empresa: null, nit_validado_rues: false, renovado_2026: false },
     ]
     const result = computeBiStats(leads, [], [])
     expect(result.empresasRenovadas).toBe(1)
