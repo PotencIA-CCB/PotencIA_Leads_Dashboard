@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import {
   countSesionesTotales,
-  countNitsUnicos,
+  countNitsUnicosFromSesiones,
   countNitsValidos,
   countEmpresasRegistradas,
   countEmpresasRenovadas,
@@ -68,12 +68,13 @@ interface BiSesionRow {
  * Pure function — no side effects, no Supabase calls.
  */
 export function computeBiStats(
-  leads: Pick<BiLeadFetchRow, 'nit' | 'empresa' | 'nit_validado_rues' | 'renovado_2026'>[],
+  leads: Pick<BiLeadFetchRow, 'id' | 'nit' | 'empresa' | 'nit_validado_rues' | 'renovado_2026'>[],
   sesiones: Pick<BiSesionRow, 'id_consultoria'>[],
+  consultorias: Pick<BiConsultoriaRow, 'id' | 'id_lead'>[],
 ): BiStats {
   return {
     sesionesTotales: countSesionesTotales(sesiones),
-    nitsUnicos: countNitsUnicos(leads),
+    nitsUnicos: countNitsUnicosFromSesiones(sesiones, consultorias, leads),
     nitsValidos: countNitsValidos(leads),
     empresasRegistradas: countEmpresasRegistradas(leads),
     empresasRenovadas: countEmpresasRenovadas(leads),
@@ -148,7 +149,7 @@ export function useBusinessIntelligence(): HookState {
       const consultorias = (consultoriasData as BiConsultoriaRow[]) ?? []
       const sesiones = (sesionData as BiSesionRow[]) ?? []
 
-      const biStats = computeBiStats(leads, sesiones)
+      const biStats = computeBiStats(leads, sesiones, consultorias)
       const funnelStats = computeFunnelStats(leads, formularios, consultorias, sesiones)
       const totalBookings = bookingsCount ?? 0
       const sessionInsights = deriveSessionInsights(

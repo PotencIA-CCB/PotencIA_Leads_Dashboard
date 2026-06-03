@@ -17,6 +17,11 @@ interface BiLeadRow {
   renovado_2026: boolean
 }
 
+interface BiConsultoriaRow {
+  id: string
+  id_lead: string
+}
+
 // ---------------------------------------------------------------------------
 // Compute functions
 // ---------------------------------------------------------------------------
@@ -42,6 +47,30 @@ export function countNitsUnicos(
   for (const lead of leads) {
     if (lead.nit !== null && lead.nit !== '') {
       seen.add(lead.nit)
+    }
+  }
+  return seen.size
+}
+
+/**
+ * Number of distinct non-null, non-empty nit values for leads that have
+ * at least one registro_sesion row.
+ * Join: registro_sesion.id_consultoria → consultorias.id → consultorias.id_lead → leads.nit
+ */
+export function countNitsUnicosFromSesiones(
+  sesiones: Pick<BiSesionRow, 'id_consultoria'>[],
+  consultorias: Pick<BiConsultoriaRow, 'id' | 'id_lead'>[],
+  leads: { id: string; nit: string | null }[],
+): number {
+  const consulMap = new Map(consultorias.map((c) => [c.id, c.id_lead]))
+  const leadNitMap = new Map(leads.map((l) => [l.id, l.nit]))
+  const seen = new Set<string>()
+  for (const s of sesiones) {
+    const id_lead = consulMap.get(s.id_consultoria)
+    if (!id_lead) continue
+    const nit = leadNitMap.get(id_lead)
+    if (nit !== null && nit !== undefined && nit !== '') {
+      seen.add(nit)
     }
   }
   return seen.size

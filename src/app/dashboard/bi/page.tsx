@@ -74,9 +74,9 @@ export default function BIPage() {
               label="NITs Únicos"
               value={biStats?.nitsUnicos ?? 0}
               accent="text-[#003087]"
-              helpText="NITs distintos y no nulos registrados en leads"
+              helpText="NITs distintos y no nulos de leads con al menos una sesión registrada. Fuente: registro_sesion → consultorias → leads.nit"
               icon="tag"
-              subtitle="NITs distintos y no nulos"
+              subtitle="NITs distintos con sesión registrada"
             />
             <StatCard
               label="NITs Válidos"

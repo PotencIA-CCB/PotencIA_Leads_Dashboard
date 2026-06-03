@@ -33,7 +33,7 @@ import type { RegistroSesion } from '@/types'
 
 describe('computeBiStats', () => {
   it('returns all 5 counts as 0 for empty inputs', () => {
-    const result = computeBiStats([], [])
+    const result = computeBiStats([], [], [])
     expect(result.sesionesTotales).toBe(0)
     expect(result.nitsUnicos).toBe(0)
     expect(result.nitsValidos).toBe(0)
@@ -47,18 +47,30 @@ describe('computeBiStats', () => {
       { id_consultoria: 'c2' },
       { id_consultoria: 'c3' },
     ]
-    const result = computeBiStats([], sesiones)
+    const result = computeBiStats([], sesiones, [])
     expect(result.sesionesTotales).toBe(3)
   })
 
-  it('counts nitsUnicos correctly — deduplicates and excludes null', () => {
+  it('counts nitsUnicos correctly — deduplicates and excludes null — via registro_sesion join', () => {
     const leads = [
-      { nit: '123', empresa: null, nit_validado_rues: false, renovado_2026: false },
-      { nit: null, empresa: null, nit_validado_rues: false, renovado_2026: false },
-      { nit: '123', empresa: null, nit_validado_rues: false, renovado_2026: false },
-      { nit: '456', empresa: null, nit_validado_rues: false, renovado_2026: false },
+      { id: 'l1', nit: '123', empresa: null, nit_validado_rues: false, renovado_2026: false },
+      { id: 'l2', nit: null, empresa: null, nit_validado_rues: false, renovado_2026: false },
+      { id: 'l3', nit: '123', empresa: null, nit_validado_rues: false, renovado_2026: false },
+      { id: 'l4', nit: '456', empresa: null, nit_validado_rues: false, renovado_2026: false },
     ]
-    const result = computeBiStats(leads, [])
+    const consultorias = [
+      { id: 'c1', id_lead: 'l1' },
+      { id: 'c2', id_lead: 'l2' },
+      { id: 'c3', id_lead: 'l3' },
+      { id: 'c4', id_lead: 'l4' },
+    ]
+    const sesiones = [
+      { id_consultoria: 'c1' },
+      { id_consultoria: 'c2' },
+      { id_consultoria: 'c3' },
+      { id_consultoria: 'c4' },
+    ]
+    const result = computeBiStats(leads, sesiones, consultorias)
     expect(result.nitsUnicos).toBe(2)
   })
 
@@ -68,7 +80,7 @@ describe('computeBiStats', () => {
       { nit: '2', empresa: null, nit_validado_rues: false, renovado_2026: false },
       { nit: '3', empresa: null, nit_validado_rues: true, renovado_2026: false },
     ]
-    const result = computeBiStats(leads, [])
+    const result = computeBiStats(leads, [], [])
     expect(result.nitsValidos).toBe(2)
   })
 
@@ -78,7 +90,7 @@ describe('computeBiStats', () => {
       { nit: null, empresa: null, nit_validado_rues: false, renovado_2026: false },
       { nit: null, empresa: '   ', nit_validado_rues: false, renovado_2026: false },
     ]
-    const result = computeBiStats(leads, [])
+    const result = computeBiStats(leads, [], [])
     expect(result.empresasRegistradas).toBe(1)
   })
 
@@ -87,12 +99,12 @@ describe('computeBiStats', () => {
       { nit: null, empresa: null, nit_validado_rues: false, renovado_2026: true },
       { nit: null, empresa: null, nit_validado_rues: false, renovado_2026: false },
     ]
-    const result = computeBiStats(leads, [])
+    const result = computeBiStats(leads, [], [])
     expect(result.empresasRenovadas).toBe(1)
   })
 
   it('returns correct shape with all 5 fields present', () => {
-    const result = computeBiStats([], [])
+    const result = computeBiStats([], [], [])
     const keys: (keyof BiStats)[] = [
       'sesionesTotales',
       'nitsUnicos',
@@ -139,12 +151,16 @@ describe('buildInitialState', () => {
 describe('HookState after fetch resolves', () => {
   it('biStats has all 5 fields as numbers after loading with populated data', () => {
     const leads = [
-      { nit: '111', empresa: 'Corp A', nit_validado_rues: true, renovado_2026: true },
-      { nit: '222', empresa: null, nit_validado_rues: false, renovado_2026: false },
+      { id: 'l1', nit: '111', empresa: 'Corp A', nit_validado_rues: true, renovado_2026: true },
+      { id: 'l2', nit: '222', empresa: null, nit_validado_rues: false, renovado_2026: false },
+    ]
+    const consultorias = [
+      { id: 'c1', id_lead: 'l1' },
+      { id: 'c2', id_lead: 'l2' },
     ]
     const sesiones = [{ id_consultoria: 'c1' }, { id_consultoria: 'c2' }]
 
-    const biStats = computeBiStats(leads, sesiones)
+    const biStats = computeBiStats(leads, sesiones, consultorias)
 
     const state: HookState = {
       biStats,
@@ -164,7 +180,7 @@ describe('HookState after fetch resolves', () => {
   })
 
   it('biStats contains all 0 counts for empty DB tables', () => {
-    const biStats = computeBiStats([], [])
+    const biStats = computeBiStats([], [], [])
     const state: HookState = {
       biStats,
       funnelStats: null,
@@ -193,7 +209,7 @@ describe('HookState after fetch resolves', () => {
       asistieronSinLandingNiBooking: 1,
     }
     const state: HookState = {
-      biStats: computeBiStats([], []),
+      biStats: computeBiStats([], [], []),
       funnelStats: sampleFunnelStats,
       totalBookings: 20,
       sessionInsights: [],
