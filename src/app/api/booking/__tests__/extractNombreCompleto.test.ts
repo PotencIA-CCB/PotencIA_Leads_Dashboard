@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractNombreCompleto } from '../route'
+import { extractNombreCompleto } from '../bookingUtils'
 
 describe('extractNombreCompleto', () => {
   it('returns full_name when both full_name and nombre are present (full_name wins)', () => {

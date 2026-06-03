@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { extractNombreCompleto } from './bookingUtils'
 
 export const dynamic = 'force-dynamic'
-
-/** Pure helper: extract the full name from a booking body. Exported for unit testing. */
-export function extractNombreCompleto(body: Record<string, string | undefined>): string {
-  return (body.full_name ?? body.nombre ?? '').trim()
-}
 
 export async function POST(req: NextRequest) {
   const supabase = createClient(
