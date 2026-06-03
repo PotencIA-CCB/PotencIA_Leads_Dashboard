@@ -1,7 +1,6 @@
 'use client'
 
-// TASK-08: Replaced Treemap with BarChart layout="vertical" for casos más solicitados.
-// bi-section-redesign: Duración → true vertical bars; Casos → inline donut.
+import React from 'react'
 import {
   BarChart,
   Bar,
@@ -107,8 +106,8 @@ function HeatmapFranjaDia({
         ))}
         {/* Data rows */}
         {HEATMAP_FRANJAS.map(franja => (
-          <>
-            <div key={`label-${franja}`} className="text-[9px] sm:text-[10px] text-slate-500 flex items-center pr-2 truncate">
+          <React.Fragment key={franja}>
+            <div className="text-[9px] sm:text-[10px] text-slate-500 flex items-center pr-2 truncate">
               {franja}
             </div>
             {HEATMAP_DIAS.map(dia => {
@@ -132,7 +131,7 @@ function HeatmapFranjaDia({
                 </div>
               )
             })}
-          </>
+          </React.Fragment>
         ))}
       </div>
     </div>
@@ -178,7 +177,7 @@ export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsPr
                 tick={<ConsultorYTick />}
                 width={calcLeftWidth(metricas.duracionPorConsultor.map((d) => d.consultor))}
               />
-              <Tooltip />
+              <Tooltip formatter={(value) => [`${value} min`, 'Duración promedio']} />
               <Bar dataKey="avg" radius={[0, 4, 4, 0]}>
                 {metricas.duracionPorConsultor.map((_, i) => (
                   <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
@@ -208,7 +207,7 @@ export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsPr
                 tick={{ fontSize: 10 }}
                 width={calcLeftWidth(metricas.recuentoPorConsultor.map((d) => d.consultor))}
               />
-              <Tooltip />
+              <Tooltip formatter={(value) => [value, 'Sesiones']} />
               <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                 {metricas.recuentoPorConsultor.map((_, i) => (
                   <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />

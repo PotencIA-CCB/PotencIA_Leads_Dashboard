@@ -84,6 +84,9 @@ export function RetentionFunnel({ metricas }: RetentionFunnelProps) {
           <ResponsiveContainer width="100%" height={220}>
             <FunnelChart>
               <Funnel dataKey="value" data={funnelData} isAnimationActive>
+                {funnelData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
                 <LabelList
                   position="right"
                   fill="#374151"

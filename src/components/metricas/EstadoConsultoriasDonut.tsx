@@ -58,7 +58,7 @@ export default function EstadoConsultoriasDonut({
                     <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value, name) => [value, String(name)]} />
               </PieChart>
             </ResponsiveContainer>
           </div>

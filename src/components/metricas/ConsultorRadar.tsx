@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import {
   RadarChart,
   Radar,
@@ -48,10 +49,10 @@ function RadarLegend() {
     <>
       <dl className="mt-3 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1.5 text-[10px] sm:text-[11px]">
         {RADAR_LEGEND_ITEMS.map(({ axis, description }) => (
-          <>
-            <dt key={`dt-${axis}`} className="font-semibold text-[#003087]">{axis}</dt>
-            <dd key={`dd-${axis}`} className="text-slate-500">{description}</dd>
-          </>
+          <React.Fragment key={axis}>
+            <dt className="font-semibold text-[#003087]">{axis}</dt>
+            <dd className="text-slate-500">{description}</dd>
+          </React.Fragment>
         ))}
       </dl>
       <p className="text-[10px] text-slate-500 mt-2">{RADAR_READING_GUIDE}</p>
