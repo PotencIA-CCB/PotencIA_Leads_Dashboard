@@ -461,7 +461,7 @@ export function avgDuracionByConsultor(
   for (const c of consultorias) {
     if (!c.id_consultor) continue
     const registro = c.id != null ? registroMap.get(c.id) : undefined
-    const duracion = registro?.duracion_sesion_minutos ?? c.duracion_minutos
+    const duracion = registro?.duracion_sesion_minutos
     if (duracion == null) continue
     const key = c.consultores?.nombre ?? 'Sin consultor'
     const entry = map.get(key)

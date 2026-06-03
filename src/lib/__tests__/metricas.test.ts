@@ -155,23 +155,32 @@ describe('avgDuracionByConsultor', () => {
 
   it('computes average and sorts descending', () => {
     const data = [
-      makeConsultoria({ duracion_minutos: 60, consultores: { nombre: 'Ana' }, id_consultor: 'c-1' }),
-      makeConsultoria({ duracion_minutos: 30, consultores: { nombre: 'Ana' }, id_consultor: 'c-1' }),
-      makeConsultoria({ duracion_minutos: 90, consultores: { nombre: 'Bob' }, id_consultor: 'c-2' }),
+      makeConsultoria({ id: 'r1', duracion_minutos: 60, consultores: { nombre: 'Ana' }, id_consultor: 'c-1' }),
+      makeConsultoria({ id: 'r2', duracion_minutos: 30, consultores: { nombre: 'Ana' }, id_consultor: 'c-1' }),
+      makeConsultoria({ id: 'r3', duracion_minutos: 90, consultores: { nombre: 'Bob' }, id_consultor: 'c-2' }),
     ]
-    const result = avgDuracionByConsultor(data)
+    const registros: RegistroSesionForMetricas[] = [
+      { id_consultoria: 'r1', cantidad_productos: 0, duracion_sesion_minutos: 60 },
+      { id_consultoria: 'r2', cantidad_productos: 0, duracion_sesion_minutos: 30 },
+      { id_consultoria: 'r3', cantidad_productos: 0, duracion_sesion_minutos: 90 },
+    ]
+    const result = avgDuracionByConsultor(data, registros)
     expect(result).toEqual([
       { consultor: 'Bob', avg: 90 },
       { consultor: 'Ana', avg: 45 },
     ])
   })
 
-  it('excludes consultor from result when all their duraciones are null', () => {
+  it('excludes consultor from result when all their registro durations are null', () => {
     const data = [
-      makeConsultoria({ duracion_minutos: 60, consultores: { nombre: 'Ana' }, id_consultor: 'c-1' }),
-      makeConsultoria({ duracion_minutos: null, consultores: { nombre: 'Bob' }, id_consultor: 'c-2' }),
+      makeConsultoria({ id: 'r1', duracion_minutos: 60, consultores: { nombre: 'Ana' }, id_consultor: 'c-1' }),
+      makeConsultoria({ id: 'r2', duracion_minutos: null, consultores: { nombre: 'Bob' }, id_consultor: 'c-2' }),
     ]
-    const result = avgDuracionByConsultor(data)
+    const registros: RegistroSesionForMetricas[] = [
+      { id_consultoria: 'r1', cantidad_productos: 0, duracion_sesion_minutos: 60 },
+      { id_consultoria: 'r2', cantidad_productos: 0, duracion_sesion_minutos: null },
+    ]
+    const result = avgDuracionByConsultor(data, registros)
     expect(result).toHaveLength(1)
     expect(result[0].consultor).toBe('Ana')
   })
@@ -187,9 +196,12 @@ describe('avgDuracionByConsultor', () => {
 
   it('includes row when id_consultor is set but consultores join is null (deleted consultant)', () => {
     const data = [
-      makeConsultoria({ duracion_minutos: 45, consultores: null, id_consultor: 'c-1' }),
+      makeConsultoria({ id: 'r1', duracion_minutos: 45, consultores: null, id_consultor: 'c-1' }),
     ]
-    const result = avgDuracionByConsultor(data)
+    const registros: RegistroSesionForMetricas[] = [
+      { id_consultoria: 'r1', cantidad_productos: 0, duracion_sesion_minutos: 45 },
+    ]
+    const result = avgDuracionByConsultor(data, registros)
     expect(result).toEqual([{ consultor: 'Sin consultor', avg: 45 }])
   })
 })
@@ -422,9 +434,12 @@ describe('avgDuracionByConsultor — excludes null id_consultor', () => {
 
   it('row with valid id_consultor appears in output', () => {
     const data = [
-      makeConsultoria({ duracion_minutos: 60, id_consultor: 'c-1', consultores: { nombre: 'Ana' } }),
+      makeConsultoria({ id: 'r1', duracion_minutos: 60, id_consultor: 'c-1', consultores: { nombre: 'Ana' } }),
     ]
-    const result = avgDuracionByConsultor(data)
+    const registros: RegistroSesionForMetricas[] = [
+      { id_consultoria: 'r1', cantidad_productos: 0, duracion_sesion_minutos: 60 },
+    ]
+    const result = avgDuracionByConsultor(data, registros)
     expect(result).toHaveLength(1)
     expect(result[0].consultor).toBe('Ana')
   })
@@ -1016,12 +1031,12 @@ describe('avgDuracionByConsultor — registro priority (new 2-arg form)', () => 
     expect(result).toEqual([{ consultor: 'Ana', avg: 60 }])
   })
 
-  it('falls back to consultoria.duracion_minutos when registroSesion=[]', () => {
+  it('returns empty when registroSesion=[] (no fallback to duracion_minutos)', () => {
     const data = [
       makeConsultoria({ id: 'c1', id_consultor: 'x', duracion_minutos: 90, consultores: { nombre: 'Ana' } }),
     ]
     const result = avgDuracionByConsultor(data, [])
-    expect(result).toEqual([{ consultor: 'Ana', avg: 90 }])
+    expect(result).toEqual([])
   })
 
   it('excludes entry when both registro.duracion and c.duracion are null', () => {
@@ -1035,12 +1050,12 @@ describe('avgDuracionByConsultor — registro priority (new 2-arg form)', () => 
     expect(result).toEqual([])
   })
 
-  it('still works with 1-arg call (backward compat)', () => {
+  it('1-arg call without registros returns empty (requires registro_sesion data)', () => {
     const data = [
       makeConsultoria({ id: 'c1', id_consultor: 'x', duracion_minutos: 60, consultores: { nombre: 'Ana' } }),
     ]
     const result = avgDuracionByConsultor(data)
-    expect(result).toEqual([{ consultor: 'Ana', avg: 60 }])
+    expect(result).toEqual([])
   })
 })
 
