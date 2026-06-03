@@ -1090,14 +1090,12 @@ export function computeMetricasFromConsultorias({
   // distribucionRetorno
   const distribucionRetorno = computeRetentionDistribution(consultorias)
 
-  // tasaRetorno: % leads con 2+ consultorias vs leads con ≥1
-  const visitasByLead = new Map<string, number>()
-  for (const c of consultorias) {
-    visitasByLead.set(c.id_lead, (visitasByLead.get(c.id_lead) ?? 0) + 1)
-  }
-  const leadsConRetorno = [...visitasByLead.values()].filter(v => v >= 2).length
-  const tasaRetorno = leadsConConsultoria > 0
-    ? Math.round((leadsConRetorno / leadsConConsultoria) * 100)
+  // tasaRetorno: (total agendadas / total atendidas) × 100
+  const totalAtendidasRetorno = consultorias.filter(c =>
+    ['Resuelto', 'En seguimiento', 'Escalar'].includes(c.status ?? '')
+  ).length
+  const tasaRetorno = totalAtendidasRetorno > 0
+    ? Math.round((consultorias.length / totalAtendidasRetorno) * 100)
     : 0
 
   // consultoriasSinRegistro: Resuelto sin registro_sesion vinculado
