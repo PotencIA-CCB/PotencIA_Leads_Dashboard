@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
-import { Lead, ConsultoriaStatus, Consultor, leadFullName } from '@/types'
+import { Lead, ConsultoriaStatus, Consultor } from '@/types'
 import LeadCard, { effectiveStatus, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
 import LeadModal from '@/components/LeadModal'
+import { matchesSearch, paginate } from './searchHelpers'
 
 const statusOptions: Array<'Todos' | ConsultoriaStatus> = ['Todos', 'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
 
@@ -27,6 +28,9 @@ export default function DashboardPage() {
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
   const [pendientesMas5, setPendientesMas5] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState<25 | 50 | 100>(25)
+
 const fetchData = async () => {
     setLoading(true)
     const consultor = await getCurrentConsultor()
@@ -161,17 +165,12 @@ const fetchData = async () => {
   }
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
     const hace5 = new Date(Date.now() - 5 * 86400000)
     const fromTs = filterDateFrom ? new Date(filterDateFrom + 'T00:00:00') : null
     const toTs = filterDateTo ? new Date(filterDateTo + 'T23:59:59') : null
 
     return leads.filter((l) => {
-      const matchSearch = !q
-        || leadFullName(l).toLowerCase().includes(q)
-        || l.email.toLowerCase().includes(q)
-        || (l.phone ?? '').toLowerCase().includes(q)
-        || (l.id_num ?? '').toLowerCase().includes(q)
+      const matchSearch = matchesSearch(l, search)
       const eff = effectiveStatus(l)
       const matchStatus = filterStatus === 'Todos' || eff === filterStatus
 
@@ -184,6 +183,13 @@ const fetchData = async () => {
       return matchSearch && matchStatus && matchDateFrom && matchDateTo && matchPendientes5
     })
   }, [leads, search, filterStatus, filterDateFrom, filterDateTo, pendientesMas5])
+
+  // Reset to page 1 whenever any filter or page size changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, filterStatus, filterDateFrom, filterDateTo, pendientesMas5, pageSize])
+
+  const { slice: paginatedLeads, totalPages, from: pageFrom, to: pageTo } = paginate(filtered, currentPage, pageSize)
 
   function clearFilters() {
     setFilterStatus('Todos')
@@ -226,7 +232,7 @@ const fetchData = async () => {
           <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px]" aria-hidden="true">search</span>
           <input
             className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 transition-colors"
-            placeholder="Buscar por nombre, email, teléfono o cédula..."
+            placeholder="Buscar por nombre, empresa, NIT, cédula, email o teléfono..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -299,10 +305,24 @@ const fetchData = async () => {
         <EmptyState onClear={clearFilters} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((lead) => (
+          {paginatedLeads.map((lead) => (
             <LeadCard key={lead.id} lead={lead} onClick={setSelectedLead} />
           ))}
         </div>
+      )}
+
+      {/* Pagination — only when not loading and there are results */}
+      {!loading && filtered.length > 0 && (
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          from={pageFrom}
+          to={pageTo}
+          total={filtered.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => setPageSize(size)}
+        />
       )}
 
       {/* Modal */}
@@ -317,6 +337,83 @@ const fetchData = async () => {
   )
 }
 
+
+interface PaginationBarProps {
+  currentPage: number
+  totalPages: number
+  pageSize: 25 | 50 | 100
+  from: number
+  to: number
+  total: number
+  onPageChange: (page: number) => void
+  onPageSizeChange: (size: 25 | 50 | 100) => void
+}
+
+function PaginationBar({
+  currentPage,
+  totalPages,
+  pageSize,
+  from,
+  to,
+  total,
+  onPageChange,
+  onPageSizeChange,
+}: PaginationBarProps) {
+  return (
+    <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] px-5 py-3">
+      {/* Count label */}
+      <span className="text-xs text-slate-500 shrink-0">
+        Mostrando {from}–{to} de {total}
+      </span>
+
+      {/* Controls */}
+      <div className="flex items-center gap-3">
+        {/* Page size selector */}
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest shrink-0">
+            Por página
+          </label>
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value) as 25 | 50 | 100)}
+            className="text-xs px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 text-slate-700 cursor-pointer"
+          >
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
+        </div>
+
+        <div className="w-px h-4 bg-slate-200" aria-hidden="true" />
+
+        {/* Prev / page indicator / next */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+            aria-label="Página anterior"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[#00C8FF]/40 transition-colors cursor-pointer disabled:pointer-events-none"
+          >
+            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">chevron_left</span>
+          </button>
+
+          <span className="px-2.5 py-1 text-xs font-semibold text-slate-700 tabular-nums">
+            {currentPage} / {totalPages}
+          </span>
+
+          <button
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+            aria-label="Página siguiente"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[#00C8FF]/40 transition-colors cursor-pointer disabled:pointer-events-none"
+          >
+            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">chevron_right</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function SkeletonGrid() {
   return (
