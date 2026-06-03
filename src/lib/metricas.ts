@@ -109,8 +109,7 @@ export interface ConsultoriaForMetricas {
   /** Booking reference from MS Bookings. Null when row was created by WF-3 with no matching WF-2 booking. */
   booking_id?: string | null
   leads: {
-    nombre?: string | null
-    apellidos?: string | null
+    nombre_completo?: string | null
     city: string | null
     company_role_level: string | null
     origen: string | null

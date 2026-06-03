@@ -3,6 +3,11 @@ import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
+/** Pure helper: extract the full name from a booking body. Exported for unit testing. */
+export function extractNombreCompleto(body: Record<string, string | undefined>): string {
+  return (body.full_name ?? body.nombre ?? '').trim()
+}
+
 export async function POST(req: NextRequest) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,10 +43,7 @@ export async function POST(req: NextRequest) {
       nit = null,
     } = body
 
-    const rawName: string = body.full_name ?? body.nombre ?? ''
-    const nameParts = rawName.trim().split(/\s+/)
-    const nombre = nameParts[0] ?? null
-    const apellidos = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null
+    const nombre_completo = extractNombreCompleto(body)
 
     const durationRaw = body.duration ?? null
     const duration = typeof durationRaw === 'number' ? durationRaw : (typeof durationRaw === 'string' ? parseInt(durationRaw, 10) || null : null)
@@ -92,9 +94,9 @@ export async function POST(req: NextRequest) {
     const hora_inicio = start.hora
     const hora_fin = end.hora || null
 
-    if (!nombre || !email || !fecha_sesion || !hora_inicio) {
+    if (!nombre_completo || !email || !fecha_sesion || !hora_inicio) {
       return NextResponse.json(
-        { error: 'Faltan campos requeridos: nombre (o full_name), email, fecha_sesion, hora_inicio' },
+        { error: 'Faltan campos requeridos: nombre_completo (o full_name), email, fecha_sesion, hora_inicio' },
         { status: 400 }
       )
     }
@@ -141,8 +143,7 @@ export async function POST(req: NextRequest) {
       'match_or_create_lead',
       {
         p_email: email,
-        p_nombre: nombre,
-        p_apellidos: apellidos,
+        p_nombre_completo: nombre_completo,
         p_phone: phone,
         p_city: city,
         p_booking_customer_id: body.customer_id ?? null,

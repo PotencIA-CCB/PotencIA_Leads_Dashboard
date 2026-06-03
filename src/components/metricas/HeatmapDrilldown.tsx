@@ -95,9 +95,7 @@ export function HeatmapDrilldown({ consultorias, cell, onClose }: HeatmapDrilldo
                         {c.consultores?.nombre ?? 'Sin consultor'}
                       </td>
                       <td className="py-2 pr-4 text-slate-600">
-                        {[c.leads?.nombre, c.leads?.apellidos].filter(Boolean).join(' ') ||
-                          c.leads?.city ||
-                          '—'}
+                        {c.leads?.nombre_completo || c.leads?.city || '—'}
                       </td>
                       <td className="py-2 text-slate-600">{canonicalStatus(c.status)}</td>
                     </tr>

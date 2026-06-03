@@ -4,8 +4,7 @@ export interface Lead {
   id: string
   created_at: string
   updated_at: string
-  nombre: string | null
-  apellidos: string | null
+  nombre_completo: string | null
   id_num: string | null
   nit: string | null
   email: string
@@ -24,8 +23,8 @@ export interface Lead {
   renovado_2026: boolean
 }
 
-export function leadFullName(lead: Pick<Lead, 'nombre' | 'apellidos'>): string {
-  return [lead.nombre, lead.apellidos].filter(Boolean).join(' ') || 'Sin nombre'
+export function leadFullName(lead: Pick<Lead, 'nombre_completo'>): string {
+  return lead.nombre_completo || 'Sin nombre'
 }
 
 export interface FormularioLanding {
