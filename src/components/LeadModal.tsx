@@ -137,7 +137,7 @@ export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalPr
             {con && (
               <Field label="Estado">
                 <select
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 transition-colors"
+                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 focus-visible:ring-2 focus-visible:ring-[#00C8FF]/40 transition-colors"
                   value={con.status}
                   onChange={(e) => { onStatusChange(lead.id, con.id, e.target.value as ConsultoriaStatus); showSaved() }}
                 >
@@ -234,7 +234,7 @@ export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalPr
           )}
 
           {/* Footer */}
-          <div className="text-xs text-slate-400 border-t border-slate-100 pt-4">
+          <div className="text-xs text-slate-500 border-t border-slate-100 pt-4">
             Registrado el{' '}
             {new Date(lead.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}
           </div>
@@ -247,7 +247,7 @@ export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalPr
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">
+      <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">
         {title}
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
@@ -270,7 +270,7 @@ function Row({ label, value, fullWidth }: { label: string; value: string | null 
   if (value === null || value === undefined || value === '') return null
   return (
     <div className={`flex flex-col gap-0.5 ${fullWidth ? 'md:col-span-2' : ''}`}>
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</span>
       <span className="text-sm text-slate-800">{value}</span>
     </div>
   )

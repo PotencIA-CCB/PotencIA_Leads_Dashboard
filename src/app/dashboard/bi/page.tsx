@@ -1,9 +1,19 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useBusinessIntelligence } from '@/hooks/useBusinessIntelligence'
+import { useMetricas } from '@/hooks/useMetricas'
 import { StatCard } from '@/components/dashboard/StatCard'
 import LeadsFunnel from '@/components/dashboard/LeadsFunnel'
 import InsightSection from '@/components/dashboard/InsightSection'
+import { GeneralKPIs } from '@/components/metricas/GeneralKPIs'
+import { ProductividadKPIs } from '@/components/metricas/ProductividadKPIs'
+import { RetentionFunnel } from '@/components/metricas/RetentionFunnel'
+import { ConsultorRadar } from '@/components/metricas/ConsultorRadar'
+import { HeatmapDrilldown } from '@/components/metricas/HeatmapDrilldown'
+import InfoTooltip from '@/components/metricas/InfoTooltip'
+import WordCloud from '@/components/metricas/WordCloud'
+import { createClient } from '@/lib/supabase-browser'
 import type { FunnelStats } from '@/lib/capturaStats'
 
 const emptyFunnelStats: FunnelStats = {
@@ -18,14 +28,41 @@ const emptyFunnelStats: FunnelStats = {
 }
 
 export default function BIPage() {
-  const { biStats, funnelStats, totalBookings, loading } = useBusinessIntelligence()
+  const { biStats, funnelStats, totalBookings, loading: biLoading } = useBusinessIntelligence()
+  const { metricas, consultorias, loading: metricasLoading } = useMetricas()
+
+  const [heatmapDrilldown, setHeatmapDrilldown] = useState<{
+    dia: string
+    franja: string
+    consultoriaIds: string[]
+  } | null>(null)
+  const [wordCloudSentences, setWordCloudSentences] = useState<string[]>([])
+
+  // Fetch descripcion text from formularios_landing for the AI-filtered word cloud
+  useEffect(() => {
+    async function cargarDescripciones() {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('formularios_landing')
+        .select('descripcion')
+        .not('descripcion', 'is', null)
+        .limit(200)
+      if (data) {
+        const sentences = (data as { descripcion: string | null }[])
+          .map((r) => r.descripcion)
+          .filter((d): d is string => d !== null)
+        setWordCloudSentences(sentences)
+      }
+    }
+    cargarDescripciones()
+  }, [])
 
   return (
     <>
-      {/* Section Header */}
+      {/* Header */}
       <div className="mb-8">
         <nav aria-label="Breadcrumb" className="mb-2">
-          <ol className="flex items-center gap-2 text-[11px] font-medium text-slate-400 uppercase tracking-wider list-none p-0 m-0">
+          <ol className="flex items-center gap-2 text-[11px] font-medium text-slate-500 uppercase tracking-wider list-none p-0 m-0">
             <li className="flex items-center">
               <span>Analysis</span>
               <span className="material-symbols-outlined text-[14px] mx-1" aria-hidden="true">chevron_right</span>
@@ -48,96 +85,259 @@ export default function BIPage() {
         </div>
       </div>
 
-      {/* Section 1 — Result Indicators */}
-      <section aria-labelledby="result-indicators-heading" className="mb-8">
-        <h3
-          id="result-indicators-heading"
-          className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4"
-          style={{ fontFamily: 'Space Grotesk, sans-serif' }}
-        >
-          Indicadores de Resultado
-        </h3>
+      {/* ================================================================
+          SECTION 1 — NUMERIC INDICATORS (all KPI tiles / stat cards)
+          Both hook loading states are independent — each gates its own block.
+          ================================================================ */}
+      <div data-testid="kpi-section">
 
-        {loading ? (
-          <SkeletonIndicators />
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <StatCard
-              label="Sesiones Totales"
-              value={biStats?.sesionesTotales ?? 0}
-              accent="text-[#003087]"
-              helpText="Total de sesiones de consultoría registradas"
-              icon="event_available"
-              subtitle="Sesiones de consultoría registradas"
+        {/* 1a — Indicadores Globales (from useMetricas) */}
+        <section aria-labelledby="global-indicators-heading" className="mb-6">
+          <h3
+            id="global-indicators-heading"
+            className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4"
+            style={{ fontFamily: 'Space Grotesk, sans-serif' }}
+          >
+            Indicadores Globales
+          </h3>
+
+          {metricasLoading ? (
+            <SkeletonKPIGrid count={6} />
+          ) : !metricas ? (
+            <p className="text-sm text-red-400">Error al cargar indicadores globales.</p>
+          ) : (
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+              {[
+                {
+                  label: 'Total Consultorías',
+                  value: metricas.totalConsultorias,
+                  icon: 'event',
+                  sub: 'Sesiones efectivas realizadas',
+                  helpText: 'Cantidad de sesiones efectivas realizadas. Fuente: registro_sesion (count of rows).',
+                },
+                {
+                  label: 'Resueltas',
+                  value: metricas.consultoriasResueltas,
+                  icon: 'task_alt',
+                  sub: 'Estado Resuelto',
+                  helpText: 'Sesiones con estado Resuelto. Fuente: consultorias.status',
+                },
+                {
+                  label: 'En Seguimiento',
+                  value: metricas.consultoriasEnSeguimientoAtendidas,
+                  icon: 'monitoring',
+                  sub: 'Consultorías atendidas en seguimiento',
+                  helpText: 'Consultorías atendidas con estado "En seguimiento". Fuente: consultorias.status filtrado por registro_sesion',
+                },
+                {
+                  label: '% Conversión',
+                  value: `${metricas.tasaConversion.toFixed(2)}%`,
+                  icon: 'trending_up',
+                  sub: 'Sesiones / reservas únicas',
+                  helpText: 'Sesiones efectivas / reservas únicas (booking_id distintos). Fórmula: registro_sesion.count / DISTINCT consultorias.booking_id × 100.',
+                },
+                {
+                  label: 'Productos generados',
+                  value: metricas.totalProductos,
+                  icon: 'inventory_2',
+                  sub: 'Total productos creados',
+                  helpText: 'Suma de cantidad_productos en registro_sesion. Fuente: registro_sesion.cantidad_productos',
+                },
+                {
+                  label: 'Horas de consultoría',
+                  value: metricas.totalMinutos === 0 ? '0 h' : `${(metricas.totalMinutos / 60).toFixed(1)} h`,
+                  icon: 'schedule',
+                  sub: 'Tiempo total de sesiones',
+                  helpText: 'Suma de duracion_sesion_minutos de las sesiones registradas, expresado en horas. Fuente: registro_sesion.duracion_sesion_minutos.',
+                },
+              ].map((kpi) => (
+                <div
+                  key={kpi.label}
+                  className="bg-white p-6 rounded-[10px] border-t-[3px] border-[#004BB5] border border-[#E5E7EB] shadow-sm"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[12px] text-[#5A6475] font-medium tracking-tight">{kpi.label}</p>
+                      <InfoTooltip helpText={kpi.helpText} />
+                    </div>
+                    <span className="material-symbols-outlined text-[#00C8FF] text-xl">{kpi.icon}</span>
+                  </div>
+                  <h3
+                    className="text-2xl sm:text-3xl lg:text-[32px] font-bold text-[#003087] leading-none"
+                    style={{ fontFamily: 'Space Grotesk, sans-serif' }}
+                  >
+                    {kpi.value}
+                  </h3>
+                  <p className="text-[10px] text-slate-500 mt-3">{kpi.sub}</p>
+                </div>
+              ))}
+            </section>
+          )}
+        </section>
+
+        {/* 1b — Indicadores de Resultado (from useBusinessIntelligence) */}
+        <section aria-labelledby="result-indicators-heading" className="mb-8">
+          <h3
+            id="result-indicators-heading"
+            className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4"
+            style={{ fontFamily: 'Space Grotesk, sans-serif' }}
+          >
+            Indicadores de Resultado
+          </h3>
+
+          {biLoading ? (
+            <SkeletonStatCards />
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <StatCard
+                label="Sesiones Totales"
+                value={biStats?.sesionesTotales ?? 0}
+                accent="text-[#003087]"
+                helpText="Total de sesiones de consultoría registradas"
+                icon="event_available"
+                subtitle="Sesiones de consultoría registradas"
+              />
+              <StatCard
+                label="NITs Únicos"
+                value={biStats?.nitsUnicos ?? 0}
+                accent="text-[#003087]"
+                helpText="NITs distintos y no nulos de leads con al menos una sesión registrada. Fuente: registro_sesion → consultorias → leads.nit"
+                icon="tag"
+                subtitle="NITs distintos con sesión registrada"
+              />
+              <StatCard
+                label="NITs Válidos"
+                value={biStats?.nitsValidos ?? 0}
+                accent="text-[#003087]"
+                helpText="NITs validados manualmente en cámara de comercio (RUES)"
+                icon="verified"
+                subtitle="Validados en RUES (cámara)"
+              />
+              <StatCard
+                label="Empresas Registradas"
+                value={biStats?.empresasRegistradas ?? 0}
+                accent="text-[#003087]"
+                helpText="Leads con nombre de empresa registrado"
+                icon="apartment"
+                subtitle="Leads con empresa registrada"
+              />
+              <StatCard
+                label="Empresas Registradas y Renovadas"
+                value={biStats?.empresasRenovadas ?? 0}
+                accent="text-[#003087]"
+                helpText="Empresas validadas en RUES con renovación activa en 2026"
+                icon="autorenew"
+                subtitle="Renovación activa en 2026"
+              />
+            </div>
+          )}
+        </section>
+
+      </div>{/* end kpi-section */}
+
+      {/* ================================================================
+          SECTION 2 — CHARTS (all visualizations, below KPI tiles)
+          ================================================================ */}
+      <div data-testid="charts-section">
+
+        {/* Embudo de Captura */}
+        <section aria-labelledby="process-indicators-heading" className="mb-8">
+          <h3
+            id="process-indicators-heading"
+            className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4"
+            style={{ fontFamily: 'Space Grotesk, sans-serif' }}
+          >
+            Indicadores de Proceso
+          </h3>
+          <LeadsFunnel
+            stats={funnelStats ?? emptyFunnelStats}
+            totalBookings={totalBookings}
+          />
+        </section>
+
+        {/* Resumen Ejecutivo con IA */}
+        <section aria-labelledby="insights-heading" className="mb-8">
+          <h3
+            id="insights-heading"
+            className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4"
+            style={{ fontFamily: 'Space Grotesk, sans-serif' }}
+          >
+            Resumen Ejecutivo
+          </h3>
+          <InsightSection ready={!biLoading} />
+        </section>
+
+        {/* Metricas charts — gated on metricas data */}
+        {!metricasLoading && metricas && (
+          <>
+            {/* Sesiones en el tiempo */}
+            <GeneralKPIs metricas={metricas} consultorias={consultorias} />
+
+            {/* Productividad + Heatmap drill-down */}
+            <ProductividadKPIs
+              metricas={metricas}
+              onCellClick={(cell) => setHeatmapDrilldown(cell)}
             />
-            <StatCard
-              label="NITs Únicos"
-              value={biStats?.nitsUnicos ?? 0}
-              accent="text-[#003087]"
-              helpText="NITs distintos y no nulos de leads con al menos una sesión registrada. Fuente: registro_sesion → consultorias → leads.nit"
-              icon="tag"
-              subtitle="NITs distintos con sesión registrada"
+            <HeatmapDrilldown
+              consultorias={consultorias}
+              cell={heatmapDrilldown}
+              onClose={() => setHeatmapDrilldown(null)}
             />
-            <StatCard
-              label="NITs Válidos"
-              value={biStats?.nitsValidos ?? 0}
-              accent="text-[#003087]"
-              helpText="NITs validados manualmente en cámara de comercio (RUES)"
-              icon="verified"
-              subtitle="Validados en RUES (cámara)"
-            />
-            <StatCard
-              label="Empresas Registradas"
-              value={biStats?.empresasRegistradas ?? 0}
-              accent="text-[#003087]"
-              helpText="Leads con nombre de empresa registrado"
-              icon="apartment"
-              subtitle="Leads con empresa registrada"
-            />
-            <StatCard
-              label="Empresas Registradas y Renovadas"
-              value={biStats?.empresasRenovadas ?? 0}
-              accent="text-[#003087]"
-              helpText="Empresas validadas en RUES con renovación activa en 2026"
-              icon="autorenew"
-              subtitle="Renovación activa en 2026"
-            />
-          </div>
+
+            {/* Funnel de retención */}
+            <RetentionFunnel metricas={metricas} />
+
+            {/* Radar por consultor */}
+            <ConsultorRadar metricas={metricas} />
+
+            {/* Word Cloud */}
+            <section className="bg-white rounded-[10px] border border-[#E5E7EB] shadow-sm">
+              <div className="px-6 py-4 border-b border-slate-100">
+                <h4
+                  className="text-sm font-bold text-[#003087] uppercase tracking-widest"
+                  style={{ fontFamily: 'Space Grotesk, sans-serif' }}
+                >
+                  ¿Qué quieren lograr?
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Palabras más frecuentes en las solicitudes de consultoría
+                </p>
+              </div>
+              <WordCloud sentences={wordCloudSentences} />
+            </section>
+          </>
         )}
-      </section>
 
-      {/* Section 2 — Embudo de Captura */}
-      <section aria-labelledby="process-indicators-heading" className="mb-8">
-        <h3
-          id="process-indicators-heading"
-          className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4"
-          style={{ fontFamily: 'Space Grotesk, sans-serif' }}
-        >
-          Indicadores de Proceso
-        </h3>
-        <LeadsFunnel
-          stats={funnelStats ?? emptyFunnelStats}
-          totalBookings={totalBookings}
-        />
-      </section>
-
-      {/* Section 3 — Insights con IA */}
-      <section aria-labelledby="insights-heading" className="mb-8">
-        <h3
-          id="insights-heading"
-          className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4"
-          style={{ fontFamily: 'Space Grotesk, sans-serif' }}
-        >
-          Resumen Ejecutivo
-        </h3>
-        <InsightSection ready={!loading} />
-      </section>
-
+      </div>{/* end charts-section */}
     </>
   )
 }
 
-function SkeletonIndicators() {
+// ---------------------------------------------------------------------------
+// Loading skeletons
+// ---------------------------------------------------------------------------
+
+function SkeletonKPIGrid({ count }: { count: number }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="bg-white p-6 rounded-[10px] border-t-[3px] border-slate-200 border border-slate-100 shadow-sm animate-pulse"
+        >
+          <div className="flex justify-between items-start mb-4">
+            <div className="h-3 bg-slate-200 rounded w-2/3" />
+            <div className="h-5 w-5 bg-slate-200 rounded" />
+          </div>
+          <div className="h-8 bg-slate-200 rounded w-1/2 mt-2" />
+          <div className="h-2 bg-slate-200 rounded w-3/4 mt-3" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SkeletonStatCards() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
       {Array.from({ length: 5 }).map((_, i) => (

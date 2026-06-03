@@ -204,7 +204,7 @@ const fetchData = async () => {
       {/* Section Header */}
       <div className="mb-8">
         <nav aria-label="Breadcrumb" className="mb-2">
-          <ol className="flex items-center gap-2 text-[11px] font-medium text-slate-400 uppercase tracking-wider list-none p-0 m-0">
+          <ol className="flex items-center gap-2 text-[11px] font-medium text-slate-500 uppercase tracking-wider list-none p-0 m-0">
             <li className="flex items-center">
               <span>Analysis</span>
               <span className="material-symbols-outlined text-[14px] mx-1" aria-hidden="true">chevron_right</span>
@@ -239,7 +239,7 @@ const fetchData = async () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1">Estado</span>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mr-1">Estado</span>
           {statusOptions.map((s) => {
             const active = filterStatus === s
             const styles = statusChip[s]
@@ -247,7 +247,7 @@ const fetchData = async () => {
               <button
                 key={s}
                 onClick={() => setFilterStatus(s)}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer ${active ? styles.active : styles.idle}`}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00C8FF]/40 ${active ? styles.active : `${styles.idle} hover:bg-slate-50`}`}
               >
                 {s}
               </button>
@@ -256,10 +256,10 @@ const fetchData = async () => {
           <div className="w-px h-4 bg-slate-200 mx-1" aria-hidden="true" />
           <button
             onClick={() => setPendientesMas5((v) => !v)}
-            className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+            className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00C8FF]/40 ${
               pendientesMas5
-                ? 'bg-amber-500 text-white border border-amber-500'
-                : 'bg-white text-amber-700 border border-amber-200'
+                ? 'bg-amber-500 text-white border border-amber-500 hover:bg-amber-600'
+                : 'bg-white text-amber-700 border border-amber-200 hover:bg-amber-50'
             }`}
           >
             <span className="material-symbols-outlined text-[13px]" aria-hidden="true">schedule</span>
@@ -268,7 +268,7 @@ const fetchData = async () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-slate-100">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registro</span>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Registro</span>
           <div className="flex items-center gap-2">
             <label className="text-xs text-slate-500 shrink-0">Desde</label>
             <input
@@ -290,7 +290,7 @@ const fetchData = async () => {
           {(filterDateFrom || filterDateTo) && (
             <button
               onClick={() => { setFilterDateFrom(''); setFilterDateTo('') }}
-              className="text-[11px] text-slate-400 hover:text-slate-600 underline cursor-pointer"
+              className="text-[11px] text-slate-500 hover:text-slate-700 underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00C8FF]/40 rounded"
             >
               Limpiar fechas
             </button>
@@ -448,7 +448,7 @@ function EmptyState({ onClear }: { onClear: () => void }) {
       <p className="text-sm text-slate-500 mt-1">No hay leads que coincidan con tus filtros.</p>
       <button
         onClick={onClear}
-        className="mt-5 px-4 py-2 rounded-lg bg-[#003087] text-white text-xs font-semibold cursor-pointer"
+        className="mt-5 px-4 py-2 rounded-lg bg-[#003087] text-white text-xs font-semibold cursor-pointer hover:bg-[#004BB5] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00C8FF]/40"
       >
         Limpiar filtros
       </button>
