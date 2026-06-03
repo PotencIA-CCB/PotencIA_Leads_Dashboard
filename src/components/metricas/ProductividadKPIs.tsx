@@ -41,6 +41,29 @@ function calcLeftWidth(labels: string[]): number {
   return Math.min(120, Math.max(60, ...labels.map((l) => l.length * 6)))
 }
 
+function ConsultorTick({
+  x,
+  y,
+  payload,
+}: {
+  x?: number
+  y?: number
+  payload?: { value: string }
+}) {
+  if (!payload) return null
+  const words = payload.value.split(' ')
+  const line1 = words[0]
+  const line2 = words.slice(1).join(' ')
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text textAnchor="middle" fill="#64748b" fontSize={10}>
+        <tspan x={0} dy="0.8em">{line1}</tspan>
+        {line2 && <tspan x={0} dy="1.3em">{line2}</tspan>}
+      </text>
+    </g>
+  )
+}
+
 
 // TASK-15: Sáb and Dom removed — only Mon–Fri produced by compute layer
 const HEATMAP_DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
@@ -134,17 +157,15 @@ export function ProductividadKPIs({ metricas, onCellClick }: ProductividadKPIsPr
           <ResponsiveContainer width="100%" height={260}>
             <BarChart
               data={metricas.duracionPorConsultor}
-              margin={{ top: 0, right: 16, left: 0, bottom: 60 }}
+              margin={{ top: 0, right: 16, left: 0, bottom: 10 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
               <XAxis
                 dataKey="consultor"
                 type="category"
-                angle={-35}
-                textAnchor="end"
                 interval={0}
-                height={70}
-                tick={{ fontSize: 10 }}
+                height={46}
+                tick={<ConsultorTick />}
               />
               <YAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
               <Tooltip />
