@@ -20,7 +20,6 @@ const statusChip: Record<string, { active: string; idle: string }> = {
 
 export default function DashboardPage() {
   const [leads, setLeads] = useState<LeadWithMeta[]>([])
-  const [consultores, setConsultores] = useState<Consultor[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<LeadWithMeta | null>(null)
   const [search, setSearch] = useState('')
@@ -28,7 +27,6 @@ export default function DashboardPage() {
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
   const [pendientesMas5, setPendientesMas5] = useState(false)
-  const [rol, setRol] = useState('')
 const fetchData = async () => {
     setLoading(true)
     const consultor = await getCurrentConsultor()
@@ -36,7 +34,6 @@ const fetchData = async () => {
       setLoading(false)
       return
     }
-    setRol(consultor.rol)
 
     const supabase = createClient()
 
@@ -101,7 +98,6 @@ const fetchData = async () => {
     ])
 
     const allConsultores = (consRes.data as Consultor[]) || []
-    if (consultor.rol === 'admin') setConsultores(allConsultores)
     const consultorById: Record<string, string> = {}
     for (const c of allConsultores) consultorById[c.id] = c.nombre
 
@@ -164,31 +160,6 @@ const fetchData = async () => {
     }
   }
 
-  async function handleAsignarConsultor(consultoriaId: string, id_consultor: string) {
-    const supabase = createClient()
-    await supabase.from('consultorias').update({ id_consultor: id_consultor || null }).eq('id', consultoriaId)
-    const nombre = id_consultor ? (consultores.find((c) => c.id === id_consultor)?.nombre ?? null) : null
-    setLeads((prev) => prev.map((l) =>
-      l.consultoria?.id === consultoriaId
-        ? { ...l, consultoria: { ...l.consultoria!, id_consultor: id_consultor || null }, consultor_nombre: nombre }
-        : l
-    ))
-    if (selectedLead?.consultoria?.id === consultoriaId) {
-      setSelectedLead((prev) => prev ? {
-        ...prev,
-        consultoria: { ...prev.consultoria!, id_consultor: id_consultor || null },
-        consultor_nombre: nombre,
-      } : prev)
-    }
-  }
-
-  const isAdmin = rol === 'admin'
-
-  const sinAsignar = useMemo(
-    () => isAdmin ? leads.filter((l) => l.consultoria?.status === 'Agendado' && !l.consultoria?.id_consultor) : [],
-    [leads, isAdmin]
-  )
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     const hace5 = new Date(Date.now() - 5 * 86400000)
@@ -224,27 +195,6 @@ const fetchData = async () => {
 
   return (
     <>
-      {/* Banner sin asignar — admin */}
-      {sinAsignar.length > 0 && filterStatus !== 'Agendado' && (
-        <button
-          onClick={() => setFilterStatus('Agendado')}
-          className="w-full mb-6 flex items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-left cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">notification_important</span>
-            </span>
-            <div>
-              <p className="text-sm font-bold text-amber-900">
-                {sinAsignar.length} agendamiento{sinAsignar.length > 1 ? 's' : ''} sin consultor asignado
-              </p>
-              <p className="text-xs text-amber-700">Llegaron desde Microsoft Bookings. Haz clic para revisarlos.</p>
-            </div>
-          </div>
-          <span className="material-symbols-outlined text-amber-500 text-[20px]" aria-hidden="true">arrow_forward</span>
-        </button>
-      )}
-
       {/* Section Header */}
       <div className="mb-8">
         <nav aria-label="Breadcrumb" className="mb-2">
@@ -361,8 +311,6 @@ const fetchData = async () => {
           lead={selectedLead}
           onClose={() => setSelectedLead(null)}
           onStatusChange={handleStatusChange}
-          onAsignarConsultor={isAdmin ? handleAsignarConsultor : undefined}
-          consultores={isAdmin ? consultores : []}
         />
       )}
     </>

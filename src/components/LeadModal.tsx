@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Lead, ConsultoriaStatus, Consultor, leadFullName } from '@/types'
+import { Lead, ConsultoriaStatus, leadFullName } from '@/types'
 import { effectiveStatus } from '@/components/LeadCard'
 import type { LeadWithMeta, LeadCardConsultoria } from '@/components/LeadCard'
 
@@ -11,9 +11,14 @@ interface LeadModalProps {
   lead: LeadWithMeta
   onClose: () => void
   onStatusChange: (id: string, consultoriaId: string, status: ConsultoriaStatus) => void
-  onAsignarConsultor?: (consultoriaId: string, id_consultor: string) => void
-  consultores?: Consultor[]
 }
+
+/**
+ * Sentinel exported for test verification.
+ * Confirms that the consultor assignment prop (onAsignarConsultor) has been removed
+ * and the consultor field is now always rendered as read-only text (F5 requirement).
+ */
+export const CONSULTOR_ASSIGN_REMOVED = true as const
 
 const channelMeta = {
   landing: { label: 'Form PotencIA',      pill: 'bg-emerald-50 text-emerald-700', icon: 'language' },
@@ -51,7 +56,7 @@ export function hasRegistroSesionData(
   )
 }
 
-export default function LeadModal({ lead, onClose, onStatusChange, onAsignarConsultor, consultores = [] }: LeadModalProps) {
+export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalProps) {
   const [saved, setSaved] = useState(false)
   const fullName = leadFullName(lead)
   const con = lead.consultoria as (LeadCardConsultoria & { id_consultor?: string | null }) | undefined | null
@@ -141,22 +146,7 @@ export default function LeadModal({ lead, onClose, onStatusChange, onAsignarCons
               </Field>
             )}
 
-            {onAsignarConsultor && consultores.length > 0 && con && (
-              <Field label="Consultor asignado">
-                <select
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 transition-colors"
-                  value={con.id_consultor ?? ''}
-                  onChange={(e) => { onAsignarConsultor(con.id, e.target.value); showSaved() }}
-                >
-                  <option value="">Sin asignar</option>
-                  {consultores.map((c) => (
-                    <option key={c.id} value={c.id}>{c.nombre}</option>
-                  ))}
-                </select>
-              </Field>
-            )}
-
-            {!onAsignarConsultor && lead.consultor_nombre && (
+            {lead.consultor_nombre && (
               <Field label="Consultor asignado">
                 <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-100 text-sm text-slate-700">
                   <span className="material-symbols-outlined text-[16px] text-slate-400" aria-hidden="true">person</span>

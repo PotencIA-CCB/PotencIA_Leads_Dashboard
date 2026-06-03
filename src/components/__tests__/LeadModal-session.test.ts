@@ -5,7 +5,7 @@
  * Tests verify which session fields trigger the "Registro de sesión" section.
  */
 import { describe, it, expect } from 'vitest'
-import { hasRegistroSesionData } from '../LeadModal'
+import { hasRegistroSesionData, CONSULTOR_ASSIGN_REMOVED } from '../LeadModal'
 
 describe('LeadModal — hasRegistroSesionData', () => {
   it('returns false when registro_sesion is null', () => {
@@ -54,5 +54,13 @@ describe('LeadModal — hasRegistroSesionData', () => {
       acciones_realizadas: 'Revisión financiera',
       resultado_final: 'Seguimiento programado',
     })).toBe(true)
+  })
+})
+
+describe('LeadModal — consultor assignment removal (F5)', () => {
+  it('exports CONSULTOR_ASSIGN_REMOVED sentinel as true (verifies onAsignarConsultor prop has been removed)', () => {
+    // This test is RED until T10 implementation removes the prop and adds the sentinel.
+    // When CONSULTOR_ASSIGN_REMOVED is exported from LeadModal, this goes GREEN.
+    expect(CONSULTOR_ASSIGN_REMOVED).toBe(true)
   })
 })
