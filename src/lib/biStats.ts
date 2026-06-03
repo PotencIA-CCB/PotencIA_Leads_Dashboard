@@ -13,13 +13,7 @@ interface BiSesionRow {
 interface BiLeadRow {
   nit: string | null
   empresa: string | null
-  nit_validado_rues: boolean
-  renovado_2026: boolean
-}
-
-interface BiConsultoriaRow {
-  id: string
-  id_lead: string
+  renovado?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -52,38 +46,34 @@ export function countNitsUnicos(
   return seen.size
 }
 
-/**
- * Number of distinct non-null, non-empty nit values for leads that have
- * at least one registro_sesion row.
- * Join: registro_sesion.id_consultoria → consultorias.id → consultorias.id_lead → leads.nit
- */
-export function countNitsUnicosFromSesiones(
-  sesiones: Pick<BiSesionRow, 'id_consultoria'>[],
-  consultorias: Pick<BiConsultoriaRow, 'id' | 'id_lead'>[],
-  leads: { id: string; nit: string | null }[],
-): number {
-  const consulMap = new Map(consultorias.map((c) => [c.id, c.id_lead]))
-  const leadNitMap = new Map(leads.map((l) => [l.id, l.nit]))
+export function countTotalEmpresasRegistradas(leads: Pick<BiLeadRow, 'nit'>[]): number {
   const seen = new Set<string>()
-  for (const s of sesiones) {
-    const id_lead = consulMap.get(s.id_consultoria)
-    if (!id_lead) continue
-    const nit = leadNitMap.get(id_lead)
-    if (nit !== null && nit !== undefined && nit !== '') {
-      seen.add(nit)
+  for (const lead of leads) {
+    if (lead.nit !== null && lead.nit !== '') {
+      seen.add(lead.nit)
     }
   }
   return seen.size
 }
 
-/**
- * Number of leads where nit_validado_rues is true.
- * Business definition: COUNT leads WHERE nit_validado_rues = true.
- */
-export function countNitsValidos(
-  leads: Pick<BiLeadRow, 'nit_validado_rues'>[],
-): number {
-  return leads.filter((l) => l.nit_validado_rues === true).length
+export function countEmpresasNitsValidos(leads: Pick<BiLeadRow, 'nit' | 'renovado'>[]): number {
+  const seen = new Set<string>()
+  for (const lead of leads) {
+    if (lead.nit !== null && lead.nit !== '' && lead.renovado != null && lead.renovado !== '') {
+      seen.add(lead.nit)
+    }
+  }
+  return seen.size
+}
+
+export function countEmpresasRenovadas(leads: Pick<BiLeadRow, 'nit' | 'renovado'>[]): number {
+  const seen = new Set<string>()
+  for (const lead of leads) {
+    if (lead.nit !== null && lead.nit !== '' && lead.renovado === 'Renovado') {
+      seen.add(lead.nit)
+    }
+  }
+  return seen.size
 }
 
 /**
@@ -96,14 +86,4 @@ export function countEmpresasRegistradas(
   return leads.filter(
     (l) => l.empresa !== null && l.empresa.trim() !== '',
   ).length
-}
-
-/**
- * Number of leads where renovado_2026 is true.
- * Business definition: COUNT leads WHERE renovado_2026 = true.
- */
-export function countEmpresasRenovadas(
-  leads: Pick<BiLeadRow, 'renovado_2026'>[],
-): number {
-  return leads.filter((l) => l.renovado_2026 === true).length
 }

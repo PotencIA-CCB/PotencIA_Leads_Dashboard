@@ -99,8 +99,8 @@ function makeBIData() {
   return {
     biStats: {
       sesionesTotales: 10,
-      nitsUnicos: 5,
-      nitsValidos: 3,
+      totalEmpresasRegistradas: 5,
+      empresasNitsValidos: 3,
       empresasRegistradas: 8,
       empresasRenovadas: 2,
     },

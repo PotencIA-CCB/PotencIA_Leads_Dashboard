@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import {
   countSesionesTotales,
-  countNitsUnicosFromSesiones,
-  countNitsValidos,
-  countEmpresasRegistradas,
+  countTotalEmpresasRegistradas,
+  countEmpresasNitsValidos,
   countEmpresasRenovadas,
+  countEmpresasRegistradas,
 } from '@/lib/biStats'
 import { computeFunnelStats, type FunnelStats } from '@/lib/capturaStats'
 import type { RegistroSesion } from '@/types'
@@ -18,10 +18,10 @@ import type { RegistroSesion } from '@/types'
 
 export interface BiStats {
   sesionesTotales: number
-  nitsUnicos: number
-  nitsValidos: number
-  empresasRegistradas: number
+  totalEmpresasRegistradas: number
+  empresasNitsValidos: number
   empresasRenovadas: number
+  empresasRegistradas: number
 }
 
 export interface HookState {
@@ -40,8 +40,7 @@ interface BiLeadFetchRow {
   id: string
   nit: string | null
   empresa: string | null
-  nit_validado_rues: boolean
-  renovado_2026: boolean
+  renovado: string | null
 }
 
 interface BiFormularioRow {
@@ -68,16 +67,16 @@ interface BiSesionRow {
  * Pure function — no side effects, no Supabase calls.
  */
 export function computeBiStats(
-  leads: Pick<BiLeadFetchRow, 'id' | 'nit' | 'empresa' | 'nit_validado_rues' | 'renovado_2026'>[],
+  leads: Pick<BiLeadFetchRow, 'id' | 'nit' | 'empresa' | 'renovado'>[],
   sesiones: Pick<BiSesionRow, 'id_consultoria'>[],
   consultorias: Pick<BiConsultoriaRow, 'id' | 'id_lead'>[],
 ): BiStats {
   return {
     sesionesTotales: countSesionesTotales(sesiones),
-    nitsUnicos: countNitsUnicosFromSesiones(sesiones, consultorias, leads),
-    nitsValidos: countNitsValidos(leads),
-    empresasRegistradas: countEmpresasRegistradas(leads),
+    totalEmpresasRegistradas: countTotalEmpresasRegistradas(leads),
+    empresasNitsValidos: countEmpresasNitsValidos(leads),
     empresasRenovadas: countEmpresasRenovadas(leads),
+    empresasRegistradas: countEmpresasRegistradas(leads),
   }
 }
 
@@ -130,7 +129,7 @@ export function useBusinessIntelligence(): HookState {
         { count: bookingsCount },
         { data: sessionInsightsRaw },
       ] = await Promise.all([
-        supabase.from('leads').select('id, nit, empresa, nit_validado_rues, renovado_2026'),
+        supabase.from('leads').select('id, nit, empresa, renovado'),
         supabase.from('formularios_landing').select('id_lead'),
         supabase.from('consultorias').select('id, id_lead, status'),
         supabase.from('registro_sesion').select('id_consultoria, resultado'),

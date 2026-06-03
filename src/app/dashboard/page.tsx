@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [selectedLead, setSelectedLead] = useState<LeadWithMeta | null>(null)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | ConsultoriaStatus>('Todos')
+  const [filterRenovado, setFilterRenovado] = useState<string>('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
   const [pendientesMas5, setPendientesMas5] = useState(false)
@@ -179,20 +180,22 @@ const fetchData = async () => {
       const matchDateFrom = !fromTs || (regTs !== null && regTs >= fromTs)
       const matchDateTo = !toTs || (regTs !== null && regTs <= toTs)
       const matchPendientes5 = !pendientesMas5 || (eff === 'Pendiente' && regTs !== null && regTs <= hace5)
+      const matchRenovado = !filterRenovado || l.renovado === filterRenovado
 
-      return matchSearch && matchStatus && matchDateFrom && matchDateTo && matchPendientes5
+      return matchSearch && matchStatus && matchDateFrom && matchDateTo && matchPendientes5 && matchRenovado
     })
-  }, [leads, search, filterStatus, filterDateFrom, filterDateTo, pendientesMas5])
+  }, [leads, search, filterStatus, filterRenovado, filterDateFrom, filterDateTo, pendientesMas5])
 
   // Reset to page 1 whenever any filter or page size changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, filterStatus, filterDateFrom, filterDateTo, pendientesMas5, pageSize])
+  }, [search, filterStatus, filterRenovado, filterDateFrom, filterDateTo, pendientesMas5, pageSize])
 
   const { slice: paginatedLeads, totalPages, from: pageFrom, to: pageTo } = paginate(filtered, currentPage, pageSize)
 
   function clearFilters() {
     setFilterStatus('Todos')
+    setFilterRenovado('')
     setSearch('')
     setFilterDateFrom('')
     setFilterDateTo('')
@@ -265,6 +268,21 @@ const fetchData = async () => {
             <span className="material-symbols-outlined text-[13px]" aria-hidden="true">schedule</span>
             Pendientes +5 días
           </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-slate-100">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Renovado</span>
+          <select
+            value={filterRenovado}
+            onChange={(e) => setFilterRenovado(e.target.value)}
+            className="text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 text-slate-700 cursor-pointer"
+          >
+            <option value="">Todos</option>
+            <option value="Renovado">Renovado</option>
+            <option value="No renovado">No renovado</option>
+            <option value="Sin dato">Sin dato</option>
+            <option value="Proponentes">Proponentes</option>
+          </select>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-slate-100">

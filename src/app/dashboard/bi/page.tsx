@@ -190,28 +190,28 @@ export default function BIPage() {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <StatCard
-                label="Sesiones Totales"
-                value={biStats?.sesionesTotales ?? 0}
+                label="Total Empresas Registradas"
+                value={biStats?.totalEmpresasRegistradas ?? 0}
                 accent="text-[#003087]"
-                helpText="Total de sesiones de consultoría registradas"
-                icon="event_available"
-                subtitle="Sesiones de consultoría registradas"
+                helpText="NITs únicos registrados sin importar estado. Fuente: leads.nit (DISTINCT, no nulos)"
+                icon="domain"
+                subtitle="NITs únicos registrados"
               />
               <StatCard
-                label="NITs Únicos"
-                value={biStats?.nitsUnicos ?? 0}
+                label="Empresas con NITs válidos"
+                value={biStats?.empresasNitsValidos ?? 0}
                 accent="text-[#003087]"
-                helpText="NITs distintos y no nulos de leads con al menos una sesión registrada. Fuente: registro_sesion → consultorias → leads.nit"
-                icon="tag"
-                subtitle="NITs distintos con sesión registrada"
-              />
-              <StatCard
-                label="NITs Válidos"
-                value={biStats?.nitsValidos ?? 0}
-                accent="text-[#003087]"
-                helpText="NITs validados manualmente en cámara de comercio (RUES)"
+                helpText="NITs únicos donde el campo renovado tiene un valor (no es nulo ni vacío)"
                 icon="verified"
-                subtitle="Validados en RUES (cámara)"
+                subtitle="NITs únicos con estado de renovación"
+              />
+              <StatCard
+                label="Empresas renovadas"
+                value={biStats?.empresasRenovadas ?? 0}
+                accent="text-[#003087]"
+                helpText="NITs únicos donde renovado = 'Renovado'"
+                icon="autorenew"
+                subtitle="Empresas con renovación activa"
               />
               <StatCard
                 label="Empresas Registradas"

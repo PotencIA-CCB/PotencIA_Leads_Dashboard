@@ -35,8 +35,8 @@ describe('computeBiStats', () => {
   it('returns all 5 counts as 0 for empty inputs', () => {
     const result = computeBiStats([], [], [])
     expect(result.sesionesTotales).toBe(0)
-    expect(result.nitsUnicos).toBe(0)
-    expect(result.nitsValidos).toBe(0)
+    expect(result.totalEmpresasRegistradas).toBe(0)
+    expect(result.empresasNitsValidos).toBe(0)
     expect(result.empresasRegistradas).toBe(0)
     expect(result.empresasRenovadas).toBe(0)
   })
@@ -51,44 +51,32 @@ describe('computeBiStats', () => {
     expect(result.sesionesTotales).toBe(3)
   })
 
-  it('counts nitsUnicos correctly — deduplicates and excludes null — via registro_sesion join', () => {
+  it('counts totalEmpresasRegistradas correctly — deduplicates and excludes null', () => {
     const leads = [
-      { id: 'l1', nit: '123', empresa: null, nit_validado_rues: false, renovado_2026: false },
-      { id: 'l2', nit: null, empresa: null, nit_validado_rues: false, renovado_2026: false },
-      { id: 'l3', nit: '123', empresa: null, nit_validado_rues: false, renovado_2026: false },
-      { id: 'l4', nit: '456', empresa: null, nit_validado_rues: false, renovado_2026: false },
-    ]
-    const consultorias = [
-      { id: 'c1', id_lead: 'l1' },
-      { id: 'c2', id_lead: 'l2' },
-      { id: 'c3', id_lead: 'l3' },
-      { id: 'c4', id_lead: 'l4' },
-    ]
-    const sesiones = [
-      { id_consultoria: 'c1' },
-      { id_consultoria: 'c2' },
-      { id_consultoria: 'c3' },
-      { id_consultoria: 'c4' },
-    ]
-    const result = computeBiStats(leads, sesiones, consultorias)
-    expect(result.nitsUnicos).toBe(2)
-  })
-
-  it('counts nitsValidos correctly', () => {
-    const leads = [
-      { id: '1', nit: '1', empresa: null, nit_validado_rues: true, renovado_2026: false },
-      { id: '2', nit: '2', empresa: null, nit_validado_rues: false, renovado_2026: false },
-      { id: '3', nit: '3', empresa: null, nit_validado_rues: true, renovado_2026: false },
+      { id: 'l1', nit: '123', empresa: null, renovado: null },
+      { id: 'l2', nit: null, empresa: null, renovado: null },
+      { id: 'l3', nit: '123', empresa: null, renovado: null },
+      { id: 'l4', nit: '456', empresa: null, renovado: null },
     ]
     const result = computeBiStats(leads, [], [])
-    expect(result.nitsValidos).toBe(2)
+    expect(result.totalEmpresasRegistradas).toBe(2)
+  })
+
+  it('counts empresasNitsValidos correctly — NITs únicos donde renovado no es null', () => {
+    const leads = [
+      { id: '1', nit: '1', empresa: null, renovado: 'Renovado' },
+      { id: '2', nit: '2', empresa: null, renovado: null },
+      { id: '3', nit: '3', empresa: null, renovado: 'No renovado' },
+    ]
+    const result = computeBiStats(leads, [], [])
+    expect(result.empresasNitsValidos).toBe(2)
   })
 
   it('counts empresasRegistradas correctly — excludes null and whitespace', () => {
     const leads = [
-      { id: '1', nit: null, empresa: 'Acme', nit_validado_rues: false, renovado_2026: false },
-      { id: '2', nit: null, empresa: null, nit_validado_rues: false, renovado_2026: false },
-      { id: '3', nit: null, empresa: '   ', nit_validado_rues: false, renovado_2026: false },
+      { id: '1', nit: null, empresa: 'Acme', renovado: null },
+      { id: '2', nit: null, empresa: null, renovado: null },
+      { id: '3', nit: null, empresa: '   ', renovado: null },
     ]
     const result = computeBiStats(leads, [], [])
     expect(result.empresasRegistradas).toBe(1)
@@ -96,8 +84,8 @@ describe('computeBiStats', () => {
 
   it('counts empresasRenovadas correctly', () => {
     const leads = [
-      { id: '1', nit: null, empresa: null, nit_validado_rues: false, renovado_2026: true },
-      { id: '2', nit: null, empresa: null, nit_validado_rues: false, renovado_2026: false },
+      { id: '1', nit: '100', empresa: null, renovado: 'Renovado' },
+      { id: '2', nit: '200', empresa: null, renovado: 'No renovado' },
     ]
     const result = computeBiStats(leads, [], [])
     expect(result.empresasRenovadas).toBe(1)
@@ -107,8 +95,8 @@ describe('computeBiStats', () => {
     const result = computeBiStats([], [], [])
     const keys: (keyof BiStats)[] = [
       'sesionesTotales',
-      'nitsUnicos',
-      'nitsValidos',
+      'totalEmpresasRegistradas',
+      'empresasNitsValidos',
       'empresasRegistradas',
       'empresasRenovadas',
     ]
@@ -151,8 +139,8 @@ describe('buildInitialState', () => {
 describe('HookState after fetch resolves', () => {
   it('biStats has all 5 fields as numbers after loading with populated data', () => {
     const leads = [
-      { id: 'l1', nit: '111', empresa: 'Corp A', nit_validado_rues: true, renovado_2026: true },
-      { id: 'l2', nit: '222', empresa: null, nit_validado_rues: false, renovado_2026: false },
+      { id: 'l1', nit: '111', empresa: 'Corp A', renovado: 'Renovado' },
+      { id: 'l2', nit: '222', empresa: null, renovado: null },
     ]
     const consultorias = [
       { id: 'c1', id_lead: 'l1' },
@@ -173,8 +161,8 @@ describe('HookState after fetch resolves', () => {
     expect(state.loading).toBe(false)
     expect(state.biStats).not.toBeNull()
     expect(state.biStats!.sesionesTotales).toBe(2)
-    expect(state.biStats!.nitsUnicos).toBe(2)
-    expect(state.biStats!.nitsValidos).toBe(1)
+    expect(state.biStats!.totalEmpresasRegistradas).toBe(2)
+    expect(state.biStats!.empresasNitsValidos).toBe(1)
     expect(state.biStats!.empresasRegistradas).toBe(1)
     expect(state.biStats!.empresasRenovadas).toBe(1)
   })
@@ -191,8 +179,8 @@ describe('HookState after fetch resolves', () => {
     expect(state.loading).toBe(false)
     expect(state.biStats).not.toBeNull()
     expect(state.biStats!.sesionesTotales).toBe(0)
-    expect(state.biStats!.nitsUnicos).toBe(0)
-    expect(state.biStats!.nitsValidos).toBe(0)
+    expect(state.biStats!.totalEmpresasRegistradas).toBe(0)
+    expect(state.biStats!.empresasNitsValidos).toBe(0)
     expect(state.biStats!.empresasRegistradas).toBe(0)
     expect(state.biStats!.empresasRenovadas).toBe(0)
   })

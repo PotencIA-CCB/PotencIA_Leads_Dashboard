@@ -21,6 +21,7 @@ export interface Lead {
   origen: LeadOrigen
   nit_validado_rues: boolean
   renovado_2026: boolean
+  renovado?: string | null
 }
 
 export function leadFullName(lead: Pick<Lead, 'nombre_completo'>): string {
