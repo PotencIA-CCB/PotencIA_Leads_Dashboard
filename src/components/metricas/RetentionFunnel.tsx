@@ -57,7 +57,7 @@ export function RetentionFunnel({ metricas }: RetentionFunnelProps) {
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
             <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Tasa de retorno</p>
-            <InfoTooltip helpText="Comparativo entre sesiones agendadas y atendidas. Fórmula: (total agendadas / total atendidas) × 100. Atendidas = Resuelto + En seguimiento + Escalar. Fuente: consultorias.status" />
+            <InfoTooltip helpText="Comparativo entre sesiones atendidas y agendadas. Fórmula: (total atendidas / total agendadas) × 100. Atendidas = Resuelto + En seguimiento + Escalar. Fuente: consultorias.status" />
           </div>
           <p className="text-2xl font-bold text-[#003087]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             {metricas.tasaRetorno}%

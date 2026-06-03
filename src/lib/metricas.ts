@@ -1090,12 +1090,12 @@ export function computeMetricasFromConsultorias({
   // distribucionRetorno
   const distribucionRetorno = computeRetentionDistribution(consultorias)
 
-  // tasaRetorno: (total agendadas / total atendidas) × 100
+  // tasaRetorno: (total atendidas / total agendadas) × 100
   const totalAtendidasRetorno = consultorias.filter(c =>
     ['Resuelto', 'En seguimiento', 'Escalar'].includes(c.status ?? '')
   ).length
-  const tasaRetorno = totalAtendidasRetorno > 0
-    ? Math.round((consultorias.length / totalAtendidasRetorno) * 100)
+  const tasaRetorno = consultorias.length > 0
+    ? Math.round((totalAtendidasRetorno / consultorias.length) * 100)
     : 0
 
   // consultoriasSinRegistro: Resuelto sin registro_sesion vinculado
