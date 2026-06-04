@@ -142,6 +142,9 @@ REGLAS:
     })
     clearTimeout(timeoutId)
     if (!res.ok) {
+      if (res.status === 429) {
+        return NextResponse.json({ skipped: true, reason: 'rate_limit' })
+      }
       const txt = await res.text()
       return NextResponse.json({ error: `LLM error ${res.status}`, detail: txt }, { status: 502 })
     }

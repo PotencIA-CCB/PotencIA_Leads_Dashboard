@@ -100,6 +100,7 @@ export default function ConsultoresPage() {
   const [loading, setLoading] = useState(true)
   const [insights, setInsights] = useState<InsightItem[]>([])
   const [insightsLoading, setInsightsLoading] = useState(false)
+  const [insightsSkip, setInsightsSkip] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -135,6 +136,7 @@ export default function ConsultoresPage() {
   useEffect(() => {
     if (!selectedId) return
     setInsights([])
+    setInsightsSkip(null)
     setInsightsLoading(true)
     fetch('/api/consultor-insights', {
       method: 'POST',
@@ -142,8 +144,11 @@ export default function ConsultoresPage() {
       body: JSON.stringify({ consultorId: selectedId }),
     })
       .then(r => r.json())
-      .then(data => { if (Array.isArray(data.insights)) setInsights(data.insights) })
-      .catch(() => {})
+      .then(data => {
+        if (Array.isArray(data.insights)) setInsights(data.insights)
+        else if (data.skipped) setInsightsSkip(data.reason ?? 'unknown')
+      })
+      .catch(() => setInsightsSkip('error'))
       .finally(() => setInsightsLoading(false))
   }, [selectedId])
 
@@ -235,14 +240,18 @@ export default function ConsultoresPage() {
                 onClick={() => {
                   setInsights([])
                   setInsightsLoading(true)
+                  setInsightsSkip(null)
                   fetch('/api/consultor-insights', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ consultorId: selectedId, force: true }),
                   })
                     .then(r => r.json())
-                    .then(data => { if (Array.isArray(data.insights)) setInsights(data.insights) })
-                    .catch(() => {})
+                    .then(data => {
+                      if (Array.isArray(data.insights)) setInsights(data.insights)
+                      else if (data.skipped) setInsightsSkip(data.reason ?? 'unknown')
+                    })
+                    .catch(() => setInsightsSkip('error'))
                     .finally(() => setInsightsLoading(false))
                 }}
                 className="text-[11px] text-gray-400 hover:text-indigo-500 transition-colors cursor-pointer"
@@ -261,7 +270,15 @@ export default function ConsultoresPage() {
               ))}
             </div>
           ) : insights.length === 0 ? (
-            <p className="text-sm text-gray-400">Sin acciones registradas para generar insights</p>
+            <p className="text-sm text-gray-400">
+              {insightsSkip === 'rate_limit'
+                ? 'Límite diario de IA alcanzado. Los insights estarán disponibles mañana.'
+                : insightsSkip === 'no_acciones' || insightsSkip === 'no_data'
+                  ? 'Sin acciones registradas para generar insights.'
+                  : insightsSkip === 'error'
+                    ? 'Error al generar insights. Intentá más tarde.'
+                    : 'Sin acciones registradas para generar insights.'}
+            </p>
           ) : (
             <div className="flex flex-col gap-2.5">
               {insights.map((ins, i) => {
