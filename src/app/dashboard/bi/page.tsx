@@ -12,8 +12,8 @@ import { RetentionFunnel } from '@/components/metricas/RetentionFunnel'
 import { ConsultorRadar } from '@/components/metricas/ConsultorRadar'
 import { HeatmapDrilldown } from '@/components/metricas/HeatmapDrilldown'
 import InfoTooltip from '@/components/metricas/InfoTooltip'
-import WordCloud from '@/components/metricas/WordCloud'
-import { createClient } from '@/lib/supabase-browser'
+import ToolsCloud from '@/components/metricas/ToolsCloud'
+import type { ToolsStatus } from '@/components/metricas/ToolsCloud'
 import type { FunnelStats } from '@/lib/capturaStats'
 
 const emptyFunnelStats: FunnelStats = {
@@ -36,25 +36,27 @@ export default function BIPage() {
     franja: string
     consultoriaIds: string[]
   } | null>(null)
-  const [wordCloudSentences, setWordCloudSentences] = useState<string[]>([])
+  const [tools, setTools] = useState<{ label: string; count: number }[]>([])
+  const [toolsStatus, setToolsStatus] = useState<ToolsStatus>('loading')
 
-  // Fetch descripcion text from formularios_landing for the AI-filtered word cloud
+  // Fetch cached tools from GET /api/herramientas; fire-and-forget POST when cache is empty
   useEffect(() => {
-    async function cargarDescripciones() {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('formularios_landing')
-        .select('descripcion')
-        .not('descripcion', 'is', null)
-        .limit(200)
-      if (data) {
-        const sentences = (data as { descripcion: string | null }[])
-          .map((r) => r.descripcion)
-          .filter((d): d is string => d !== null)
-        setWordCloudSentences(sentences)
+    async function fetchTools() {
+      try {
+        const res = await fetch('/api/herramientas')
+        if (!res.ok) throw new Error('fetch failed')
+        const body = await res.json() as { herramientas: { label: string; count: number }[]; generated_at: string | null }
+        setTools(body.herramientas ?? [])
+        setToolsStatus('ready')
+        // Trigger threshold-gated generation if cache is empty (fire-and-forget)
+        if (!body.herramientas || body.herramientas.length === 0) {
+          fetch('/api/herramientas', { method: 'POST' }).catch(() => { /* non-blocking */ })
+        }
+      } catch {
+        setToolsStatus('error')
       }
     }
-    cargarDescripciones()
+    fetchTools()
   }, [])
 
   return (
@@ -290,20 +292,20 @@ export default function BIPage() {
             {/* Radar por consultor */}
             <ConsultorRadar metricas={metricas} />
 
-            {/* Word Cloud */}
+            {/* Herramientas más usadas */}
             <section className="bg-white rounded-[10px] border border-[#E5E7EB] shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100">
                 <h4
                   className="text-sm font-bold text-[#003087] uppercase tracking-widest"
                   style={{ fontFamily: 'Space Grotesk, sans-serif' }}
                 >
-                  ¿Qué quieren lograr?
+                  Herramientas más usadas
                 </h4>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Palabras más frecuentes en las solicitudes de consultoría
+                  Herramientas más utilizadas en las sesiones de consultoría
                 </p>
               </div>
-              <WordCloud sentences={wordCloudSentences} />
+              <ToolsCloud tools={tools} status={toolsStatus} />
             </section>
           </>
         )}
