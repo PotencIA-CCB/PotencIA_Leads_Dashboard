@@ -126,13 +126,12 @@ describe('ToolsCloud — populated state', () => {
     }
   })
 
-  it('each listitem includes the count visible in the markup (spec 4.1)', () => {
+  it('does NOT render the count as a visible number (no superscript element)', () => {
     const html = renderToStaticMarkup(
       React.createElement(ToolsCloud, { tools, status: 'ready' })
     )
-    for (const tool of tools) {
-      expect(html).toContain(String(tool.count))
-    }
+    // The count drives size/weight only; it must not be shown beside the word.
+    expect(html).not.toContain('<sup')
   })
 
   it('each listitem has aria-label containing label and count (spec 4.2)', () => {
