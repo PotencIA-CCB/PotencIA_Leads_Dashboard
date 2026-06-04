@@ -84,25 +84,16 @@ function EmptyState() {
   )
 }
 
-function HowToReadGuide() {
+function AxisLegend() {
   return (
-    <div className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2.5 mb-4">
-      <p className="text-[10px] sm:text-[11px] font-semibold text-[#003087] mb-1.5">
-        Cómo interpretar
-      </p>
-      <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-[10px] sm:text-[11px]">
-        {RADAR_LEGEND_ITEMS.map(({ axis, description }) => (
-          <React.Fragment key={axis}>
-            <dt className="font-semibold text-slate-700">{axis}</dt>
-            <dd className="text-slate-500">{description}</dd>
-          </React.Fragment>
-        ))}
-      </dl>
-      <div className="mt-2 pt-2 border-t border-slate-200 space-y-0.5">
-        <p className="text-[10px] text-slate-600 font-medium">{RADAR_READING_GUIDE}</p>
-        <p className="text-[10px] text-slate-400">{RADAR_FOOTNOTE}</p>
-      </div>
-    </div>
+    <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-[10px] sm:text-[11px]">
+      {RADAR_LEGEND_ITEMS.map(({ axis, description }) => (
+        <React.Fragment key={axis}>
+          <dt className="font-semibold text-slate-700">{axis}</dt>
+          <dd className="text-slate-500">{description}</dd>
+        </React.Fragment>
+      ))}
+    </dl>
   )
 }
 
@@ -148,7 +139,7 @@ function RadarTooltip({ active, payload, label }: RadarTooltipProps) {
     .sort((a, b) => b.value - a.value)
   const avgEntry = payload.find(p => p.name === TEAM_AVG_KEY)
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-md px-2 py-1.5 text-[11px] min-w-[140px]">
+    <div className="bg-white/95 backdrop-blur-sm border border-slate-200 rounded-lg shadow-lg px-2.5 py-2 text-[11px] min-w-[150px]">
       <p className="font-semibold text-slate-700 mb-1">{label}</p>
       {consultorEntries.map(p => (
         <div key={p.name} className="flex items-center gap-1.5 py-px">
@@ -165,49 +156,6 @@ function RadarTooltip({ active, payload, label }: RadarTooltipProps) {
           <span className="font-mono text-slate-500 shrink-0">{avgEntry.value}/100</span>
         </div>
       )}
-    </div>
-  )
-}
-
-function SideLegend({
-  consultores,
-  colors,
-  selected,
-  onSelect,
-}: {
-  consultores: Array<{ consultor: string }>
-  colors: string[]
-  selected: string | null
-  onSelect: (name: string) => void
-}) {
-  return (
-    <div className="flex flex-col gap-2 justify-center shrink-0 w-[160px]">
-      {consultores.map((c, i) => {
-        const color = colors[i % colors.length]
-        const dimmed = selected !== null && selected !== c.consultor
-        return (
-          <button
-            key={c.consultor}
-            type="button"
-            onClick={() => onSelect(c.consultor)}
-            className="flex items-start gap-1.5 text-left group cursor-pointer"
-          >
-            <span
-              className="mt-0.5 w-2.5 h-2.5 rounded-sm shrink-0 transition-opacity"
-              style={{ backgroundColor: color, opacity: dimmed ? 0.2 : 1 }}
-            />
-            <span
-              className={`text-[10px] leading-tight transition-colors ${
-                selected === c.consultor
-                  ? 'font-semibold text-slate-800'
-                  : 'text-slate-500 group-hover:text-slate-700'
-              }`}
-            >
-              {c.consultor}
-            </span>
-          </button>
-        )
-      })}
     </div>
   )
 }
@@ -232,7 +180,7 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
     return (
       <MetricaChartCard title="Perfil de consultores" className="mb-8">
         <EmptyState />
-        <HowToReadGuide />
+        <AxisLegend />
       </MetricaChartCard>
     )
   }
@@ -249,29 +197,68 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
     ? topConsultores
     : topConsultores.filter(c => c.consultor === selectedConsultor)
 
+  const handleSelect = (name: string) => {
+    setSelectedConsultor(prev => (prev === name ? null : name))
+  }
+
   return (
     <MetricaChartCard title="Perfil de consultores" className="mb-8">
-      <HowToReadGuide />
-      <div className="mb-3">
-        <button
-          type="button"
-          onClick={() => setSelectedConsultor(null)}
-          className={`px-3 py-1 rounded-lg text-xs border transition-colors cursor-pointer ${
-            isAllMode
-              ? 'bg-[#003087] text-white border-[#003087]'
-              : 'bg-white text-slate-600 border-slate-200 hover:border-[#003087]'
-          }`}
-        >
-          Todos
-        </button>
-      </div>
-      <div className="flex items-center gap-4">
-        <SideLegend
-          consultores={topConsultores}
-          colors={BAR_COLORS}
-          selected={selectedConsultor}
-          onSelect={(name) => setSelectedConsultor(prev => (prev === name ? null : name))}
-        />
+      <div className="flex flex-col sm:flex-row gap-5">
+        {/* LEFT COLUMN — Legend + Filters */}
+        <div className="shrink-0 w-full sm:w-[200px] space-y-4">
+          {/* Consultor filter buttons */}
+          <div>
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+              Filtrar por consultor
+            </p>
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                onClick={() => setSelectedConsultor(null)}
+                className={`px-2.5 py-0.5 rounded-md text-[11px] border transition-colors cursor-pointer ${
+                  isAllMode
+                    ? 'bg-[#003087] text-white border-[#003087]'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-[#003087] hover:text-[#003087]'
+                }`}
+              >
+                Todos
+              </button>
+              {topConsultores.map((c, i) => {
+                const color = BAR_COLORS[i % BAR_COLORS.length]
+                const active = selectedConsultor === c.consultor
+                return (
+                  <button
+                    key={c.consultor}
+                    type="button"
+                    onClick={() => handleSelect(c.consultor)}
+                    className="px-2.5 py-0.5 rounded-md text-[11px] border transition-colors cursor-pointer"
+                    style={{
+                      backgroundColor: active ? color : 'white',
+                      color: active ? 'white' : color,
+                      borderColor: color,
+                    }}
+                  >
+                    {c.consultor}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Axis descriptions */}
+          <div>
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+              Cómo interpretar
+            </p>
+            <AxisLegend />
+            <div className="mt-2 pt-2 border-t border-slate-100 space-y-0.5">
+              <p className="text-[10px] text-slate-600 font-medium">{RADAR_READING_GUIDE}</p>
+              <p className="text-[10px] text-slate-400">{RADAR_FOOTNOTE}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN — Radar polygon */}
         <div className="flex-1 min-w-0">
           <ResponsiveContainer width="100%" height={chartHeight}>
             <RadarChart data={radarData} margin={margin}>
@@ -293,33 +280,40 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
                 strokeWidth={1.5}
                 strokeDasharray="5 3"
                 fill="#94a3b8"
-                fillOpacity={isAllMode ? 0 : 0.1}
+                fillOpacity={isAllMode ? 0.05 : 0.1}
                 dot={false}
               />
               {visibleConsultores.map((c) => {
                 const colorIdx = topConsultores.findIndex(t => t.consultor === c.consultor)
                 const isSelected = selectedConsultor === c.consultor
+                const color = BAR_COLORS[colorIdx % BAR_COLORS.length]
                 return (
                   <Radar
                     key={c.consultor}
                     name={c.consultor}
                     dataKey={c.consultor}
-                    stroke={BAR_COLORS[colorIdx % BAR_COLORS.length]}
+                    stroke={color}
                     strokeWidth={isSelected ? 2.5 : 1.5}
-                    fill={BAR_COLORS[colorIdx % BAR_COLORS.length]}
+                    fill={color}
                     fillOpacity={isSelected ? 0.2 : 0}
                     dot={false}
                   />
                 )
               })}
-              <Tooltip content={<RadarTooltip />} />
+              <Tooltip
+                content={<RadarTooltip />}
+                position={{ x: 0, y: 0 }}
+                wrapperStyle={{ transform: 'translate(0, 0)', zIndex: 50 }}
+              />
             </RadarChart>
           </ResponsiveContainer>
-          {!isAllMode && (
-            <p className="text-[10px] text-slate-400 text-center mt-1">
-              — — Línea gris punteada = promedio del equipo
-            </p>
-          )}
+          <div className="text-[10px] text-center mt-1">
+            {!isAllMode && (
+              <p className="text-slate-400">
+                — — Línea gris punteada = promedio del equipo
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </MetricaChartCard>
