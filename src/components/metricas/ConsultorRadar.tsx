@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import {
   RadarChart,
   Radar,
@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { type MetricasGlobales } from '@/lib/metricas'
+import { radarFillOpacity } from '@/lib/dashboardTransforms'
 import { MetricaChartCard } from './MetricaChartCard'
 import { useWindowWidth } from '@/hooks/useWindowWidth'
 
@@ -61,6 +62,7 @@ function RadarLegend() {
 }
 
 export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
+  const [selectedConsultor, setSelectedConsultor] = useState<string | null>(null)
   const w = useWindowWidth()
   const isMobile = w < 640
   const isTablet = w >= 640 && w < 1024
@@ -115,6 +117,35 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
 
   return (
     <MetricaChartCard title="Perfil de consultores" className="mb-8">
+      {/* Consultor selector */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        <button
+          type="button"
+          onClick={() => setSelectedConsultor(null)}
+          className={`px-3 py-1 rounded-lg text-xs border transition-colors ${
+            selectedConsultor === null
+              ? 'bg-[#003087] text-white border-[#003087]'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-[#003087]'
+          }`}
+        >
+          Todos
+        </button>
+        {topConsultores.map((c, i) => (
+          <button
+            key={c.consultor}
+            type="button"
+            onClick={() => setSelectedConsultor(c.consultor)}
+            className="px-3 py-1 rounded-lg text-xs border transition-colors"
+            style={
+              selectedConsultor === c.consultor
+                ? { backgroundColor: BAR_COLORS[i % BAR_COLORS.length], color: 'white', borderColor: BAR_COLORS[i % BAR_COLORS.length] }
+                : { borderColor: BAR_COLORS[i % BAR_COLORS.length], color: BAR_COLORS[i % BAR_COLORS.length] }
+            }
+          >
+            {c.consultor}
+          </button>
+        ))}
+      </div>
       <ResponsiveContainer width="100%" height={chartHeight}>
         <RadarChart data={radarData} margin={margin}>
           <PolarGrid />
@@ -127,7 +158,7 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
               dataKey={c.consultor}
               stroke={BAR_COLORS[i % BAR_COLORS.length]}
               fill={BAR_COLORS[i % BAR_COLORS.length]}
-              fillOpacity={0.15}
+              fillOpacity={radarFillOpacity(c.consultor, selectedConsultor)}
             />
           ))}
           <Legend wrapperStyle={{ fontSize: legendFontSize }} />

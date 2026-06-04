@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
-import { Consultor, Consultoria, Lead, leadFullName } from '@/types'
+import { Consultor, Consultoria, Lead, leadFullName, FormularioLanding } from '@/types'
+import { buildPorTema } from '@/lib/dashboardTransforms'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts'
@@ -33,6 +34,7 @@ export default function ConsultoresPage() {
   const [consultores, setConsultores] = useState<Consultor[]>([])
   const [consultorias, setConsultorias] = useState<Consultoria[]>([])
   const [leads, setLeads] = useState<Lead[]>([])
+  const [formularios, setFormularios] = useState<Pick<FormularioLanding, 'id_lead' | 'tema'>[]>([])
   const [selectedId, setSelectedId] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
@@ -45,9 +47,10 @@ export default function ConsultoresPage() {
       if (me.rol !== 'admin') { router.replace('/dashboard'); return }
 
       const supabase = createClient()
-      const [{ data: cons }, { data: lds }] = await Promise.all([
+      const [{ data: cons }, { data: lds }, { data: forms }] = await Promise.all([
         supabase.from('consultores').select('*'),
         supabase.from('leads').select('*'),
+        supabase.from('formularios_landing').select('id_lead, tema'),
       ])
       if (cancelled) return
       if (cons) {
@@ -55,6 +58,7 @@ export default function ConsultoresPage() {
         setSelectedId(cons[0]?.id || '')
       }
       if (lds) setLeads(lds as Lead[])
+      if (forms) setFormularios(forms as Pick<FormularioLanding, 'id_lead' | 'tema'>[])
 
       // Fetch todas las consultorias (no es ideal para escala pero funciona para equipos chicos)
       const { data: consor } = await supabase.from('consultorias').select('*')
@@ -70,16 +74,9 @@ export default function ConsultoresPage() {
   // KPIs
   const total = conConsultor.length
   const resueltos = conConsultor.filter((c) => c.status === 'Resuelto').length
-  const cancelados = conConsultor.filter((c) => c.status === 'Cancelado').length
-  const tasaCancelacion = total > 0 ? Math.round((cancelados / total) * 100) : 0
-  const tasaConversion = total > 0 ? Math.round((resueltos / total) * 100) : 0
 
   // Servicios trabajados
-  const servicioMap: Record<string, number> = {}
-  conConsultor.forEach((c) => {
-    if (c.servicio) servicioMap[c.servicio] = (servicioMap[c.servicio] || 0) + 1
-  })
-  const porServicio = Object.entries(servicioMap).map(([servicio, total]) => ({ servicio, total }))
+  const porServicio = buildPorTema(conConsultor, formularios)
 
   // Por estado
   const estadoMap: Record<string, number> = {}
@@ -117,11 +114,9 @@ export default function ConsultoresPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <KPICard label="Consultorías" value={total} />
         <KPICard label="Resueltos" value={resueltos} />
-        <KPICard label="Tasa de conversión" value={`${tasaConversion}%`} />
-        <KPICard label="Tasa de cancelación" value={`${tasaCancelacion}%`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">

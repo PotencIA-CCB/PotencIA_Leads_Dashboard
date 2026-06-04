@@ -190,7 +190,7 @@ export default function BIPage() {
           {biLoading ? (
             <SkeletonStatCards />
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <StatCard
                 label="Total Empresas Registradas"
                 value={biStats?.totalEmpresasRegistradas ?? 0}
@@ -203,33 +203,17 @@ export default function BIPage() {
                 label="Empresas con NITs válidos"
                 value={biStats?.empresasNitsValidos ?? 0}
                 accent="text-[#003087]"
-                helpText="NITs únicos donde el campo renovado tiene un valor (no es nulo ni vacío)"
+                helpText="NITs únicos con estado Renovado, No renovado o Proponentes. Excluye Sin dato."
                 icon="verified"
-                subtitle="NITs únicos con estado de renovación"
+                subtitle="NITs con estado de renovación válido"
               />
               <StatCard
-                label="Empresas renovadas"
+                label="Empresas Renovadas"
                 value={biStats?.empresasRenovadas ?? 0}
                 accent="text-[#003087]"
                 helpText="NITs únicos donde renovado = 'Renovado'"
                 icon="autorenew"
                 subtitle="Empresas con renovación activa"
-              />
-              <StatCard
-                label="Empresas Registradas"
-                value={biStats?.empresasRegistradas ?? 0}
-                accent="text-[#003087]"
-                helpText="Leads con nombre de empresa registrado"
-                icon="apartment"
-                subtitle="Leads con empresa registrada"
-              />
-              <StatCard
-                label="Empresas Registradas y Renovadas"
-                value={biStats?.empresasRenovadas ?? 0}
-                accent="text-[#003087]"
-                helpText="Empresas validadas en RUES con renovación activa en 2026"
-                icon="autorenew"
-                subtitle="Renovación activa en 2026"
               />
             </div>
           )}
@@ -341,8 +325,8 @@ function SkeletonKPIGrid({ count }: { count: number }) {
 
 function SkeletonStatCards() {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-      {Array.from({ length: 5 }).map((_, i) => (
+    <div className="grid grid-cols-3 gap-4">
+      {Array.from({ length: 3 }).map((_, i) => (
         <div
           key={i}
           className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] px-5 py-4 animate-pulse"

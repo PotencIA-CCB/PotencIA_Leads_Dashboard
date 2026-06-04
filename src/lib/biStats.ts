@@ -56,10 +56,12 @@ export function countTotalEmpresasRegistradas(leads: Pick<BiLeadRow, 'nit'>[]): 
   return seen.size
 }
 
+const VALID_RENOVADO_STATES = new Set(['Renovado', 'No renovado', 'Proponentes'])
+
 export function countEmpresasNitsValidos(leads: Pick<BiLeadRow, 'nit' | 'renovado'>[]): number {
   const seen = new Set<string>()
   for (const lead of leads) {
-    if (lead.nit !== null && lead.nit !== '' && lead.renovado != null && lead.renovado !== '') {
+    if (lead.nit !== null && lead.nit !== '' && VALID_RENOVADO_STATES.has(lead.renovado ?? '')) {
       seen.add(lead.nit)
     }
   }

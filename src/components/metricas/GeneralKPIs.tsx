@@ -13,6 +13,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { type MetricasGlobales, type ConsultoriaForMetricas, type Granularidad, groupByPeriod, canonicalStatus } from '@/lib/metricas'
+import { computeBrecha } from '@/lib/dashboardTransforms'
 import { MetricaChartCard } from './MetricaChartCard'
 import { PeriodGranularitySelector } from './PeriodGranularitySelector'
 import InfoTooltip from './InfoTooltip'
@@ -82,6 +83,15 @@ function ChartTooltip({ active, payload, label, novedadesMap }: ChartTooltipProp
           <span className="font-semibold">{p.value}</span>
         </p>
       ))}
+      {payload.length >= 2 && (() => {
+        const agendadas = payload.find(p => p.dataKey === 'agendadas')?.value ?? 0
+        const resuelto = payload.find(p => p.dataKey === 'resuelto')?.value ?? 0
+        return (
+          <p className="text-slate-600 mt-0.5">
+            Brecha: <span className="font-semibold">{computeBrecha(agendadas, resuelto)}</span>
+          </p>
+        )
+      })()}
       {novs.length > 0 && (
         <div className="mt-2 border-t border-slate-100 pt-2 space-y-2">
           <p className="text-[10px] text-[#E8470A] font-semibold uppercase tracking-wide">
@@ -156,7 +166,13 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
   }, [novedades, showNovedades, period, keyToLabel, range])
 
   return (
-    <MetricaChartCard title="Sesiones en el tiempo" className="mb-8">
+    <MetricaChartCard
+      title="Sesiones en el tiempo"
+      className="mb-8"
+      titleAdornment={
+        <InfoTooltip helpText="Agendadas = sesiones programadas. Resueltas = con resultado registrado. La brecha = pendientes de resolver." />
+      }
+    >
       {/* KPI summary row */}
       <div className="flex flex-wrap gap-4 sm:gap-6 mb-5">
         <div>
