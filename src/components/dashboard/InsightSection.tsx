@@ -194,14 +194,18 @@ export default function InsightSection({
         setInsights({
           insights: data
             .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'insight')
-            .map((r: { tipo: string; valor_texto: string }) => r.valor_texto),
+            .map((r: { tipo: string; valor_texto: string }) => r.valor_texto)
+            .slice(0, 3),
           recomendaciones: data
             .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'recomendacion')
-            .map((r: { tipo: string; valor_texto: string }) => r.valor_texto),
+            .map((r: { tipo: string; valor_texto: string }) => r.valor_texto)
+            .slice(0, 3),
           alertas: data
             .filter((r: { tipo: string; valor_texto: string }) => r.tipo === 'alerta')
-            .map((r: { tipo: string; valor_texto: string }) => r.valor_texto),
+            .map((r: { tipo: string; valor_texto: string }) => r.valor_texto)
+            .slice(0, 3),
         })
+        setInsightsError(null)
       }
     } catch {
       /* fallback failed — already showing error from POST */

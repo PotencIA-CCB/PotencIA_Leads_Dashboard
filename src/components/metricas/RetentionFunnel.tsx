@@ -102,7 +102,10 @@ export function RetentionFunnel({ metricas }: RetentionFunnelProps) {
 
         {/* Retention bar chart */}
         <div>
-          <p className="text-[11px] text-slate-400 font-medium mb-2 uppercase tracking-wide">Distribución de visitas por lead</p>
+          <div className="flex items-center gap-1.5 mb-2">
+            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Distribución de visitas por lead</p>
+            <InfoTooltip helpText="Cantidad de leads agrupados por número de visitas (sesiones) que han tenido. Cada barra muestra cuántos leads registran 1, 2, 3 o 4+ consultorías. Fuente: consultorias.id_lead (DISTINCT count por lead)." />
+          </div>
           {metricas.distribucionRetorno.every(d => d.leads === 0) ? (
             <div className="flex items-center justify-center h-[220px]">
               <p className="text-sm text-slate-400">Sin datos disponibles.</p>

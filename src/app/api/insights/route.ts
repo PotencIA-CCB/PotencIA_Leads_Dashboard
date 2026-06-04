@@ -23,10 +23,21 @@ export async function GET() {
     .from('insights')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(50)
+    .limit(1)
 
-  if (error) return NextResponse.json(null)
-  return NextResponse.json(data ?? [])
+  if (error || !data || data.length === 0) return NextResponse.json([])
+
+  const latest = data[0] as { periodo_inicio: string; periodo_fin: string }
+
+  const { data: batch, error: batchError } = await supabase
+    .from('insights')
+    .select('*')
+    .eq('periodo_inicio', latest.periodo_inicio)
+    .eq('periodo_fin', latest.periodo_fin)
+    .order('id', { ascending: true })
+
+  if (batchError) return NextResponse.json(null)
+  return NextResponse.json(batch ?? [])
 }
 
 /**
