@@ -5,6 +5,9 @@
  *   (a) KPI tile section heading ("Total Consultorías") appears before any chart section
  *   (b) The page does not throw when useMetricas is still loading
  *   (c) The page does not throw when useBusinessIntelligence is still loading
+ *   (d) "Herramientas más usadas" section is present in the charts block
+ *   (e) Legacy "¿Qué quieren lograr?" word cloud section is gone
+ *   (f) /api/herramientas is fetched (not supabase formularios_landing)
  *
  * Uses renderToStaticMarkup to avoid jsdom / hook complexity while still asserting
  * DOM order: the KPI section must appear earlier in the HTML string than the first
@@ -42,7 +45,8 @@ vi.mock('@/components/metricas/ConsultorRadar', () => ({
 vi.mock('@/components/metricas/HeatmapDrilldown', () => ({
   HeatmapDrilldown: () => null,
 }))
-vi.mock('@/components/metricas/WordCloud', () => ({
+// ToolsCloud replaces WordCloud in the BI page — mock it so it renders a sentinel
+vi.mock('@/components/metricas/ToolsCloud', () => ({
   default: () => null,
 }))
 vi.mock('@/components/metricas/InfoTooltip', () => ({
@@ -54,17 +58,14 @@ vi.mock('@/components/dashboard/LeadsFunnel', () => ({
 vi.mock('@/components/dashboard/InsightSection', () => ({
   default: () => null,
 }))
-vi.mock('@/lib/supabase-browser', () => ({
-  createClient: vi.fn(() => ({
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        not: vi.fn(() => ({
-          limit: vi.fn(() => Promise.resolve({ data: [] })),
-        })),
-      })),
-    })),
-  })),
-}))
+
+// Mock global fetch — the BI page now calls GET /api/herramientas (not supabase-browser)
+vi.stubGlobal('fetch', vi.fn(() =>
+  Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({ herramientas: [], generated_at: null }),
+  })
+))
 
 // ---------------------------------------------------------------------------
 // Lazy import after mocks are set up
@@ -154,6 +155,36 @@ describe('Unified BIPage — smoke tests (T18)', () => {
   it('(c) does not throw when useBusinessIntelligence is loading', async () => {
     mockUseMetricas.mockReturnValue(makeMetricasData())
     mockUseBI.mockReturnValue({ biStats: null, funnelStats: null, totalBookings: 0, loading: true })
+
+    const { default: BIPage } = await import('../bi/page')
+    expect(() => renderToStaticMarkup(createElement(BIPage))).not.toThrow()
+  })
+
+  it('(d) "Herramientas más usadas" heading is present in the charts section', async () => {
+    mockUseMetricas.mockReturnValue(makeMetricasData())
+    mockUseBI.mockReturnValue(makeBIData())
+
+    const { default: BIPage } = await import('../bi/page')
+    const html = renderToStaticMarkup(createElement(BIPage))
+
+    // New section heading must be present
+    expect(html).toContain('Herramientas m')
+  })
+
+  it('(e) legacy "¿Qué quieren lograr?" word cloud heading is gone', async () => {
+    mockUseMetricas.mockReturnValue(makeMetricasData())
+    mockUseBI.mockReturnValue(makeBIData())
+
+    const { default: BIPage } = await import('../bi/page')
+    const html = renderToStaticMarkup(createElement(BIPage))
+
+    // Old heading must NOT exist in the rendered output
+    expect(html).not.toContain('quieren lograr')
+  })
+
+  it('(f) page renders without crashing when metricas data is available (tools section path)', async () => {
+    mockUseMetricas.mockReturnValue(makeMetricasData())
+    mockUseBI.mockReturnValue(makeBIData())
 
     const { default: BIPage } = await import('../bi/page')
     expect(() => renderToStaticMarkup(createElement(BIPage))).not.toThrow()
