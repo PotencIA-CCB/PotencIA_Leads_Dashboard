@@ -27,31 +27,31 @@ interface CardData {
 
 const CARD_SIZES = {
   0: {
-    wrap: 'px-5 sm:px-7 py-4 sm:py-6 gap-3 sm:gap-5',
-    icon: 'w-[48px] h-[48px] sm:w-[56px] sm:h-[56px]',
-    iconText: 'text-[22px] sm:text-[26px]',
-    num: 'text-[32px] sm:text-[40px] md:text-[48px]',
-    label: 'text-[12px] sm:text-[14px] md:text-[16px]',
-    sub: 'text-[10px] sm:text-[11px] md:text-[12px]',
-    radius: 'rounded-[18px]',
-  },
-  1: {
-    wrap: 'px-4 sm:px-5 py-3.5 sm:py-4 gap-3 sm:gap-4',
-    icon: 'w-[40px] h-[40px] sm:w-[46px] sm:h-[46px]',
-    iconText: 'text-[18px] sm:text-[21px]',
+    wrap: 'px-4 sm:px-5 py-3 sm:py-4 gap-3 sm:gap-4',
+    icon: 'w-[38px] h-[38px] sm:w-[44px] sm:h-[44px]',
+    iconText: 'text-[17px] sm:text-[20px]',
     num: 'text-[24px] sm:text-[30px] md:text-[36px]',
     label: 'text-[11px] sm:text-[12px] md:text-[14px]',
     sub: 'text-[9px] sm:text-[10px] md:text-[11px]',
-    radius: 'rounded-[14px]',
+    radius: 'rounded-[16px]',
   },
-  2: {
-    wrap: 'px-3 sm:px-4 py-3 sm:py-3.5 gap-2.5 sm:gap-3',
-    icon: 'w-[34px] h-[34px] sm:w-[38px] sm:h-[38px]',
-    iconText: 'text-[15px] sm:text-[17px]',
-    num: 'text-[20px] sm:text-[24px] md:text-[28px]',
-    label: 'text-[10px] sm:text-[11px] md:text-[13px]',
+  1: {
+    wrap: 'px-3 sm:px-4 py-2.5 sm:py-3 gap-2.5 sm:gap-3',
+    icon: 'w-[32px] h-[32px] sm:w-[36px] sm:h-[36px]',
+    iconText: 'text-[14px] sm:text-[16px]',
+    num: 'text-[19px] sm:text-[24px] md:text-[28px]',
+    label: 'text-[10px] sm:text-[11px] md:text-[12px]',
     sub: 'text-[8px] sm:text-[9px] md:text-[10px]',
     radius: 'rounded-[12px]',
+  },
+  2: {
+    wrap: 'px-3 sm:px-3 py-2 sm:py-2.5 gap-2 sm:gap-2.5',
+    icon: 'w-[26px] h-[26px] sm:w-[30px] sm:h-[30px]',
+    iconText: 'text-[11px] sm:text-[13px]',
+    num: 'text-[15px] sm:text-[19px] md:text-[22px]',
+    label: 'text-[9px] sm:text-[10px] md:text-[11px]',
+    sub: 'text-[7px] sm:text-[8px] md:text-[9px]',
+    radius: 'rounded-[10px]',
   },
 } as const
 
@@ -133,7 +133,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
   const landingPct = pct(landingNeverBooked, totalLandingLeads)
 
   return (
-    <div className="space-y-16">
+    <div className="space-y-10 sm:space-y-16">
       {/* ==================== TREE 1 — Landing ==================== */}
       <div className="flex flex-col items-center">
         {/* Root */}

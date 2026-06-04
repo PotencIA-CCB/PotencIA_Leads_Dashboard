@@ -157,87 +157,51 @@ body {
 }
 
 /* ------------------------------------------------------------------ */
-/* Mobile: vertical cascade (< 640px)                                 */
+/* Mobile: indented list (< 640px)                                    */
 /* ------------------------------------------------------------------ */
 @media (max-width: 639px) {
-  .funnel-stem {
+  /* Hide all connector pseudo-elements — replaced by border-left on containers */
+  .funnel-stem,
+  .funnel-branch::before,
+  .funnel-branch::after,
+  .funnel-branch-right::before,
+  .funnel-branch-right::after,
+  .funnel-child::before,
+  .funnel-child::after {
     display: none;
   }
 
-  /* Shared column layout */
+  /* Column layout */
   .funnel-branch,
   .funnel-branch-right {
     flex-direction: column;
     padding-top: 0;
   }
 
-  /* Level 2 branch */
+  /* Level 2 — indent + dark left accent */
   .funnel-branch {
-    padding-left: 16px;
-    gap: 10px;
-    margin-top: 6px;
-  }
-
-  /* Level 3 branch — lighter color + extra indent to show depth */
-  .funnel-branch-right {
-    padding-left: 14px;
     gap: 8px;
-    margin-top: 10px;
-    margin-left: 6px;
+    margin-top: 8px;
+    padding-left: 12px;
+    border-left: 3px solid #64748b;
+    border-radius: 0 0 0 4px;
   }
 
-  /* Left border — darker for level 2 */
-  .funnel-branch::before {
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: auto;
-    width: 2px;
-    height: unset;
-    background: #64748b;
+  /* Level 3 — deeper indent + lighter accent */
+  .funnel-branch-right {
+    gap: 6px;
+    margin-top: 8px;
+    margin-left: 2px;
+    padding-left: 10px;
+    border-left: 3px solid #94a3b8;
+    border-radius: 0 0 0 4px;
   }
 
-  /* Left border — lighter for level 3, visually conveys depth */
-  .funnel-branch-right::before {
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: auto;
-    width: 2px;
-    height: unset;
-    background: #94a3b8;
-  }
-
-  /* Hide T-junction and endpoint dots on mobile */
-  .funnel-branch::after,
-  .funnel-branch-right::after,
-  .funnel-child::after {
-    display: none;
-  }
-
+  /* Children fill full width */
   .funnel-child {
     align-items: stretch;
-  }
-
-  /*
-   * Horizontal tick — fixed offset from top instead of 50%.
-   * top: 50% broke when funnel-child contained card + nested branch-right,
-   * placing the tick in the middle of the subtree instead of on the card.
-   * 1.75rem ≈ center of a mobile level-1 card (py-3.5 + content ~28px).
-   */
-  .funnel-child::before {
-    top: 1.75rem;
-    left: -16px;
-    transform: none;
-    width: 12px;
-    height: 2px;
-    background: #64748b;
-  }
-
-  /* Level 3 ticks match the lighter border */
-  .funnel-branch-right .funnel-child::before {
-    left: -14px;
-    background: #94a3b8;
+    flex: none;
+    width: 100%;
   }
 }
 
