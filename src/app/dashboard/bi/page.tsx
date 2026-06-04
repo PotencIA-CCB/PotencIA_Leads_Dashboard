@@ -283,10 +283,10 @@ export default function BIPage() {
                   className="text-sm font-bold text-[#003087] uppercase tracking-widest"
                   style={{ fontFamily: 'Space Grotesk, sans-serif' }}
                 >
-                  Herramientas más usadas
+                  Herramientas IA más usadas
                 </h4>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Herramientas más utilizadas en las sesiones de consultoría
+                  Herramientas IA más utilizadas en las sesiones de consultoría
                 </p>
               </div>
               <ToolsCloud tools={tools} status={toolsStatus} />

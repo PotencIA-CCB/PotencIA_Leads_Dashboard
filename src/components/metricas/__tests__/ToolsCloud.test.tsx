@@ -8,8 +8,12 @@
  *      empty/loading/error states.
  *
  * Spec refs: Requirement 4, scenarios 4.1–4.4.
- * Design ref: Section 5 — scaleWeight formula: fontSize = 13 + ratio * 17 (13..30px),
- *   fontWeight 500..700, ratio = count / maxCount.
+ * Design ref: Section 5 — scaleWeight formula (redesigned word-cloud):
+ *   fontSize = 14 + ratio * 42 (14px min → 56px max),
+ *   fontWeight 500..800, ratio = count / maxCount.
+ *
+ * UI polish (post-merge, branch feat/herramientas-ia-cloud-ui):
+ *   scaleWeight range widened for true word-cloud dominance hierarchy.
  */
 import { describe, it, expect } from 'vitest'
 import React from 'react'
@@ -17,24 +21,24 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import ToolsCloud, { scaleWeight } from '../ToolsCloud'
 
 // ---------------------------------------------------------------------------
-// scaleWeight — pure math helper
+// scaleWeight — pure math helper (new range: 14..56px, fontWeight 500..800)
 // ---------------------------------------------------------------------------
 
 describe('scaleWeight — pure math helper', () => {
-  it('returns minimum fontSize 13 when count === 0 or ratio is 0', () => {
+  it('returns minimum fontSize 14 when count === 0 or ratio is 0', () => {
     const result = scaleWeight(0, 10)
-    expect(result.fontSize).toBe(13)
+    expect(result.fontSize).toBe(14)
   })
 
-  it('returns maximum fontSize 30 when count === maxCount (ratio = 1)', () => {
+  it('returns maximum fontSize 56 when count === maxCount (ratio = 1)', () => {
     const result = scaleWeight(10, 10)
-    expect(result.fontSize).toBe(30)
+    expect(result.fontSize).toBe(56)
   })
 
-  it('returns mid-range fontSize ~21.5 when count is exactly half of maxCount', () => {
+  it('returns mid-range fontSize ~35 when count is exactly half of maxCount', () => {
     const result = scaleWeight(5, 10)
-    // ratio = 0.5 → 13 + 0.5 * 17 = 21.5
-    expect(result.fontSize).toBeCloseTo(21.5, 1)
+    // ratio = 0.5 → 14 + 0.5 * 42 = 35
+    expect(result.fontSize).toBeCloseTo(35, 1)
   })
 
   it('returns fontWeight 500 at minimum ratio (count = 0)', () => {
@@ -42,27 +46,27 @@ describe('scaleWeight — pure math helper', () => {
     expect(result.fontWeight).toBe(500)
   })
 
-  it('returns fontWeight 700 at maximum ratio (count = maxCount)', () => {
+  it('returns fontWeight 800 at maximum ratio (count = maxCount)', () => {
     const result = scaleWeight(10, 10)
-    expect(result.fontWeight).toBe(700)
+    expect(result.fontWeight).toBe(800)
   })
 
-  it('returns fontWeight between 500 and 700 for intermediate counts', () => {
+  it('returns fontWeight between 500 and 800 for intermediate counts', () => {
     const result = scaleWeight(5, 10)
     expect(result.fontWeight).toBeGreaterThanOrEqual(500)
-    expect(result.fontWeight).toBeLessThanOrEqual(700)
+    expect(result.fontWeight).toBeLessThanOrEqual(800)
   })
 
-  it('clamps fontSize to minimum 13 even if count is negative (defensive)', () => {
+  it('clamps fontSize to minimum 14 even if count is negative (defensive)', () => {
     // ratio for negative count: treat as 0
     const result = scaleWeight(0, 10)
-    expect(result.fontSize).toBeGreaterThanOrEqual(13)
+    expect(result.fontSize).toBeGreaterThanOrEqual(14)
   })
 
-  it('clamps fontSize to maximum 30 even at ratio > 1 (defensive: count > maxCount)', () => {
+  it('clamps fontSize to maximum 56 even at ratio > 1 (defensive: count > maxCount)', () => {
     // If somehow count > maxCount, ratio > 1 — design clamps at max
     const result = scaleWeight(15, 10)
-    expect(result.fontSize).toBeLessThanOrEqual(30)
+    expect(result.fontSize).toBeLessThanOrEqual(56)
   })
 
   it('fontWeight is always an integer (no fractional font-weight)', () => {
@@ -75,7 +79,7 @@ describe('scaleWeight — pure math helper', () => {
   it('handles maxCount = 0 safely (returns minimum without dividing by zero)', () => {
     expect(() => scaleWeight(0, 0)).not.toThrow()
     const result = scaleWeight(0, 0)
-    expect(result.fontSize).toBe(13)
+    expect(result.fontSize).toBe(14)
   })
 })
 
@@ -122,7 +126,7 @@ describe('ToolsCloud — populated state', () => {
     }
   })
 
-  it('each listitem includes the count (spec 4.1 — count visible as inline data)', () => {
+  it('each listitem includes the count visible in the markup (spec 4.1)', () => {
     const html = renderToStaticMarkup(
       React.createElement(ToolsCloud, { tools, status: 'ready' })
     )
@@ -160,10 +164,19 @@ describe('ToolsCloud — populated state', () => {
     expect(maxSize).toBeGreaterThan(minSize)
   })
 
-  it('top-count tool has fontSize close to 30px (max per design)', () => {
+  it('top-count tool has fontSize close to 56px (max per new word-cloud design)', () => {
     const topWeight = scaleWeight(9, 9)
-    // At max (9/9 = 1.0): 13 + 1 * 17 = 30
-    expect(topWeight.fontSize).toBeCloseTo(30, 0)
+    // At max (9/9 = 1.0): 14 + 1 * 42 = 56
+    expect(topWeight.fontSize).toBeCloseTo(56, 0)
+  })
+
+  it('word cloud renders colored text without pill borders (word-cloud redesign)', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ToolsCloud, { tools, status: 'ready' })
+    )
+    // Words should be plain text — no rounded-full pill border class on listitem spans
+    // The pill design used "rounded-full border px-3 py-1" on the outer span
+    expect(html).not.toContain('rounded-full border px-3')
   })
 })
 
@@ -246,10 +259,10 @@ describe('ToolsCloud — triangulation edge cases', () => {
     )
     expect(html).toContain('role="listitem"')
     expect(html).toContain('Notion')
-    // Single tool: maxCount = 5, count = 5 → ratio = 1 → fontSize 30
+    // Single tool: maxCount = 5, count = 5 → ratio = 1 → fontSize 56
     const fontSizeMatch = html.match(/font-size:\s*([\d.]+)px/)
     expect(fontSizeMatch).not.toBeNull()
-    expect(parseFloat(fontSizeMatch![1])).toBeCloseTo(30, 0)
+    expect(parseFloat(fontSizeMatch![1])).toBeCloseTo(56, 0)
   })
 
   it('all tools with count = 1 render at identical fontSize (no ranking needed)', () => {
@@ -262,7 +275,7 @@ describe('ToolsCloud — triangulation edge cases', () => {
     )
     const fontSizeMatches = [...html.matchAll(/font-size:\s*([\d.]+)px/g)]
     const sizes = fontSizeMatches.map((m) => parseFloat(m[1]))
-    // All equal — all at max (count/maxCount = 1/1 = 1 → 30px)
+    // All equal — all at max (count/maxCount = 1/1 = 1 → 56px)
     expect(sizes.every((s) => s === sizes[0])).toBe(true)
   })
 })
