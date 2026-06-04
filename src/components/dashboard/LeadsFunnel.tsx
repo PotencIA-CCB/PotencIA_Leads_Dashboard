@@ -11,51 +11,7 @@ interface LeadsFunnelProps {
 }
 
 // ---------------------------------------------------------------------------
-// Tree connector — SVG lines between parent and children
-// ---------------------------------------------------------------------------
-
-function BranchSVG({ children }: { children?: number }) {
-  const count = children ?? 2
-  if (count === 2) {
-    return (
-      <svg
-        className="w-full h-10 sm:h-12 overflow-visible"
-        viewBox="0 0 200 48"
-        preserveAspectRatio="none"
-      >
-        <line x1="100" y1="0" x2="100" y2="18" stroke="#cbd5e1" strokeWidth="1" />
-        <line x1="46" y1="18" x2="154" y2="18" stroke="#cbd5e1" strokeWidth="1" />
-        <line x1="50" y1="18" x2="50" y2="48" stroke="#cbd5e1" strokeWidth="1" />
-        <line x1="150" y1="18" x2="150" y2="48" stroke="#cbd5e1" strokeWidth="1" />
-      </svg>
-    )
-  }
-  // fallback — simple vertical drop
-  return (
-    <svg className="w-full h-8 overflow-visible" viewBox="0 0 200 32" preserveAspectRatio="none">
-      <line x1="100" y1="0" x2="100" y2="32" stroke="#cbd5e1" strokeWidth="1" />
-    </svg>
-  )
-}
-
-/** Narrower branch offset to the right (used for level-2 → level-3 under "sí agendaron") */
-function BranchSVGRight() {
-  return (
-    <svg
-      className="w-full h-10 sm:h-12 overflow-visible"
-      viewBox="0 0 200 48"
-      preserveAspectRatio="none"
-    >
-      <line x1="150" y1="0" x2="150" y2="18" stroke="#cbd5e1" strokeWidth="1" />
-      <line x1="70" y1="18" x2="190" y2="18" stroke="#cbd5e1" strokeWidth="1" />
-      <line x1="80" y1="18" x2="80" y2="48" stroke="#cbd5e1" strokeWidth="1" />
-      <line x1="180" y1="18" x2="180" y2="48" stroke="#cbd5e1" strokeWidth="1" />
-    </svg>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// FunnelCard — unified card styling
+// FunnelCard
 // ---------------------------------------------------------------------------
 
 interface CardData {
@@ -66,12 +22,11 @@ interface CardData {
   colorClass: string
   iconBg: string
   iconAccent: string
-  wide?: boolean
 }
 
-function FunnelCard({ value, label, sub, icon, colorClass, iconBg, iconAccent, wide }: CardData) {
+function FunnelCard({ value, label, sub, icon, colorClass, iconBg, iconAccent }: CardData) {
   return (
-    <div className={`bg-white rounded-[18px] shadow-[0_4px_16px_rgba(15,23,42,0.06)] flex items-center gap-4 px-5 sm:px-6 py-4 sm:py-5 border border-slate-100/60 ${wide ? '' : 'max-w-[440px]'} w-full`}>
+    <div className="bg-white rounded-[18px] shadow-[0_4px_16px_rgba(15,23,42,0.06)] flex items-center gap-4 px-5 sm:px-6 py-4 sm:py-5 border border-slate-100/60 w-full">
       <div className={`w-[48px] h-[48px] sm:w-[52px] sm:h-[52px] rounded-[14px] flex items-center justify-center shrink-0 ${iconBg}`}>
         <span className={`material-symbols-outlined text-[22px] sm:text-[24px] ${iconAccent}`}>
           {icon}
@@ -91,7 +46,7 @@ function FunnelCard({ value, label, sub, icon, colorClass, iconBg, iconAccent, w
 }
 
 // ---------------------------------------------------------------------------
-// Summary table row
+// SummaryRow
 // ---------------------------------------------------------------------------
 
 function SummaryRow({
@@ -148,9 +103,9 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
   return (
     <div className="space-y-16">
       {/* ==================== TREE 1 — Landing ==================== */}
-      <div>
+      <div className="flex flex-col items-center">
         {/* Root */}
-        <div className="flex justify-center">
+        <div className="w-full max-w-[600px]">
           <FunnelCard
             value={totalLandingLeads}
             label="se registraron en landing"
@@ -158,65 +113,73 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
             colorClass="text-[#1d72f3]"
             iconBg="bg-blue-50"
             iconAccent="text-[#1d72f3]"
-            wide
           />
         </div>
 
-        <BranchSVG />
+        <div className="funnel-stem" />
 
         {/* Level 2 */}
-        <div className="flex flex-col sm:flex-row justify-center items-center gap-6 sm:gap-10">
-          <FunnelCard
-            value={landingNeverBooked}
-            label="nunca agendaron"
-            sub="→ leads perdidos"
-            icon="calendar_today"
-            colorClass="text-[#1d72f3]"
-            iconBg="bg-blue-50"
-            iconAccent="text-[#1d72f3]"
-          />
-          <FunnelCard
-            value={landingBooked}
-            label="sí agendaron"
-            icon="event_available"
-            colorClass="text-[#1d72f3]"
-            iconBg="bg-blue-50"
-            iconAccent="text-[#1d72f3]"
-          />
+        <div className="funnel-branch w-full max-w-[940px]">
+          <div className="funnel-child px-2">
+            <FunnelCard
+              value={landingNeverBooked}
+              label="nunca agendaron"
+              sub="→ leads perdidos"
+              icon="calendar_today"
+              colorClass="text-[#1d72f3]"
+              iconBg="bg-blue-50"
+              iconAccent="text-[#1d72f3]"
+            />
+          </div>
+          <div className="funnel-child px-2">
+            <FunnelCard
+              value={landingBooked}
+              label="sí agendaron"
+              icon="event_available"
+              colorClass="text-[#1d72f3]"
+              iconBg="bg-blue-50"
+              iconAccent="text-[#1d72f3]"
+            />
+
+            {landingBooked > 0 && (
+              <>
+                <div className="funnel-stem" />
+
+                {/* Level 3 */}
+                <div className="funnel-branch-right w-full">
+                  <div className="funnel-child px-1.5">
+                    <FunnelCard
+                      value={noShows}
+                      label="agendaron pero no asistieron"
+                      sub="→ no-shows"
+                      icon="person_off"
+                      colorClass="text-[#ef4444]"
+                      iconBg="bg-red-50"
+                      iconAccent="text-[#ef4444]"
+                    />
+                  </div>
+                  <div className="funnel-child px-1.5">
+                    <FunnelCard
+                      value={cicloCompleto}
+                      label="completaron todo el ciclo"
+                      sub="(landing → booking → sesión)"
+                      icon="check_circle"
+                      colorClass="text-[#22c55e]"
+                      iconBg="bg-emerald-50"
+                      iconAccent="text-[#22c55e]"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
-
-        {landingBooked > 0 && (
-          <>
-            <BranchSVGRight />
-
-            {/* Level 3 */}
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-6 sm:gap-10 sm:pl-[200px]">
-              <FunnelCard
-                value={noShows}
-                label="agendaron pero no asistieron"
-                sub="→ no-shows"
-                icon="person_off"
-                colorClass="text-[#ef4444]"
-                iconBg="bg-red-50"
-                iconAccent="text-[#ef4444]"
-              />
-              <FunnelCard
-                value={cicloCompleto}
-                label="completaron todo el ciclo"
-                sub="(landing → booking → sesión)"
-                icon="check_circle"
-                colorClass="text-[#22c55e]"
-                iconBg="bg-emerald-50"
-                iconAccent="text-[#22c55e]"
-              />
-            </div>
-          </>
-        )}
       </div>
 
       {/* ==================== TREE 2 — Bookings ==================== */}
-      <div>
-        <div className="flex justify-center">
+      <div className="flex flex-col items-center">
+        {/* Root */}
+        <div className="w-full max-w-[600px]">
           <FunnelCard
             value={totalBookings}
             label="bookings totales"
@@ -224,31 +187,35 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
             colorClass="text-[#7c5ce0]"
             iconBg="bg-violet-50"
             iconAccent="text-[#7c5ce0]"
-            wide
           />
         </div>
 
-        <BranchSVG />
+        <div className="funnel-stem" />
 
-        <div className="flex flex-col sm:flex-row justify-center items-center gap-6 sm:gap-10">
-          <FunnelCard
-            value={soloBookedNoSession}
-            label="solo agendaron"
-            sub="(sin landing, sin asistencia)"
-            icon="event_busy"
-            colorClass="text-[#f59e0b]"
-            iconBg="bg-amber-50"
-            iconAccent="text-[#f59e0b]"
-          />
-          <FunnelCard
-            value={bookedNoLandingDirecto}
-            label="agendaron y asistieron sin landing"
-            sub="→ canal directo"
-            icon="group"
-            colorClass="text-[#7c5ce0]"
-            iconBg="bg-violet-50"
-            iconAccent="text-[#7c5ce0]"
-          />
+        {/* Level 2 */}
+        <div className="funnel-branch w-full max-w-[940px]">
+          <div className="funnel-child px-2">
+            <FunnelCard
+              value={soloBookedNoSession}
+              label="solo agendaron"
+              sub="(sin landing, sin asistencia)"
+              icon="event_busy"
+              colorClass="text-[#f59e0b]"
+              iconBg="bg-amber-50"
+              iconAccent="text-[#f59e0b]"
+            />
+          </div>
+          <div className="funnel-child px-2">
+            <FunnelCard
+              value={bookedNoLandingDirecto}
+              label="agendaron y asistieron sin landing"
+              sub="→ canal directo"
+              icon="group"
+              colorClass="text-[#7c5ce0]"
+              iconBg="bg-violet-50"
+              iconAccent="text-[#7c5ce0]"
+            />
+          </div>
         </div>
       </div>
 
