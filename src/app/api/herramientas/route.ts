@@ -1,9 +1,9 @@
 // Required env vars:
 // NEXT_PUBLIC_SUPABASE_URL   — Supabase project URL
 // SUPABASE_SERVICE_ROLE_KEY  — Supabase service role key (bypasses RLS)
-// OPENCODE_API_KEY           — API key for Opencode Go (used by generateToolsUsage)
-// OPENCODE_API_BASE_URL      — Base URL for Opencode Go API
-// OPENCODE_MODEL             — Model ID to use
+// OPENROUTER_API_KEY         — OpenRouter API key (used by generateToolsUsage)
+// OPENROUTER_API_URL         — OpenRouter base URL (https://openrouter.ai/api/v1)
+// OPENROUTER_MODEL           — Model ID to use
 // HERRAMIENTAS_MIN_NEW_RECORDS — Min new registro_sesion records before regenerating (default: 20)
 
 import { NextRequest, NextResponse } from 'next/server'

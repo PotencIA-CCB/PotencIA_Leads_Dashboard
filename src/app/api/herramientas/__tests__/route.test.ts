@@ -61,16 +61,16 @@ import { generateToolsUsage } from '@/lib/tools-extraction'
 function setEnv() {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key'
-  process.env.OPENCODE_API_KEY = 'test-opencode-key'
-  process.env.OPENCODE_API_BASE_URL = 'https://api.test.com'
-  process.env.OPENCODE_MODEL = 'test-model'
+  process.env.OPENROUTER_API_KEY = 'test-openrouter-key'
+  process.env.OPENROUTER_API_URL = 'https://openrouter.ai/api/v1'
+  process.env.OPENROUTER_MODEL = 'test-model'
   process.env.HERRAMIENTAS_MIN_NEW_RECORDS = '20'
 }
 
 function clearEnv() {
-  delete process.env.OPENCODE_API_KEY
-  delete process.env.OPENCODE_API_BASE_URL
-  delete process.env.OPENCODE_MODEL
+  delete process.env.OPENROUTER_API_KEY
+  delete process.env.OPENROUTER_API_URL
+  delete process.env.OPENROUTER_MODEL
   delete process.env.HERRAMIENTAS_MIN_NEW_RECORDS
 }
 
@@ -231,7 +231,7 @@ describe('POST /api/herramientas — threshold-gated generation', () => {
     clearEnv()
   })
 
-  it('P1: config_missing when OPENCODE env vars absent → 200 skipped=true reason=config_missing', async () => {
+  it('P1: config_missing when OPENROUTER env vars absent → 200 skipped=true reason=config_missing', async () => {
     clearEnv()
     // Restore Supabase vars only
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
@@ -240,7 +240,7 @@ describe('POST /api/herramientas — threshold-gated generation', () => {
     vi.mocked(generateToolsUsage).mockResolvedValue({
       skipped: true,
       reason: 'config_missing',
-      details: { missing: ['OPENCODE_API_KEY', 'OPENCODE_API_BASE_URL', 'OPENCODE_MODEL'] },
+      details: { missing: ['OPENROUTER_API_KEY', 'OPENROUTER_API_URL', 'OPENROUTER_MODEL'] },
     })
 
     const res = await POST(makePostRequest() as never)
