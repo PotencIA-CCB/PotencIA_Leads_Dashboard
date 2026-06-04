@@ -181,7 +181,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
                 <div className="funnel-stem" />
 
                 {/* Level 3 */}
-                <div className="funnel-branch-right w-full flex-col sm:flex-row">
+                <div className="funnel-branch-right w-full flex-col lg:flex-row">
                   <div className="funnel-child px-1.5">
                     <FunnelCard
                       value={noShows}

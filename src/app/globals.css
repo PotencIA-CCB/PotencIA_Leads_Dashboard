@@ -136,24 +136,53 @@ body {
 
 /* ------------------------------------------------------------------ */
 /* Tablet: tighten stem spacing (640px–1023px)                        */
+/* funnel-branch (level 2) stays horizontal; funnel-branch-right      */
+/* (level 3) stays column until lg: (1024px) — too cramped otherwise  */
 /* ------------------------------------------------------------------ */
 @media (min-width: 640px) and (max-width: 1023px) {
   .funnel-stem {
     height: 28px;
   }
 
-  .funnel-branch,
-  .funnel-branch-right {
+  .funnel-branch {
     padding-top: 28px;
   }
 
-  .funnel-child::before {
+  .funnel-branch > .funnel-child::before {
     top: -28px;
     height: 28px;
   }
 
-  .funnel-child::after {
+  .funnel-branch > .funnel-child::after {
     top: -28px;
+  }
+
+  /* Level 3: column layout at tablet — mirrors mobile pattern */
+  .funnel-branch-right {
+    flex-direction: column;
+    padding-top: 0;
+    gap: 6px;
+    margin-top: 8px;
+    margin-left: 2px;
+    padding-left: 10px;
+    border-left: 3px solid #94a3b8;
+    border-radius: 0 0 0 4px;
+  }
+
+  .funnel-branch-right::before,
+  .funnel-branch-right::after {
+    display: none;
+  }
+
+  .funnel-branch-right > .funnel-child {
+    align-items: stretch;
+    flex: none;
+    width: 100%;
+  }
+
+  .funnel-branch-right > .funnel-child::before,
+  .funnel-branch-right > .funnel-child::after {
+    display: none;
   }
 }
 
