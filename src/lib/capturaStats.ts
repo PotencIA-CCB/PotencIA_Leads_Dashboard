@@ -90,17 +90,11 @@ export function computeFunnelStats(
     if (leadId) sesionSet.add(leadId)
   }
 
-  // No-shows: landing leads with a consultoria row status === 'No asistió'
-  const noShowLeadSet = new Set<string>()
-  for (const c of consultoriasData) {
-    if (c.status === 'No asistió' && landingSet.has(c.id_lead)) {
-      noShowLeadSet.add(c.id_lead)
-    }
-  }
-
+  // Compute per-lead classification
   let totalLandingLeads = 0
   let landingNeverBooked = 0
   let landingBooked = 0
+  let noShows = 0
   let cicloCompleto = 0
   let bookedNoLandingDirecto = 0
   let soloBookedNoSession = 0
@@ -113,6 +107,7 @@ export function computeFunnelStats(
     if (L) totalLandingLeads++
     if (L && !C) landingNeverBooked++
     if (L && C) landingBooked++
+    if (L && C && !S) noShows++
     if (L && C && S) cicloCompleto++
     if (C && S && !L) bookedNoLandingDirecto++
     if (C && !S && !L) soloBookedNoSession++
@@ -128,8 +123,6 @@ export function computeFunnelStats(
       asistieronSinLandingNiBooking++
     }
   }
-
-  const noShows = noShowLeadSet.size
 
   return {
     totalLandingLeads,

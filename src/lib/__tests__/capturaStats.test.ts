@@ -149,17 +149,20 @@ describe('computeFunnelStats', () => {
     expect(result.landingBooked).toBe(result.totalLandingLeads - result.landingNeverBooked)
   })
 
-  // T-F04: noShows = consultorias with status === 'No asistió' (case-sensitive, landing-scoped)
-  it('T-F04: noShows counts only status === "No asistió" (case-sensitive)', () => {
+  // T-F04: noShows = landing leads with consultoria but NO registro_sesion
+  it('T-F04: noShows counts leads with landing+consultoria but no registro_sesion', () => {
     const leads = [fLead('l1'), fLead('l2'), fLead('l3')]
     const formularios = [fFormulario('l1'), fFormulario('l2'), fFormulario('l3')]
     const consultorias = [
-      fConsultoria('c1', 'l1', 'No asistió'),   // should count
-      fConsultoria('c2', 'l2', 'no asistió'),   // lowercase — should NOT count
-      fConsultoria('c3', 'l3', 'Agendado'),     // different status
+      fConsultoria('c1', 'l1'), // has session → ciclo completo
+      fConsultoria('c2', 'l2'), // no session → noShow
+      // l3: landing only, no consultoria → landingNeverBooked
     ]
-    const result = computeFunnelStats(leads, formularios, consultorias, [])
-    expect(result.noShows).toBe(1)
+    const sesiones = [fSesion('c1')]
+    const result = computeFunnelStats(leads, formularios, consultorias, sesiones)
+    expect(result.noShows).toBe(1) // l2: landing + consultoria, no sesion
+    expect(result.cicloCompleto).toBe(1) // l1
+    expect(result.landingBooked).toBe(2) // l1 + l2 = noShows + cicloCompleto
   })
 
   // T-F05: cicloCompleto = landing ∩ consultorias ∩ sesiones
