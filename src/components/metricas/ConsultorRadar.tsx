@@ -70,8 +70,8 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
   const margin = isMobile
     ? { top: 8, right: 8, left: 8, bottom: 8 }
     : isTablet
-      ? { top: 12, right: 20, left: 20, bottom: 12 }
-      : { top: 16, right: 32, left: 32, bottom: 16 }
+      ? { top: 12, right: 20, left: 140, bottom: 12 }
+      : { top: 16, right: 32, left: 160, bottom: 16 }
   const tickFontSize = isMobile ? 9 : isTablet ? 10 : 11
   const legendFontSize = isMobile ? 9 : 11
   const chartHeight = isMobile ? 280 : 320
@@ -122,7 +122,7 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
         <button
           type="button"
           onClick={() => setSelectedConsultor(null)}
-          className={`px-3 py-1 rounded-lg text-xs border transition-colors ${
+          className={`px-3 py-1 rounded-lg text-xs border transition-colors cursor-pointer ${
             selectedConsultor === null
               ? 'bg-[#003087] text-white border-[#003087]'
               : 'bg-white text-slate-600 border-slate-200 hover:border-[#003087]'
@@ -135,7 +135,7 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
             key={c.consultor}
             type="button"
             onClick={() => setSelectedConsultor(c.consultor)}
-            className="px-3 py-1 rounded-lg text-xs border transition-colors"
+            className="px-3 py-1 rounded-lg text-xs border transition-colors cursor-pointer"
             style={
               selectedConsultor === c.consultor
                 ? { backgroundColor: BAR_COLORS[i % BAR_COLORS.length], color: 'white', borderColor: BAR_COLORS[i % BAR_COLORS.length] }
@@ -161,7 +161,23 @@ export function ConsultorRadar({ metricas }: ConsultorRadarProps) {
               fillOpacity={radarFillOpacity(c.consultor, selectedConsultor)}
             />
           ))}
-          <Legend wrapperStyle={{ fontSize: legendFontSize }} />
+          {isMobile ? (
+            <Legend
+              layout="horizontal"
+              align="center"
+              verticalAlign="bottom"
+              iconSize={10}
+              wrapperStyle={{ fontSize: legendFontSize }}
+            />
+          ) : (
+            <Legend
+              layout="vertical"
+              align="left"
+              verticalAlign="middle"
+              iconSize={10}
+              wrapperStyle={{ fontSize: legendFontSize }}
+            />
+          )}
           <Tooltip formatter={(value) => [`${value ?? 0}`, 'Score (normalizado)']} />
         </RadarChart>
       </ResponsiveContainer>

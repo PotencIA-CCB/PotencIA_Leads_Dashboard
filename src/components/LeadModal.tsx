@@ -79,7 +79,7 @@ export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalPr
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-4 animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-4 animate-fade-in cursor-pointer"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -137,7 +137,7 @@ export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalPr
             {con && (
               <Field label="Estado">
                 <select
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 focus-visible:ring-2 focus-visible:ring-[#00C8FF]/40 transition-colors"
+                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 focus-visible:ring-2 focus-visible:ring-[#00C8FF]/40 transition-colors cursor-pointer"
                   value={con.status}
                   onChange={(e) => { onStatusChange(lead.id, con.id, e.target.value as ConsultoriaStatus); showSaved() }}
                 >
