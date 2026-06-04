@@ -133,7 +133,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
   const landingPct = pct(landingNeverBooked, totalLandingLeads)
 
   return (
-    <div className="space-y-10 sm:space-y-16">
+    <div className="space-y-10 sm:space-y-16 w-full overflow-x-hidden">
       {/* ==================== TREE 1 — Landing ==================== */}
       <div className="flex flex-col items-center">
         {/* Root */}
@@ -152,7 +152,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
         <div className="funnel-stem" />
 
         {/* Level 2 */}
-        <div className="funnel-branch w-full max-w-[940px] flex-col sm:flex-row">
+        <div className="funnel-branch w-full max-w-full flex-col sm:flex-row">
           <div className="funnel-child px-2">
             <FunnelCard
               value={landingNeverBooked}
@@ -231,7 +231,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
         <div className="funnel-stem" />
 
         {/* Level 2 */}
-        <div className="funnel-branch w-full max-w-[940px] flex-col sm:flex-row">
+        <div className="funnel-branch w-full max-w-full flex-col sm:flex-row">
           <div className="funnel-child px-2">
             <FunnelCard
               value={soloBookedNoSession}
