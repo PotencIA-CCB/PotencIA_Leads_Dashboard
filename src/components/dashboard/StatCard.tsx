@@ -18,7 +18,7 @@ export function StatCard({
   subtitle?: string
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] px-5 py-4 flex flex-col">
+    <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm px-5 py-4 flex flex-col">
       {/* Top row: label + InfoTooltip (left) | accent icon square (right) */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5">

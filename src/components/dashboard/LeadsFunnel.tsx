@@ -22,24 +22,56 @@ interface CardData {
   colorClass: string
   iconBg: string
   iconAccent: string
+  level?: 0 | 1 | 2
 }
 
-function FunnelCard({ value, label, sub, icon, colorClass, iconBg, iconAccent }: CardData) {
+const CARD_SIZES = {
+  0: {
+    wrap: 'px-5 sm:px-7 py-4 sm:py-6 gap-3 sm:gap-5',
+    icon: 'w-[48px] h-[48px] sm:w-[56px] sm:h-[56px]',
+    iconText: 'text-[22px] sm:text-[26px]',
+    num: 'text-[32px] sm:text-[40px] md:text-[48px]',
+    label: 'text-[12px] sm:text-[14px] md:text-[16px]',
+    sub: 'text-[10px] sm:text-[11px] md:text-[12px]',
+    radius: 'rounded-[18px]',
+  },
+  1: {
+    wrap: 'px-4 sm:px-5 py-3.5 sm:py-4 gap-3 sm:gap-4',
+    icon: 'w-[40px] h-[40px] sm:w-[46px] sm:h-[46px]',
+    iconText: 'text-[18px] sm:text-[21px]',
+    num: 'text-[24px] sm:text-[30px] md:text-[36px]',
+    label: 'text-[11px] sm:text-[12px] md:text-[14px]',
+    sub: 'text-[9px] sm:text-[10px] md:text-[11px]',
+    radius: 'rounded-[14px]',
+  },
+  2: {
+    wrap: 'px-3 sm:px-4 py-3 sm:py-3.5 gap-2.5 sm:gap-3',
+    icon: 'w-[34px] h-[34px] sm:w-[38px] sm:h-[38px]',
+    iconText: 'text-[15px] sm:text-[17px]',
+    num: 'text-[20px] sm:text-[24px] md:text-[28px]',
+    label: 'text-[10px] sm:text-[11px] md:text-[13px]',
+    sub: 'text-[8px] sm:text-[9px] md:text-[10px]',
+    radius: 'rounded-[12px]',
+  },
+} as const
+
+function FunnelCard({ value, label, sub, icon, colorClass, iconBg, iconAccent, level = 1 }: CardData) {
+  const s = CARD_SIZES[level]
   return (
-    <div className="bg-white rounded-[18px] shadow-[0_4px_16px_rgba(15,23,42,0.06)] flex items-center gap-4 px-5 sm:px-6 py-4 sm:py-5 border border-slate-100/60 w-full">
-      <div className={`w-[48px] h-[48px] sm:w-[52px] sm:h-[52px] rounded-[14px] flex items-center justify-center shrink-0 ${iconBg}`}>
-        <span className={`material-symbols-outlined text-[22px] sm:text-[24px] ${iconAccent}`}>
+    <div className={`bg-white ${s.radius} shadow-[0_4px_16px_rgba(15,23,42,0.06)] flex items-center ${s.wrap} border border-slate-100/60 w-full`}>
+      <div className={`${s.icon} rounded-[12px] flex items-center justify-center shrink-0 ${iconBg}`}>
+        <span className={`material-symbols-outlined ${s.iconText} ${iconAccent}`}>
           {icon}
         </span>
       </div>
       <div className="shrink-0">
-        <span className={`text-[28px] sm:text-[34px] md:text-[40px] leading-none font-bold ${colorClass}`} style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+        <span className={`${s.num} leading-none font-bold ${colorClass}`} style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
           {value}
         </span>
       </div>
       <div className="min-w-0">
-        <p className="text-[11px] sm:text-[13px] md:text-[15px] font-semibold text-slate-800 leading-snug">{label}</p>
-        {sub && <p className="text-[9px] sm:text-[10px] md:text-[11px] text-slate-400 mt-0.5">{sub}</p>}
+        <p className={`${s.label} font-semibold text-slate-800 leading-snug`}>{label}</p>
+        {sub && <p className={`${s.sub} text-slate-400 mt-0.5`}>{sub}</p>}
       </div>
     </div>
   )
@@ -113,6 +145,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
             colorClass="text-[#1d72f3]"
             iconBg="bg-blue-50"
             iconAccent="text-[#1d72f3]"
+            level={0}
           />
         </div>
 
@@ -129,6 +162,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
               colorClass="text-[#1d72f3]"
               iconBg="bg-blue-50"
               iconAccent="text-[#1d72f3]"
+              level={1}
             />
           </div>
           <div className="funnel-child px-2">
@@ -139,6 +173,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
               colorClass="text-[#1d72f3]"
               iconBg="bg-blue-50"
               iconAccent="text-[#1d72f3]"
+              level={1}
             />
 
             {landingBooked > 0 && (
@@ -156,6 +191,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
                       colorClass="text-[#ef4444]"
                       iconBg="bg-red-50"
                       iconAccent="text-[#ef4444]"
+                      level={2}
                     />
                   </div>
                   <div className="funnel-child px-1.5">
@@ -167,6 +203,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
                       colorClass="text-[#22c55e]"
                       iconBg="bg-emerald-50"
                       iconAccent="text-[#22c55e]"
+                      level={2}
                     />
                   </div>
                 </div>
@@ -187,6 +224,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
             colorClass="text-[#7c5ce0]"
             iconBg="bg-violet-50"
             iconAccent="text-[#7c5ce0]"
+            level={0}
           />
         </div>
 
@@ -203,6 +241,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
               colorClass="text-[#f59e0b]"
               iconBg="bg-amber-50"
               iconAccent="text-[#f59e0b]"
+              level={1}
             />
           </div>
           <div className="funnel-child px-2">
@@ -214,6 +253,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
               colorClass="text-[#7c5ce0]"
               iconBg="bg-violet-50"
               iconAccent="text-[#7c5ce0]"
+              level={1}
             />
           </div>
         </div>

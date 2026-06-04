@@ -11,14 +11,6 @@ import {
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6']
 
-const statusColors: Record<string, string> = {
-  Pendiente: 'bg-yellow-100 text-yellow-800',
-  Agendado: 'bg-blue-100 text-blue-800',
-  'En seguimiento': 'bg-purple-100 text-purple-800',
-  Resuelto: 'bg-green-100 text-green-800',
-  Cancelado: 'bg-red-100 text-red-800',
-}
-
 // Tool extraction from acciones_realizadas
 const TOOL_KEYWORDS: { tool: string; category: string; keywords: string[] }[] = [
   { tool: 'ChatGPT', category: 'Asistentes IA', keywords: ['chatgpt', 'chat gpt', 'gpt-4', 'gpt4', 'openai'] },
@@ -66,8 +58,23 @@ function getTopCategory(toolStats: { tool: string; count: number }[]): { categor
   return top ? { category: top[0], count: top[1] } : null
 }
 
+
 function calcLeftWidth(labels: string[]): number {
   return Math.min(130, Math.max(60, ...labels.map(l => l.length * 6.5)))
+}
+
+interface InsightItem {
+  titulo: string
+  detalle: string
+  tipo: string
+}
+
+const INSIGHT_STYLE: Record<string, { bg: string; border: string; title: string; icon: string }> = {
+  caso_uso:    { bg: 'bg-violet-50',  border: 'border-violet-100', title: 'text-violet-800', icon: '🎯' },
+  sector:      { bg: 'bg-blue-50',    border: 'border-blue-100',   title: 'text-blue-800',   icon: '🏢' },
+  herramienta: { bg: 'bg-amber-50',   border: 'border-amber-100',  title: 'text-amber-800',  icon: '🛠️' },
+  efectividad: { bg: 'bg-emerald-50', border: 'border-emerald-100',title: 'text-emerald-800',icon: '✅' },
+  patron:      { bg: 'bg-rose-50',    border: 'border-rose-100',   title: 'text-rose-800',   icon: '💡' },
 }
 
 function KPICard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -91,6 +98,8 @@ export default function ConsultoresPage() {
   const [registroSesiones, setRegistroSesiones] = useState<SesionRow[]>([])
   const [selectedId, setSelectedId] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [insights, setInsights] = useState<InsightItem[]>([])
+  const [insightsLoading, setInsightsLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -123,6 +132,21 @@ export default function ConsultoresPage() {
     return () => { cancelled = true }
   }, [router])
 
+  useEffect(() => {
+    if (!selectedId) return
+    setInsights([])
+    setInsightsLoading(true)
+    fetch('/api/consultor-insights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ consultorId: selectedId }),
+    })
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data.insights)) setInsights(data.insights) })
+      .catch(() => {})
+      .finally(() => setInsightsLoading(false))
+  }, [selectedId])
+
   const conConsultor = consultorias.filter((c) => c.id_consultor === selectedId)
   const consultoriaIds = new Set(conConsultor.map(c => c.id))
   const sesionesConsultor = registroSesiones.filter(rs => consultoriaIds.has(rs.id_consultoria))
@@ -135,13 +159,6 @@ export default function ConsultoresPage() {
 
   // Servicios trabajados
   const porServicio = buildPorTema(conConsultor, formularios)
-
-  // Por estado
-  const estadoMap: Record<string, number> = {}
-  conConsultor.forEach((c) => {
-    estadoMap[c.status] = (estadoMap[c.status] || 0) + 1
-  })
-  const porEstado = Object.entries(estadoMap).map(([status, count]) => ({ status, total: count }))
 
   // Herramientas IA
   const toolStats = buildToolStats(sesionesConsultor.map(rs => rs.acciones_realizadas))
@@ -208,19 +225,57 @@ export default function ConsultoresPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">Distribución por estado</h2>
-          {porEstado.length === 0 ? (
-            <p className="text-sm text-gray-400">Sin datos</p>
-          ) : (
-            <div className="flex flex-col gap-2 mt-2">
-              {porEstado.map((e) => (
-                <div key={e.status} className="flex items-center justify-between">
-                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[e.status] || 'bg-gray-100 text-gray-600'}`}>
-                    {e.status}
-                  </span>
-                  <span className="text-sm font-semibold text-gray-700">{e.total}</span>
-                </div>
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-sm font-semibold text-gray-700">Perfil del consultor</h2>
+            {insightsLoading && (
+              <span className="text-[11px] text-indigo-500 animate-pulse">Generando…</span>
+            )}
+            {!insightsLoading && insights.length > 0 && (
+              <button
+                onClick={() => {
+                  setInsights([])
+                  setInsightsLoading(true)
+                  fetch('/api/consultor-insights', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ consultorId: selectedId, force: true }),
+                  })
+                    .then(r => r.json())
+                    .then(data => { if (Array.isArray(data.insights)) setInsights(data.insights) })
+                    .catch(() => {})
+                    .finally(() => setInsightsLoading(false))
+                }}
+                className="text-[11px] text-gray-400 hover:text-indigo-500 transition-colors cursor-pointer"
+                title="Regenerar insights"
+              >
+                ↻ actualizar
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-gray-400 mb-3">Generado por IA · basado en acciones de cada sesión</p>
+
+          {insightsLoading ? (
+            <div className="flex flex-col gap-2.5">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-[60px] rounded-xl bg-gray-100 animate-pulse" />
               ))}
+            </div>
+          ) : insights.length === 0 ? (
+            <p className="text-sm text-gray-400">Sin acciones registradas para generar insights</p>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {insights.map((ins, i) => {
+                const s = INSIGHT_STYLE[ins.tipo] ?? INSIGHT_STYLE.patron
+                return (
+                  <div key={i} className={`flex items-start gap-3 p-3.5 rounded-xl border ${s.bg} ${s.border}`}>
+                    <span className="text-base leading-none mt-0.5 shrink-0">{s.icon}</span>
+                    <div className="min-w-0">
+                      <p className={`text-sm font-semibold ${s.title} leading-snug`}>{ins.titulo}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{ins.detalle}</p>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

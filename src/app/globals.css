@@ -58,26 +58,46 @@ body {
 /* ------------------------------------------------------------------ */
 
 .funnel-stem {
-  width: 1px;
-  height: 24px;
-  background: #cbd5e1;
+  width: 2px;
+  height: 40px;
+  background: #64748b;
   margin: 0 auto;
+  flex-shrink: 0;
 }
 
-.funnel-branch {
+.funnel-branch,
+.funnel-branch-right {
   display: flex;
   position: relative;
-  padding-top: 24px;
+  padding-top: 40px;
 }
 
-.funnel-branch::before {
-  content: "";
+/* Horizontal connector line */
+.funnel-branch::before,
+.funnel-branch-right::before {
+  content: '';
   position: absolute;
   top: 0;
-  height: 1px;
-  background: #cbd5e1;
+  height: 2px;
+  background: #64748b;
   left: 25%;
   right: 25%;
+}
+
+/* T-junction hollow dot where stem meets horizontal line */
+.funnel-branch::after,
+.funnel-branch-right::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid #64748b;
+  z-index: 1;
 }
 
 .funnel-child {
@@ -88,52 +108,101 @@ body {
   position: relative;
 }
 
+/* Vertical line from horizontal branch down to each child card */
 .funnel-child::before {
-  content: "";
+  content: '';
   position: absolute;
-  top: -24px;
+  top: -40px;
   left: 50%;
   transform: translateX(-50%);
-  width: 1px;
-  height: 24px;
-  background: #cbd5e1;
+  width: 2px;
+  height: 40px;
+  background: #64748b;
 }
 
-.funnel-branch-right {
-  display: flex;
-  position: relative;
-  padding-top: 24px;
-}
-
-.funnel-branch-right::before {
-  content: "";
+/* Endpoint filled dot at top of each vertical line */
+.funnel-child::after {
+  content: '';
   position: absolute;
-  top: 0;
-  height: 1px;
-  background: #cbd5e1;
-  left: 25%;
-  right: 25%;
+  top: -40px;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64748b;
 }
 
-.funnel-branch-right .funnel-child::before {
-  top: -24px;
-  height: 24px;
-}
-
-@media (max-width: 639px) {
-  .funnel-stem,
-  .funnel-branch::before,
-  .funnel-child::before,
-  .funnel-branch-right::before {
-    display: none;
+/* ------------------------------------------------------------------ */
+/* Tablet: tighten stem spacing (640px–1023px)                        */
+/* ------------------------------------------------------------------ */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .funnel-stem {
+    height: 28px;
   }
+
   .funnel-branch,
   .funnel-branch-right {
-    padding-top: 0;
+    padding-top: 28px;
   }
+
+  .funnel-child::before {
+    top: -28px;
+    height: 28px;
+  }
+
+  .funnel-child::after {
+    top: -28px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Mobile: vertical cascade (< 640px)                                 */
+/* ------------------------------------------------------------------ */
+@media (max-width: 639px) {
+  .funnel-stem {
+    display: none;
+  }
+
+  .funnel-branch,
+  .funnel-branch-right {
+    flex-direction: column;
+    padding-top: 0;
+    padding-left: 20px;
+    gap: 8px;
+  }
+
+  /* Repurpose as full-height left border line */
+  .funnel-branch::before,
+  .funnel-branch-right::before {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: auto;
+    width: 2px;
+    height: unset;
+    background: #64748b;
+  }
+
+  /* Hide T-junction and endpoint dots on mobile */
+  .funnel-branch::after,
+  .funnel-branch-right::after,
+  .funnel-child::after {
+    display: none;
+  }
+
   .funnel-child {
-    border-left: 2px solid #e2e8f0;
-    padding-left: 1rem;
+    align-items: stretch;
+  }
+
+  /* Repurpose as horizontal tick from left border to card */
+  .funnel-child::before {
+    top: 50%;
+    left: -20px;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 2px;
+    background: #64748b;
   }
 }
 
