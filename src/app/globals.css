@@ -33,6 +33,7 @@ body {
   line-height: 1.6;
   color: #1E2A3A;
   background: #F4F6FA;
+  overflow-x: hidden;
 }
 
 @keyframes fade-in {
