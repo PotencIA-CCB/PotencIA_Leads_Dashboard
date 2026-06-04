@@ -45,7 +45,7 @@ const CARD_SIZES = {
     radius: 'rounded-[12px]',
   },
   2: {
-    wrap: 'px-3 sm:px-3 py-2 sm:py-2.5 gap-2 sm:gap-2.5',
+    wrap: 'px-3 py-2 sm:py-2.5 gap-2 sm:gap-2.5',
     icon: 'w-[26px] h-[26px] sm:w-[30px] sm:h-[30px]',
     iconText: 'text-[11px] sm:text-[13px]',
     num: 'text-[15px] sm:text-[19px] md:text-[22px]',
@@ -69,8 +69,8 @@ function FunnelCard({ value, label, sub, icon, colorClass, iconBg, iconAccent, l
           {value}
         </span>
       </div>
-      <div className="min-w-0">
-        <p className={`${s.label} font-semibold text-slate-800 leading-snug`}>{label}</p>
+      <div className="min-w-0 flex-1 break-words">
+        <p className={`${s.label} font-semibold text-slate-800 leading-snug break-words`}>{label}</p>
         {sub && <p className={`${s.sub} text-slate-400 mt-0.5`}>{sub}</p>}
       </div>
     </div>

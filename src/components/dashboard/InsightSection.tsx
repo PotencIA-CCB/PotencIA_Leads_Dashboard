@@ -62,7 +62,7 @@ export function InsightColumn({
   const meta = COLUMN_META[title] ?? { icon: 'info', accent: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-100' }
 
   return (
-    <div className="px-6 py-5 flex flex-col gap-4">
+    <div className="px-4 sm:px-6 py-4 sm:py-5 flex flex-col gap-4">
       {/* Column header */}
       <div className="flex items-center gap-2">
         <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg ${meta.bg} ${meta.border} border`}>
@@ -278,7 +278,7 @@ export default function InsightSection({
 
       {/* Content */}
       {insights && !loadingInsights && (
-        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 md:divide-slate-100">
           <InsightColumn title="Patrones" items={insights.insights} />
           <InsightColumn title="Qué Funciona" items={insights.recomendaciones} />
           <InsightColumn title="Hallazgos" items={insights.alertas} />

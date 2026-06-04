@@ -189,7 +189,7 @@ export default function BIPage() {
           {biLoading ? (
             <SkeletonStatCards />
           ) : (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <StatCard
                 label="Total Empresas Registradas"
                 value={biStats?.totalEmpresasRegistradas ?? 0}
@@ -324,7 +324,7 @@ function SkeletonKPIGrid({ count }: { count: number }) {
 
 function SkeletonStatCards() {
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
       {Array.from({ length: 3 }).map((_, i) => (
         <div
           key={i}
