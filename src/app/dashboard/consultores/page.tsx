@@ -261,7 +261,7 @@ export default function ConsultoresPage() {
                   tick={{ fontSize: 11 }}
                   width={calcLeftWidth(toolStats.map(d => d.tool))}
                 />
-                <Tooltip formatter={(v: number) => [`${v} sesiones`, 'Usos']} />
+                <Tooltip formatter={(value) => [`${value} sesiones`, 'Usos']} />
                 <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                   {toolStats.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Bar>

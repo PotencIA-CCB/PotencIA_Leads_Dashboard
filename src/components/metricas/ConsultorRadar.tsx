@@ -55,7 +55,7 @@ function CustomAxisTick({
   x?: number
   y?: number
   payload?: { value: string }
-  textAnchor?: string
+  textAnchor?: 'start' | 'middle' | 'end' | 'inherit'
   fontSize?: number
 }) {
   if (!payload || x === undefined || y === undefined) return null
