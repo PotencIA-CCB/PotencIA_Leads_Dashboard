@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const [filterRenovado, setFilterRenovado] = useState<string>('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
+  const [filterConsultor, setFilterConsultor] = useState('')
   const [pendientesMas5, setPendientesMas5] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState<25 | 50 | 100>(25)
@@ -165,6 +166,14 @@ const fetchData = async () => {
     }
   }
 
+  const consultoresUnicos = useMemo(() => {
+    const names = new Set<string>()
+    leads.forEach((l) => {
+      if (l.consultor_nombre) names.add(l.consultor_nombre)
+    })
+    return Array.from(names).sort((a, b) => a.localeCompare(b))
+  }, [leads])
+
   const filtered = useMemo(() => {
     const hace5 = new Date(Date.now() - 5 * 86400000)
     const fromTs = filterDateFrom ? new Date(filterDateFrom + 'T00:00:00') : null
@@ -181,21 +190,23 @@ const fetchData = async () => {
       const matchDateTo = !toTs || (regTs !== null && regTs <= toTs)
       const matchPendientes5 = !pendientesMas5 || (eff === 'Pendiente' && regTs !== null && regTs <= hace5)
       const matchRenovado = !filterRenovado || l.renovado === filterRenovado
+      const matchConsultor = !filterConsultor || l.consultor_nombre === filterConsultor
 
-      return matchSearch && matchStatus && matchDateFrom && matchDateTo && matchPendientes5 && matchRenovado
+      return matchSearch && matchStatus && matchDateFrom && matchDateTo && matchPendientes5 && matchRenovado && matchConsultor
     })
-  }, [leads, search, filterStatus, filterRenovado, filterDateFrom, filterDateTo, pendientesMas5])
+  }, [leads, search, filterStatus, filterRenovado, filterConsultor, filterDateFrom, filterDateTo, pendientesMas5])
 
   // Reset to page 1 whenever any filter or page size changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, filterStatus, filterRenovado, filterDateFrom, filterDateTo, pendientesMas5, pageSize])
+  }, [search, filterStatus, filterRenovado, filterConsultor, filterDateFrom, filterDateTo, pendientesMas5, pageSize])
 
   const { slice: paginatedLeads, totalPages, from: pageFrom, to: pageTo } = paginate(filtered, currentPage, pageSize)
 
   function clearFilters() {
     setFilterStatus('Todos')
     setFilterRenovado('')
+    setFilterConsultor('')
     setSearch('')
     setFilterDateFrom('')
     setFilterDateTo('')
@@ -282,6 +293,20 @@ const fetchData = async () => {
             <option value="No renovado">No renovado</option>
             <option value="Sin dato">Sin dato</option>
             <option value="Proponentes">Proponentes</option>
+          </select>
+
+          <div className="w-px h-4 bg-slate-200 mx-1" aria-hidden="true" />
+
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Consultor</span>
+          <select
+            value={filterConsultor}
+            onChange={(e) => setFilterConsultor(e.target.value)}
+            className="text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 text-slate-700 cursor-pointer min-w-[120px]"
+          >
+            <option value="">Todos</option>
+            {consultoresUnicos.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
           </select>
         </div>
 
