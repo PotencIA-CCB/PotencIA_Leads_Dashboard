@@ -11,7 +11,7 @@
  *   - generateToolsUsage: threshold-gated extraction pipeline (called by POST /api/herramientas)
  *
  * Architecture: mirrors the proven insights pipeline.
- *   - env: OPENCODE_API_KEY / OPENCODE_API_BASE_URL / OPENCODE_MODEL
+ *   - env: OPENROUTER_API_KEY / OPENROUTER_API_URL / OPENROUTER_MODEL
  *   - env: HERRAMIENTAS_MIN_NEW_RECORDS (default 20, clamped 0..1000)
  *   - LLM temperature: 0.2 (determinism over creativity — tool names are facts)
  *   - Timeout: 25s AbortController (mirrors insights)
@@ -180,10 +180,10 @@ export type ToolsUsageResult =
  * Threshold-gated tools extraction orchestrator.
  *
  * Called by POST /api/herramientas. Performs:
- * 1. Config check (OPENCODE_* env vars)
+ * 1. Config check (OPENROUTER_* env vars)
  * 2. Threshold check via latest herramientas_uso.generated_at anchor
  * 3. Read all registro_sesion.acciones_realizadas
- * 4. Build prompt → call Opencode Go → parse response
+ * 4. Build prompt → call OpenRouter (/chat/completions) → parse response
  * 5. DELETE old rows then INSERT new batch (ADR-3)
  *
  * Returns a typed result envelope. Never throws (all errors are caught and returned).
@@ -193,11 +193,11 @@ export async function generateToolsUsage(
   options: { minNew?: number } = {}
 ): Promise<ToolsUsageResult> {
   // ── Config check ──────────────────────────────────────────────────────────
-  const openAiKey = process.env.OPENCODE_API_KEY
-  const openAiBase = process.env.OPENCODE_API_BASE_URL
-  const openAiModel = process.env.OPENCODE_MODEL
+  const openAiKey = process.env.OPENROUTER_API_KEY
+  const openAiBase = process.env.OPENROUTER_API_URL
+  const openAiModel = process.env.OPENROUTER_MODEL
   if (!openAiKey || !openAiBase || !openAiModel) {
-    const missing = ['OPENCODE_API_KEY', 'OPENCODE_API_BASE_URL', 'OPENCODE_MODEL'].filter(
+    const missing = ['OPENROUTER_API_KEY', 'OPENROUTER_API_URL', 'OPENROUTER_MODEL'].filter(
       (k) => !process.env[k]
     )
     return { skipped: true, reason: 'config_missing', details: { missing } }
