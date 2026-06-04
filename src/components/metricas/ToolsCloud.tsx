@@ -6,8 +6,8 @@
  * UI polish (post-merge, branch feat/herramientas-ia-cloud-ui):
  * Redesigned from uniform pill chips into a TRUE distributed word cloud.
  * Each tool renders as colored text whose SIZE and WEIGHT scale with frequency.
- * No pill chrome (removed border + count badge box). Count visible via title,
- * aria-label, and a subtle faded superscript.
+ * No pill chrome and no visible count number. The count drives size/weight only;
+ * it stays available via title + aria-label for hover/accessibility.
  *
  * Design direction: luxury/refined editorial — PotencIA navy-to-cyan palette,
  * Space Grotesk typeface, generous breathing room, organic word distribution
@@ -221,13 +221,6 @@ export default function ToolsCloud({ tools, status }: ToolsCloudProps) {
             }}
           >
             {tool.label}
-            <sup
-              className="text-[0.55em] font-semibold tabular-nums"
-              style={{ color: `${color}70`, verticalAlign: 'super' }}
-              aria-hidden="true"
-            >
-              {tool.count}
-            </sup>
           </span>
         )
       })}
