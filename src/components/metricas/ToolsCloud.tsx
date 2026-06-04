@@ -1,13 +1,25 @@
 'use client'
 
 /**
- * ToolsCloud — presentational component for the "Herramientas más usadas" section.
+ * ToolsCloud — presentational component for the "Herramientas IA más usadas" section.
  *
- * Renders AI/digital tools as ranked pill chips, sized and weighted by occurrence count.
- * Deliberately styled to look like a designed data visualization, NOT a generic tag cloud.
+ * UI polish (post-merge, branch feat/herramientas-ia-cloud-ui):
+ * Redesigned from uniform pill chips into a TRUE distributed word cloud.
+ * Each tool renders as colored text whose SIZE and WEIGHT scale with frequency.
+ * No pill chrome (removed border + count badge box). Count visible via title,
+ * aria-label, and a subtle faded superscript.
  *
- * Design refs: Section 5 — PotencIA palette, pill chips, count badge, hover lift,
- * scaleWeight formula, skeleton loading, branded empty state.
+ * Design direction: luxury/refined editorial — PotencIA navy-to-cyan palette,
+ * Space Grotesk typeface, generous breathing room, organic word distribution
+ * via size variance (big and small words interleave naturally by count desc order).
+ *
+ * Design refs: Section 5 — PotencIA palette, word-cloud scaleWeight formula,
+ * skeleton loading, branded empty state.
+ *
+ * scaleWeight formula (redesigned):
+ *   ratio    = count / maxCount  (clamped 0..1)
+ *   fontSize = 14 + ratio * 42  (14px min → 56px max)
+ *   fontWeight = Math.round(500 + ratio * 300)  (500 min → 800 max, integer)
  *
  * Props:
  *   tools  — { label: string; count: number }[] from GET /api/herramientas
@@ -31,12 +43,13 @@ interface ToolsCloudProps {
 }
 
 /**
- * Compute font size and weight for a tool chip based on its count relative to the max.
+ * Compute font size and weight for a word-cloud token based on its count
+ * relative to the max count.
  *
- * Formula (design Section 5):
+ * Formula (redesigned for word-cloud dominance hierarchy):
  *   ratio    = count / maxCount  (clamped 0..1)
- *   fontSize = 13 + ratio * 17   (13px min → 30px max)
- *   fontWeight = Math.round(500 + ratio * 200)  (500 min → 700 max, integer)
+ *   fontSize = 14 + ratio * 42   (14px min → 56px max)
+ *   fontWeight = Math.round(500 + ratio * 300)  (500 min → 800 max, integer)
  *
  * Edge cases:
  *   - maxCount = 0 → ratio = 0 → returns minimum values (no divide-by-zero)
@@ -44,61 +57,79 @@ interface ToolsCloudProps {
  */
 export function scaleWeight(count: number, maxCount: number): { fontSize: number; fontWeight: number } {
   if (maxCount <= 0) {
-    return { fontSize: 13, fontWeight: 500 }
+    return { fontSize: 14, fontWeight: 500 }
   }
   const ratio = Math.min(count / maxCount, 1)
-  const fontSize = 13 + ratio * 17
-  const fontWeight = Math.round(500 + ratio * 200)
+  const fontSize = 14 + ratio * 42
+  const fontWeight = Math.round(500 + ratio * 300)
   return { fontSize, fontWeight }
 }
 
 // ---------------------------------------------------------------------------
-// Tier helpers — visual tier based on ratio position
+// Tier helpers — color tier based on frequency ratio
 // ---------------------------------------------------------------------------
 
-type ChipTier = 'primary' | 'mid' | 'tail'
+type WordTier = 'primary' | 'mid' | 'accent' | 'tail'
 
-function getChipTier(ratio: number): ChipTier {
+function getWordTier(ratio: number): WordTier {
   if (ratio >= 0.65) return 'primary'
-  if (ratio >= 0.3) return 'mid'
+  if (ratio >= 0.4) return 'mid'
+  if (ratio >= 0.2) return 'accent'
   return 'tail'
 }
 
-const TIER_CLASSES: Record<ChipTier, { text: string; bg: string; border: string }> = {
-  // Top tools: navy text on cyan-tinted background
-  primary: {
-    text: 'text-[#003087]',
-    bg: 'bg-[#E8F8FF]',
-    border: 'border-[#00C8FF]',
-  },
-  // Mid-tier: medium blue on light blue tint
-  mid: {
-    text: 'text-[#004BB5]',
-    bg: 'bg-[#EEF4FF]',
-    border: 'border-[#004BB5]/30',
-  },
-  // Long tail: slate on near-white
-  tail: {
-    text: 'text-[#5A6475]',
-    bg: 'bg-slate-50',
-    border: 'border-[#E5E7EB]',
-  },
+const TIER_COLORS: Record<WordTier, string> = {
+  // Top tools: deep navy — dominant, authoritative
+  primary: '#001d59',
+  // Mid-tier: rich blue
+  mid: '#003087',
+  // Accent: electric blue — energetic
+  accent: '#0057D9',
+  // Long tail: muted slate — recessive, supporting
+  tail: '#5A6475',
+}
+
+// Subtle hover color shift per tier
+const TIER_HOVER_COLORS: Record<WordTier, string> = {
+  primary: '#004BB5',
+  mid: '#0057D9',
+  accent: '#00C8FF',
+  tail: '#004BB5',
 }
 
 // ---------------------------------------------------------------------------
-// Loading skeleton
+// Loading skeleton — cloud-shaped varied widths/heights
 // ---------------------------------------------------------------------------
 
-const SKELETON_WIDTHS = ['w-24', 'w-32', 'w-20', 'w-36', 'w-28', 'w-40', 'w-16', 'w-32']
+const SKELETON_ITEMS = [
+  { width: 80, height: 36 },
+  { width: 120, height: 52 },
+  { width: 64, height: 28 },
+  { width: 160, height: 64 },
+  { width: 96, height: 42 },
+  { width: 140, height: 56 },
+  { width: 72, height: 32 },
+  { width: 112, height: 48 },
+  { width: 56, height: 26 },
+  { width: 128, height: 50 },
+]
 
 function ToolsSkeleton() {
   return (
-    <div className="flex flex-wrap justify-center gap-2.5 p-6" aria-busy="true" aria-label="Cargando herramientas">
-      {SKELETON_WIDTHS.map((width, i) => (
+    <div
+      className="flex flex-wrap justify-center items-baseline gap-x-6 gap-y-4 px-8 py-10 min-h-[180px]"
+      aria-busy="true"
+      aria-label="Cargando herramientas"
+    >
+      {SKELETON_ITEMS.map((item, i) => (
         <div
           key={i}
-          className={`${width} h-8 rounded-full bg-slate-100 animate-pulse`}
-          style={{ animationDelay: `${i * 80}ms` }}
+          className="rounded-md bg-slate-100 animate-pulse"
+          style={{
+            width: `${item.width}px`,
+            height: `${item.height}px`,
+            animationDelay: `${i * 60}ms`,
+          }}
         />
       ))}
     </div>
@@ -145,20 +176,21 @@ export default function ToolsCloud({ tools, status }: ToolsCloudProps) {
     )
   }
 
-  // Populated state
+  // Populated state — word cloud
   const maxCount = tools[0]?.count ?? 1
 
   return (
     <div
-      className="flex flex-wrap justify-center gap-2.5 p-6"
+      className="flex flex-wrap justify-center items-baseline gap-x-5 gap-y-3 px-8 py-10 min-h-[180px]"
       role="list"
       aria-label="Herramientas de IA y software más usadas"
     >
       {tools.map((tool) => {
         const { fontSize, fontWeight } = scaleWeight(tool.count, maxCount)
         const ratio = maxCount > 0 ? Math.min(tool.count / maxCount, 1) : 0
-        const tier = getChipTier(ratio)
-        const { text, bg, border } = TIER_CLASSES[tier]
+        const tier = getWordTier(ratio)
+        const color = TIER_COLORS[tier]
+        const hoverColor = TIER_HOVER_COLORS[tier]
 
         return (
           <span
@@ -167,24 +199,35 @@ export default function ToolsCloud({ tools, status }: ToolsCloudProps) {
             aria-label={`${tool.label}: ${tool.count} menciones`}
             title={`${tool.label}: ${tool.count} menciones`}
             className={[
-              'inline-flex items-center gap-1.5',
-              'rounded-full border px-3 py-1',
+              'inline-flex items-baseline gap-0.5',
               'cursor-default select-none',
               'transition-all duration-200 ease-out',
-              'motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-md',
-              text,
-              bg,
-              border,
+              'motion-safe:hover:scale-110',
             ].join(' ')}
-            style={{ fontSize: `${fontSize}px`, fontWeight }}
+            style={{
+              fontSize: `${fontSize}px`,
+              fontWeight,
+              fontFamily: 'Space Grotesk, sans-serif',
+              color,
+              // Subtle letter-spacing: tighter for large dominant words
+              letterSpacing: ratio >= 0.65 ? '-0.02em' : ratio >= 0.4 ? '-0.01em' : '0em',
+              // CSS custom property trick for hover — handled by Tailwind motion-safe:hover:scale-110
+            }}
+            onMouseEnter={(e) => {
+              ;(e.currentTarget as HTMLElement).style.color = hoverColor
+            }}
+            onMouseLeave={(e) => {
+              ;(e.currentTarget as HTMLElement).style.color = color
+            }}
           >
-            <span style={{ fontFamily: 'Space Grotesk, sans-serif' }}>{tool.label}</span>
-            <span
-              className="inline-flex items-center justify-center rounded-full bg-black/[0.07] px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
+            {tool.label}
+            <sup
+              className="text-[0.55em] font-semibold tabular-nums"
+              style={{ color: `${color}70`, verticalAlign: 'super' }}
               aria-hidden="true"
             >
               {tool.count}
-            </span>
+            </sup>
           </span>
         )
       })}

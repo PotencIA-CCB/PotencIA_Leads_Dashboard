@@ -160,15 +160,15 @@ describe('Unified BIPage — smoke tests (T18)', () => {
     expect(() => renderToStaticMarkup(createElement(BIPage))).not.toThrow()
   })
 
-  it('(d) "Herramientas más usadas" heading is present in the charts section', async () => {
+  it('(d) "Herramientas IA más usadas" heading is present in the charts section', async () => {
     mockUseMetricas.mockReturnValue(makeMetricasData())
     mockUseBI.mockReturnValue(makeBIData())
 
     const { default: BIPage } = await import('../bi/page')
     const html = renderToStaticMarkup(createElement(BIPage))
 
-    // New section heading must be present
-    expect(html).toContain('Herramientas m')
+    // New section heading must include "IA" (post-merge word-cloud redesign)
+    expect(html).toContain('Herramientas IA m')
   })
 
   it('(e) legacy "¿Qué quieren lograr?" word cloud heading is gone', async () => {
