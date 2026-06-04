@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
 import { Lead, ConsultoriaStatus, Consultor } from '@/types'
 import LeadCard, { effectiveStatus, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
+import { buildSessionHistory } from './sessionHistoryUtils'
 import LeadModal from '@/components/LeadModal'
 import { matchesSearch, paginate } from './searchHelpers'
 
@@ -85,13 +86,11 @@ const fetchData = async () => {
     const consultoriaByLead: Record<string, LeadCardConsultoria> = {}
     const allConsultorIds: string[] = []
     const allConsultoriaIds: string[] = []
-    const consultoriaCountByLead: Record<string, number> = {}
     if (consultoriasData) {
       for (const c of consultoriasData) {
         if (!consultoriaByLead[c.id_lead]) consultoriaByLead[c.id_lead] = c as LeadCardConsultoria
         if (c.id_consultor) allConsultorIds.push(c.id_consultor)
         if (c.id) allConsultoriaIds.push(c.id)
-        consultoriaCountByLead[c.id_lead] = (consultoriaCountByLead[c.id_lead] ?? 0) + 1
       }
     }
 
@@ -131,6 +130,7 @@ const fetchData = async () => {
         formulario: formularioByLead[l.id] ?? null,
         consultoria: con,
         consultor_nombre: con?.id_consultor ? (consultorById[con.id_consultor] ?? null) : null,
+        sesiones: buildSessionHistory(l.id, consultoriasData ?? [], sesionByConsultoria),
       }
     })
 

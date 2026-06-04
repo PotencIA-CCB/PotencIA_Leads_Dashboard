@@ -3,7 +3,18 @@
 import { useEffect, useState } from 'react'
 import { Lead, ConsultoriaStatus, leadFullName } from '@/types'
 import { effectiveStatus } from '@/components/LeadCard'
-import type { LeadWithMeta, LeadCardConsultoria } from '@/components/LeadCard'
+import type { LeadWithMeta, LeadCardConsultoria, SessionHistoryItem } from '@/components/LeadCard'
+
+/**
+ * Returns true if the lead has more than one session (history section visible).
+ * Exported so tests can import this directly from LeadModal (spec F5).
+ * Mirrors shouldShowSessionHistory in LeadCard.tsx.
+ */
+export function shouldShowSessionHistory(
+  sesiones: SessionHistoryItem[] | undefined,
+): boolean {
+  return Array.isArray(sesiones) && sesiones.length > 1
+}
 
 const statusOptions: ConsultoriaStatus[] = ['Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
 
@@ -233,6 +244,20 @@ export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalPr
             </Section>
           )}
 
+          {/* Historial de sesiones */}
+          {shouldShowSessionHistory(lead.sesiones) && (
+            <div>
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">
+                Historial de sesiones
+              </h3>
+              <div className="space-y-3">
+                {lead.sesiones!.map((sesion) => (
+                  <SessionHistoryCard key={sesion.id} sesion={sesion} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Footer */}
           <div className="text-xs text-slate-500 border-t border-slate-100 pt-4">
             Registrado el{' '}
@@ -241,6 +266,78 @@ export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalPr
         </div>
       </div>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// SessionHistoryCard — file-private sub-component
+// ---------------------------------------------------------------------------
+
+const historyStatusStyle: Record<string, { dot: string; text: string }> = {
+  Pendiente:        { dot: 'bg-amber-500',   text: 'text-amber-700' },
+  Agendado:         { dot: 'bg-sky-500',     text: 'text-sky-700' },
+  'En seguimiento': { dot: 'bg-indigo-500',  text: 'text-indigo-700' },
+  Resuelto:         { dot: 'bg-emerald-500', text: 'text-emerald-700' },
+  Cancelado:        { dot: 'bg-slate-400',   text: 'text-slate-500' },
+}
+
+function SessionHistoryCard({ sesion }: { sesion: SessionHistoryItem }) {
+  const badge = historyStatusStyle[sesion.status] ?? historyStatusStyle['Pendiente']!
+  const formattedDate = new Date(sesion.fecha + 'T00:00:00').toLocaleDateString('es-CO', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
+
+  return (
+    <article className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] px-5 py-4">
+      {/* Header row: date + hora_inicio on left, status badge on right */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm text-slate-700 font-medium">
+          <span>{formattedDate}</span>
+          {sesion.hora_inicio && (
+            <>
+              <span className="text-slate-300" aria-hidden="true">·</span>
+              <span className="text-slate-500">{sesion.hora_inicio}</span>
+            </>
+          )}
+        </div>
+        <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider shrink-0 ${badge.text}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} aria-hidden="true" />
+          {sesion.status}
+        </span>
+      </div>
+
+      {/* Service line */}
+      {sesion.servicio && (
+        <p className="mt-1 text-xs text-slate-500">{sesion.servicio}</p>
+      )}
+
+      {/* Conditional registro_sesion summary */}
+      {hasRegistroSesionData(sesion.registro_sesion) && sesion.registro_sesion && (
+        <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+          {sesion.registro_sesion.estado_inicial && (
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Estado inicial</span>
+              <p className="text-xs text-slate-700 mt-0.5">{sesion.registro_sesion.estado_inicial}</p>
+            </div>
+          )}
+          {sesion.registro_sesion.acciones_realizadas && (
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Acciones realizadas</span>
+              <p className="text-xs text-slate-700 mt-0.5">{sesion.registro_sesion.acciones_realizadas}</p>
+            </div>
+          )}
+          {sesion.registro_sesion.resultado_final && (
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Resultado final</span>
+              <p className="text-xs text-slate-700 mt-0.5">{sesion.registro_sesion.resultado_final}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </article>
   )
 }
 

@@ -28,10 +28,35 @@ export type LeadCardFormulario = {
   fecha_registro: string | null
 }
 
+export interface SessionHistoryItem {
+  id: string
+  fecha: string
+  hora_inicio: string | null
+  duracion_minutos: number | null
+  modalidad: string | null
+  servicio: string | null
+  staff_name: string | null
+  status: ConsultoriaStatus
+  registro_sesion?: {
+    estado_inicial: string | null
+    acciones_realizadas: string | null
+    resultado_final: string | null
+  } | null
+}
+
 export type LeadWithMeta = Lead & {
   formulario?: LeadCardFormulario | null
   consultoria?: LeadCardConsultoria | null
   consultor_nombre?: string | null
+  sesiones?: SessionHistoryItem[]
+}
+
+/**
+ * Returns true if the lead has more than one session (history is worth showing).
+ * Pure function — exported for testability.
+ */
+export function shouldShowSessionHistory(sesiones?: SessionHistoryItem[]): boolean {
+  return Array.isArray(sesiones) && sesiones.length > 1
 }
 
 interface LeadCardProps {
