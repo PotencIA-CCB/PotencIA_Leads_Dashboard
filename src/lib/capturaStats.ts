@@ -17,7 +17,6 @@ export interface FunnelStats {
   cicloCompleto: number
   bookedNoLandingDirecto: number
   soloBookedNoSession: number
-  asistieronSinLandingNiBooking: number
 }
 
 export interface FormularioRow {
@@ -113,17 +112,6 @@ export function computeFunnelStats(
     if (C && !S && !L) soloBookedNoSession++
   }
 
-  // asistieronSinLandingNiBooking: leads in sesionSet with no landing and no consultoria
-  // These are leads whose id was resolved via sesionSet (via leadByConsultoriaId) but
-  // are not in our leads array (they would not be counted above). Since we iterate only
-  // known leads, count them from sesionSet directly.
-  let asistieronSinLandingNiBooking = 0
-  for (const leadId of sesionSet) {
-    if (!landingSet.has(leadId) && !consultoriaSet.has(leadId)) {
-      asistieronSinLandingNiBooking++
-    }
-  }
-
   return {
     totalLandingLeads,
     landingNeverBooked,
@@ -132,6 +120,5 @@ export function computeFunnelStats(
     cicloCompleto,
     bookedNoLandingDirecto,
     soloBookedNoSession,
-    asistieronSinLandingNiBooking,
   }
 }

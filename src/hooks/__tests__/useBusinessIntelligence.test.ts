@@ -194,7 +194,6 @@ describe('HookState after fetch resolves', () => {
       cicloCompleto: 5,
       bookedNoLandingDirecto: 4,
       soloBookedNoSession: 6,
-      asistieronSinLandingNiBooking: 1,
     }
     const state: HookState = {
       biStats: computeBiStats([], [], []),

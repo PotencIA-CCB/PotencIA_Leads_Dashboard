@@ -203,39 +203,6 @@ describe('computeFunnelStats', () => {
     expect(result.bookedNoLandingDirecto).toBe(1) // only l2
   })
 
-  // T-F08: asistieronSinLandingNiBooking = sesion leads with no landing and no consultoria
-  it('T-F08: asistieronSinLandingNiBooking counts sesion leads with no landing and no consultoria', () => {
-    const leads = [fLead('l1'), fLead('l2'), fLead('l3')]
-    const formularios = [fFormulario('l1')]             // l1 has landing
-    const consultorias = [fConsultoria('c1', 'l1')]     // l1 has consultoria
-    // c2 maps to l2 in sesion, but l2 has no consultoria in our leads list
-    // We use a different consultoria id mapping here for the orphan case:
-    // Actually for this test, l3 has no landing, no consultoria, but somehow has a sesion row
-    // This is an edge case — sesion rows can reference consultorias not in our filtered list
-    // We simulate by providing a consultoria c2 mapped to l2, but NOT in consultoriasData
-    // However computeFunnelStats builds sesionSet from consultorias provided
-    // So a sesion for an unknown consultoria id won't resolve to a lead
-    // The correct interpretation: leads in sesionSet but NOT in landingSet AND NOT in consultoriaSet
-    // For this test: l2 has no landing, no consultoria, but gets into sesionSet via c_orphan
-    // We'd need c_orphan mapped to l2 — we put it in consultorias but mark it as sesion-only
-    // Actually we need to provide a way for l2 to appear in sesionSet without a real consultoria
-    // The design says sesionSet = Set(leadId for s in sesiones where leadByConsId.get(s.id_consultoria))
-    // So if l2 is to appear in sesionSet, it needs a consultoria in consultoriasData mapping to l2
-    // but NOT counted as a real booking for l2 in other segments.
-    // The design's algo requires consulting l2 being in consultoriaSet to compute this.
-    // This is a contradiction: if l2 has consultoria, it IS in consultoriaSet.
-    // Resolution: asistieronSinLandingNiBooking counts leads reachable via sesion whose id_lead
-    // maps to a lead NOT in consultoriaSet (orphan sesion via a deleted/external consultoria)
-    // OR the sesion row's consultoria is not in our filtered list.
-    // For testability, we add a consultoria for l2 to build sesionSet but exclude it from consultoriaSet
-    // That's not possible with the current algo. We'll test with zero case instead.
-    const consultorias2 = [fConsultoria('c1', 'l1')]
-    const sesiones = [fSesion('c1')]
-    const result = computeFunnelStats(leads, formularios, consultorias2, sesiones)
-    // No lead can be in sesionSet without landing/consultoria with this algo — test that it returns 0
-    expect(result.asistieronSinLandingNiBooking).toBe(0)
-  })
-
   // T-F09: totalBookings is NOT a field on FunnelStats (it is a separate prop on the component)
   it('T-F09: computeFunnelStats does not include a totalBookings field in its return value', () => {
     const result = computeFunnelStats([], [], [], [])
@@ -253,7 +220,6 @@ describe('computeFunnelStats', () => {
       cicloCompleto: 0,
       bookedNoLandingDirecto: 0,
       soloBookedNoSession: 0,
-      asistieronSinLandingNiBooking: 0,
     })
   })
 })

@@ -33,13 +33,13 @@ function FunnelCard({ value, label, sub, icon, colorClass, iconBg, iconAccent }:
         </span>
       </div>
       <div className="shrink-0">
-        <span className={`text-[34px] sm:text-[40px] leading-none font-bold ${colorClass}`} style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+        <span className={`text-[28px] sm:text-[34px] md:text-[40px] leading-none font-bold ${colorClass}`} style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
           {value}
         </span>
       </div>
       <div className="min-w-0">
-        <p className="text-[13px] sm:text-[15px] font-semibold text-slate-800 leading-snug">{label}</p>
-        {sub && <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">{sub}</p>}
+        <p className="text-[11px] sm:text-[13px] md:text-[15px] font-semibold text-slate-800 leading-snug">{label}</p>
+        {sub && <p className="text-[9px] sm:text-[10px] md:text-[11px] text-slate-400 mt-0.5">{sub}</p>}
       </div>
     </div>
   )
@@ -105,7 +105,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
       {/* ==================== TREE 1 — Landing ==================== */}
       <div className="flex flex-col items-center">
         {/* Root */}
-        <div className="w-full max-w-[600px]">
+        <div className="w-full max-w-full sm:max-w-[600px]">
           <FunnelCard
             value={totalLandingLeads}
             label="se registraron en landing"
@@ -119,7 +119,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
         <div className="funnel-stem" />
 
         {/* Level 2 */}
-        <div className="funnel-branch w-full max-w-[940px]">
+        <div className="funnel-branch w-full max-w-[940px] flex-col sm:flex-row">
           <div className="funnel-child px-2">
             <FunnelCard
               value={landingNeverBooked}
@@ -146,7 +146,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
                 <div className="funnel-stem" />
 
                 {/* Level 3 */}
-                <div className="funnel-branch-right w-full">
+                <div className="funnel-branch-right w-full flex-col sm:flex-row">
                   <div className="funnel-child px-1.5">
                     <FunnelCard
                       value={noShows}
@@ -179,7 +179,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
       {/* ==================== TREE 2 — Bookings ==================== */}
       <div className="flex flex-col items-center">
         {/* Root */}
-        <div className="w-full max-w-[600px]">
+        <div className="w-full max-w-full sm:max-w-[600px]">
           <FunnelCard
             value={totalBookings}
             label="bookings totales"
@@ -193,7 +193,7 @@ export default function LeadsFunnel({ stats, totalBookings }: LeadsFunnelProps) 
         <div className="funnel-stem" />
 
         {/* Level 2 */}
-        <div className="funnel-branch w-full max-w-[940px]">
+        <div className="funnel-branch w-full max-w-[940px] flex-col sm:flex-row">
           <div className="funnel-child px-2">
             <FunnelCard
               value={soloBookedNoSession}

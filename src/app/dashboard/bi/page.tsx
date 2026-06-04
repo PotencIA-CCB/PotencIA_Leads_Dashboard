@@ -24,7 +24,6 @@ const emptyFunnelStats: FunnelStats = {
   cicloCompleto: 0,
   bookedNoLandingDirecto: 0,
   soloBookedNoSession: 0,
-  asistieronSinLandingNiBooking: 0,
 }
 
 export default function BIPage() {

@@ -111,8 +111,8 @@ body {
   top: 0;
   height: 1px;
   background: #cbd5e1;
-  left: 16%;
-  right: 5%;
+  left: 25%;
+  right: 25%;
 }
 
 .funnel-branch-right .funnel-child::before {
@@ -130,6 +130,10 @@ body {
   .funnel-branch,
   .funnel-branch-right {
     padding-top: 0;
+  }
+  .funnel-child {
+    border-left: 2px solid #e2e8f0;
+    padding-left: 1rem;
   }
 }
 

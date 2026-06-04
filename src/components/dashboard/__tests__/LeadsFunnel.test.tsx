@@ -12,7 +12,6 @@ const defaultStats: FunnelStats = {
   cicloCompleto: 5,
   bookedNoLandingDirecto: 4,
   soloBookedNoSession: 6,
-  asistieronSinLandingNiBooking: 1,
 }
 
 const zeroStats: FunnelStats = {
@@ -23,7 +22,6 @@ const zeroStats: FunnelStats = {
   cicloCompleto: 0,
   bookedNoLandingDirecto: 0,
   soloBookedNoSession: 0,
-  asistieronSinLandingNiBooking: 0,
 }
 
 function render(stats: FunnelStats = defaultStats, totalBookings = 20): string {
@@ -63,7 +61,7 @@ describe('LeadsFunnel component', () => {
     expect(html).toContain('20') // totalBookings
     expect(html).toContain('4')  // bookedNoLandingDirecto
     expect(html).toContain('6')  // soloBookedNoSession
-    expect(html).toContain('1')  // asistieronSinLandingNiBooking
+    expect(html).toContain('>20<') // totalBookings — actually rendered via Tree 2 root
   })
 
   // T-C05: percentage note appears in the summary table for landingNeverBooked
