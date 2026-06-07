@@ -405,7 +405,7 @@ export function groupByPeriod(
     if (period === 'dia') {
       sortKey = c.fecha.slice(0, 10)
     } else if (period === 'semana') {
-      const d = new Date(c.fecha + 'T00:00:00')
+      const d = new Date(c.fecha.slice(0, 10) + 'T00:00:00')
       if (isNaN(d.getTime())) continue
       const { isoYear, isoWeek } = isoWeekParts(d)
       sortKey = `${isoYear}-W${String(isoWeek).padStart(2, '0')}`

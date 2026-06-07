@@ -25,14 +25,12 @@ interface GeneralKPIsProps {
   consultorias: ConsultoriaForMetricas[]
 }
 
-function ninetyDaysAgoISO(): string {
-  const d = new Date()
-  d.setDate(d.getDate() - 90)
-  return d.toISOString().slice(0, 10)
+function startOfYearISO(): string {
+  return `${new Date().getFullYear()}-01-01`
 }
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
+function endOfYearISO(): string {
+  return `${new Date().getFullYear()}-12-31`
 }
 
 function dayLabel(iso: string): string {
@@ -56,7 +54,7 @@ function dateToKey(iso: string, period: Granularidad): string {
   if (period === 'dia') return iso.slice(0, 10)
   if (period === 'mes') return iso.slice(0, 7)
   if (period === 'año') return iso.slice(0, 4)
-  const d = new Date(iso + 'T00:00:00')
+  const d = new Date(iso.slice(0, 10) + 'T00:00:00')
   if (isNaN(d.getTime())) return ''
   const { isoYear, isoWeek } = isoWeekPartsLocal(d)
   return `${isoYear}-W${String(isoWeek).padStart(2, '0')}`
@@ -112,8 +110,8 @@ function ChartTooltip({ active, payload, label, novedadesMap }: ChartTooltipProp
 export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
   const [period, setPeriod] = useState<Granularidad>('mes')
   const [range, setRange] = useState<{ start: string; end: string }>(() => ({
-    start: ninetyDaysAgoISO(),
-    end: todayISO(),
+    start: startOfYearISO(),
+    end: endOfYearISO(),
   }))
   const [showNovedades, setShowNovedades] = useState(false)
 
@@ -123,8 +121,9 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
     () =>
       consultorias.filter((c) => {
         if (!c.fecha) return false
-        if (range.start && c.fecha < range.start) return false
-        if (range.end && c.fecha > range.end) return false
+        const d = c.fecha.slice(0, 10)
+        if (range.start && d < range.start) return false
+        if (range.end && d > range.end) return false
         return true
       }),
     [consultorias, range],
@@ -153,8 +152,9 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
     if (!showNovedades || novedades.length === 0) return map
     for (const n of novedades) {
       if (!n.fecha_inicio) continue
-      if (range.start && n.fecha_inicio < range.start) continue
-      if (range.end && n.fecha_inicio > range.end) continue
+      const nd = n.fecha_inicio.slice(0, 10)
+      if (range.start && nd < range.start) continue
+      if (range.end && nd > range.end) continue
       const key = dateToKey(n.fecha_inicio, period)
       const label = keyToLabel.get(key)
       if (!label) continue
