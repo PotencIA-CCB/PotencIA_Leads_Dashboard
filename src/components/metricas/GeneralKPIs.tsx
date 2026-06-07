@@ -33,6 +33,12 @@ function endOfYearISO(): string {
   return `${new Date().getFullYear()}-12-31`
 }
 
+function addMonthsISO(isoDate: string, months: number): string {
+  const d = new Date(isoDate.slice(0, 10) + 'T00:00:00')
+  d.setMonth(d.getMonth() + months)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function dayLabel(iso: string): string {
   const [, m, d] = iso.split('-')
   return `${d}/${m}`
@@ -130,11 +136,16 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
   )
 
   const { chartData, keyToLabel } = useMemo(() => {
+    const lastDataDate = filtered.length > 0
+      ? filtered.map(c => c.fecha.slice(0, 10)).sort().at(-1)!
+      : null
+    const paddedEnd = lastDataDate ? addMonthsISO(lastDataDate, 2) : undefined
+
     const resueltoRaw = groupByPeriod(
       filtered.filter(c => canonicalStatus(c.status) === 'Resuelto'),
       period,
     )
-    const agendadasRaw = groupByPeriod(filtered, period)
+    const agendadasRaw = groupByPeriod(filtered, period, paddedEnd)
     const resueltoMap = new Map(resueltoRaw.map(d => [d.key, d.count]))
     const keyToLabel = new Map(
       agendadasRaw.map(d => [d.key, period === 'dia' ? dayLabel(d.label) : d.label])

@@ -393,9 +393,30 @@ export function countUniqueNit(
 const MONTH_ABBR_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 /** Group consultorias by time period (dia/semana/mes/año), sorted ascending. */
+function nextISOWeekKey(key: string): string {
+  const m = key.match(/^(\d{4})-W(\d{2})$/)
+  if (!m) return key
+  let isoYear = Number(m[1])
+  let isoWeek = Number(m[2])
+  const dec28 = new Date(isoYear, 11, 28)
+  const { isoWeek: lastWeek } = isoWeekParts(dec28)
+  if (isoWeek < lastWeek) {
+    isoWeek++
+  } else {
+    isoYear++
+    isoWeek = 1
+  }
+  return `${isoYear}-W${String(isoWeek).padStart(2, '0')}`
+}
+
+function isoDateFromDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function groupByPeriod(
   consultorias: ConsultoriaForMetricas[],
   period: Granularidad,
+  paddedEndDate?: string,
 ): { key: string; label: string; count: number }[] {
   const buckets: Record<string, { count: number }> = {}
 
@@ -423,6 +444,48 @@ export function groupByPeriod(
   const sorted = Object.entries(buckets)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, { count }]) => ({ key, label: key, count }))
+
+  // Pad with empty buckets from the last data point up to paddedEndDate
+  if (paddedEndDate && sorted.length > 0) {
+    if (period === 'dia') {
+      const cursor = new Date(sorted[sorted.length - 1].key + 'T00:00:00')
+      const end = new Date(paddedEndDate + 'T00:00:00')
+      for (let guard = 0; guard < 800 && cursor < end; guard++) {
+        cursor.setDate(cursor.getDate() + 1)
+        const key = isoDateFromDate(cursor)
+        if (!buckets[key]) {
+          buckets[key] = { count: 0 }
+          sorted.push({ key, label: key, count: 0 })
+        }
+      }
+    } else if (period === 'mes') {
+      let [y, mo] = sorted[sorted.length - 1].key.split('-').map(Number)
+      const [endY, endMo] = paddedEndDate.slice(0, 7).split('-').map(Number)
+      for (let guard = 0; guard < 60 && (y < endY || (y === endY && mo < endMo)); guard++) {
+        mo++
+        if (mo > 12) { mo = 1; y++ }
+        const key = `${y}-${String(mo).padStart(2, '0')}`
+        if (!buckets[key]) {
+          buckets[key] = { count: 0 }
+          sorted.push({ key, label: key, count: 0 })
+        }
+      }
+    } else if (period === 'semana') {
+      let curKey = nextISOWeekKey(sorted[sorted.length - 1].key)
+      for (let guard = 0; guard < 200; guard++) {
+        const wm = curKey.match(/^(\d{4})-W(\d{2})$/)
+        if (!wm) break
+        const thu = isoWeekThursday(Number(wm[1]), Number(wm[2]))
+        if (isoDateFromDate(thu) > paddedEndDate) break
+        if (!buckets[curKey]) {
+          buckets[curKey] = { count: 0 }
+          sorted.push({ key: curKey, label: curKey, count: 0 })
+        }
+        curKey = nextISOWeekKey(curKey)
+      }
+    }
+    sorted.sort((a, b) => a.key.localeCompare(b.key))
+  }
 
   // Assign sequential week-in-month labels for 'semana' using ISO Thursday
   if (period === 'semana') {
