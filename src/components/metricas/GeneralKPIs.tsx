@@ -139,7 +139,7 @@ export function GeneralKPIs({ metricas, consultorias }: GeneralKPIsProps) {
     const lastDataDate = filtered.length > 0
       ? filtered.map(c => c.fecha.slice(0, 10)).sort().at(-1)!
       : null
-    const paddedEnd = lastDataDate ? addMonthsISO(lastDataDate, 2) : undefined
+    const paddedEnd = lastDataDate ? addMonthsISO(lastDataDate, 1) : undefined
 
     const resueltoRaw = groupByPeriod(
       filtered.filter(c => canonicalStatus(c.status) === 'Resuelto'),
