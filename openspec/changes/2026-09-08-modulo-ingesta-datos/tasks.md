@@ -169,8 +169,8 @@ commit;
 
 - [ ] Verificar que el archivo no contiene ningún `drop column`:
 
-Run: `grep -in "drop column" supabase/migrations/20260908_reconcile_ingest_schema.sql`
-Expected: sin resultados (exit 1)
+Run: `grep -inE "alter table[^;]*drop column" supabase/migrations/20260908_reconcile_ingest_schema.sql`
+Expected: sin resultados (exit 1). El patrón busca DDL real, no la palabra suelta: el archivo lleva un comentario que dice "No ejecuta ningún DROP COLUMN", y un `grep` por la frase sin más se matchearía a sí mismo.
 
 ### A2 — Aplicar la migración en Supabase (paso humano)
 
