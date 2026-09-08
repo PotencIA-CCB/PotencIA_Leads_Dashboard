@@ -21,8 +21,9 @@ sin recomputarlo del lado servidor.
 |---|----------|--------|-----------------------|-----------|
 | D1 | Dónde se parsea el archivo | En el navegador; solo sube el JSON normalizado | Parseo en el Worker con subida `multipart` | Workers no guardan estado entre requests, así que preview→confirmar exigiría KV/R2 (infra nueva, y se descartó el historial de cargas) o subir el archivo dos veces. Además mantiene el parser de XLSX fuera del bundle del Worker. |
 | D2 | Librería para `.xlsx` | `read-excel-file` por su entry point `./browser`, con `import()` dinámico | `xlsx` (SheetJS); `exceljs` | `xlsx@0.18.5` en npm tiene 2 avisos de severidad alta con **"No fix available"** (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9): SheetJS dejó de publicar en npm. Son datos de clientes reales. `exceljs` pesa 21.8 MB y no publica desde 2024-12. `read-excel-file` audita limpio, pesa 2.4 MB. |
-| D3 | Autoridad de la validación | El servidor revalida cada fila con los mismos módulos puros antes de escribir | Confiar en la validación del cliente; esquema de validación separado en el servidor | Cuesta casi nada porque los módulos son puros y sin dependencias de entorno. Un solo cuerpo de reglas evita que cliente y servidor divergan. |
+| D3 | Autoridad de la validación | El cliente manda las **filas crudas parseadas** y el servidor las normaliza él mismo con el mismo módulo puro | Cliente manda filas normalizadas y el servidor las valida con un esquema aparte | Si el cliente mandara filas ya normalizadas, el servidor no podría re-ejecutar el normalizador sobre ellas (el normalizador toma filas crudas) y haría falta un segundo cuerpo de reglas de validación, que divergiría. Mandando crudo, el servidor es la autoridad real sin código duplicado — y el cliente se ahorra normalizar del todo: valida encabezados para rechazar el archivo equivocado y deja la clasificación por fila al dry-run. |
 | D4 | Estrategia de escritura | Un RPC por tipo de carga que recibe `jsonb` con el lote completo; savepoint por fila vía `begin ... exception` | N llamadas PostgREST por fila (patrón n8n); una transacción todo-o-nada | El patrón n8n hace ~5 requests/fila (~700 para 142 filas) y revienta el techo de subrequests del Worker. Todo-o-nada haría que una fila mala descarte el archivo entero. El savepoint por fila da atomicidad por fila **y** tolerancia al lote, en un round trip. |
+| D4b | Cómo se calcula la previsualización | `p_dry_run boolean` en el mismo RPC: recorre el camino real y, antes de cerrar cada fila, lanza `raise exception using errcode = 'ZZ001'`, que su propio manejador atrapa | Consulta aparte de claves existentes; reimplementar en TypeScript la lógica de búsqueda del RPC | El savepoint revierte las escrituras de la fila, pero las variables plpgsql ya calculadas **sobreviven** a la excepción, así que el manejador devuelve el `accion` que se habría aplicado. La previsualización pasa a ser exacta incluso para las claves de fallback (`lead + fecha + hora`), y detecta de una vez los choques con constraints y el staff sin consultor — cosas que una consulta de claves no vería. Un solo cuerpo de lógica de matching. |
 | D5 | Atomicidad | Por fila: `leads` + `consultorias` + `registro_sesion` entran juntas o no entran | Por tabla (todos los leads, luego todas las consultorías) | Evita el estado a medias que ya produce n8n: consultoría creada cuyo `registro_sesion` falló después. |
 | D6 | Cálculo de `hora_fin` | Aritmética entera sobre minutos, sin objetos `Date` | `new Date(...)` + `getHours()`, como WF-2 | El navegador corre en `America/Bogota` y el Worker en UTC. Con `Date` local, la misma fila daría `hora_fin` distinta en la previsualización y en la escritura. |
 | D7 | Identidad de la consultoría | **`consultorias.booking_id`** como única columna del Booking Id, formalizada en migraciones | `id_reserva` (la única en migraciones); mantener las tres columnas | `booking_id` es el estándar de facto: lo escriben WF-2, WF-3 y `/api/booking`, y **lo lee el pipeline de métricas** (`useMetricas.ts:25`, `metricas.ts:1079` — KPI de reservas únicas). `grep -rn "id_reserva" src/` da **cero** resultados: solo la escribe `trg_bookings_after_insert`, que depende de `bookings_entrante`, tabla en la que **nada inserta**. Consolidar en `id_reserva` habría exigido modificar `metricas.ts` (alta blast radius) y habría orfanado los Booking Id ya cargados. El `Id` del Excel identifica el *registro de sesión*, no la reserva, así que `id_externo` vive solo en `registro_sesion` y la consultoría se alcanza por su FK. |
@@ -48,30 +49,39 @@ admin elige tipo + archivo
         └─ .xlsx → await import('read-excel-file/browser')
         │
         ▼
-  src/lib/ingest/{bookings|sesiones}.ts
-  cada fila → { ok:true, row } | { ok:false, errores }
+  filas crudas: pares encabezado → valor
+        │
+        ├─ valida encabezados (rechazo inmediato
+        │  si el archivo es del otro tipo)
         │
         │  POST /api/cargas
-        │  { accion:'preview', tipo, claves:[...] }
+        │  { accion:'preview', tipo, filas: <crudas> }
         ├──────────────────────────────────────►  autoriza (sesión + admin)
         │                                              │
-        │                                              ├─ select claves existentes ──►
-        │                                              │  ◄── claves encontradas
-        │  ◄───────────────────────────────────── { existentes:[...] }
+        │                                              ├─ normaliza (autoridad)
+        │                                              │
+        │                                              ├─ rpc ingest_*(filas, true) ──►
+        │                                              │        │
+        │                                              │        │  por cada fila:
+        │                                              │        │   savepoint
+        │                                              │        │   ... camino real ...
+        │                                              │        │   raise 'ZZ001'
+        │                                              │        │   ↳ rollback de la fila,
+        │                                              │        │     accion sobrevive
+        │                                              │  ◄──── (fila, accion, aviso, error)[]
+        │  ◄───────────────────────────────────── { creadas, actualizadas, fallidas, avisos }
         ▼
-  previsualización
-  ✓ crear   ↻ actualizar   ⚠ error (fila + motivo)
+  previsualización EXACTA
+  ✓ crear   ↻ actualizar   ⚠ error   ⓘ aviso
         │
         │  [ Cargar ]
         │  POST /api/cargas
-        │  { accion:'commit', tipo, filas:[...] }
+        │  { accion:'commit', tipo, filas: <las mismas crudas> }
         ├──────────────────────────────────────►  autoriza (sesión + admin)
         │                                              │
-        │                                              ├─ REVALIDA con los mismos
-        │                                              │  módulos puros
+        │                                              ├─ normaliza (autoridad)
         │                                              │
-        │                                              ├─ rpc ingest_bookings(jsonb) ──►
-        │                                              │  o ingest_sesiones(jsonb)
+        │                                              ├─ rpc ingest_*(filas, false) ──►
         │                                              │        │
         │                                              │        │  por cada fila:
         │                                              │        │   savepoint
@@ -80,8 +90,8 @@ admin elige tipo + archivo
         │                                              │        │   upsert consultoria
         │                                              │        │   upsert registro_sesion
         │                                              │        │   release / rollback
-        │                                              │  ◄──── (fila, accion, error)[]
-        │  ◄───────────────────────────────────── { creadas, actualizadas, fallidas }
+        │                                              │  ◄──── (fila, accion, aviso, error)[]
+        │  ◄───────────────────────────────────── { creadas, actualizadas, fallidas, avisos }
         ▼
   reporte final
 ```
@@ -108,10 +118,10 @@ REGISTRO DE SESIÓN .xlsx
 | `src/lib/ingest/bookings.ts` | New | `parseTsv`, `normalizeBookingRow`, `EXPECTED_BOOKING_HEADERS` |
 | `src/lib/ingest/sesiones.ts` | New | `normalizeSesionRow`, `mapResultadoAStatus` (7 estados), `EXPECTED_SESION_HEADERS` |
 | `src/lib/ingest/__tests__/*.test.ts` | New | Tests co-locados por módulo (ver spec `normalizacion-filas`) |
-| `src/app/api/cargas/route.ts` | New | `POST` con `accion: 'preview' \| 'commit'`; autorización, revalidación, RPC |
+| `src/app/api/cargas/route.ts` | New | `POST` con `accion: 'preview' \| 'commit'`; autorización, normalización autoritativa, RPC con `p_dry_run` |
 | `src/app/dashboard/cargas/page.tsx` | New | Pestañas por tipo, dropzone, previsualización, reporte |
 | `supabase/migrations/20260908_reconcile_ingest_schema.sql` | New | Reconciliación idempotente + redefinición de `trg_registro_sesion_after_insert` (ver spec `reconciliacion-esquema`) |
-| `supabase/migrations/20260908_ingest_rpc.sql` | New | `ingest_bookings(jsonb)`, `ingest_sesiones(jsonb)` |
+| `supabase/migrations/20260908_ingest_rpc.sql` | New | `ingest_bookings(jsonb, boolean)`, `ingest_sesiones(jsonb, boolean)`, con `execute` revocado de `public` |
 | `src/app/dashboard/DashboardShell.tsx` | Modified | `{ label: 'Cargas', href: '/dashboard/cargas', icon: 'upload_file', adminOnly: true }` |
 | `src/types/index.ts` | Modified | `Consultoria`: quitar `booking_id` e `id_externo`. `RegistroSesion`: añadir `id_externo`, `duracion_sesion_minutos` |
 | `src/app/api/booking/route.ts` | Modified | Solo `modalidad` normalizada a `Virtual`/`Presencial` — la columna `booking_id` que ya escribe resulta ser la correcta |
