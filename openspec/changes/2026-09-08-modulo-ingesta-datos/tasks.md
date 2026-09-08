@@ -235,10 +235,22 @@ por:
   duracion_sesion_minutos: number | null
 ```
 
+- [ ] Arreglar los dos literales de `RegistroSesion` que quedarán incompletos. Las dos propiedades nuevas son **requeridas**, y estos dos archivos construyen el tipo completo:
+
+  - `src/hooks/__tests__/useBusinessIntelligence.test.ts:269` — en la fábrica `makeSessionRow`
+  - `src/components/dashboard/__tests__/SessionInsightsSection.test.tsx:19` — en la fábrica `makeSession`
+
+  En cada una, añadir al objeto base las dos propiedades con valor `null`:
+
+```ts
+  id_externo: null,
+  duracion_sesion_minutos: null,
+```
+
 - [ ] Verificar que el typecheck pasa:
 
 Run: `npx tsc --noEmit`
-Expected: sin errores. Si aparece un error por `id_externo` faltante en algún literal de `RegistroSesion` en tests existentes, añadir la propiedad al literal con valor `null`.
+Expected: sin errores. Si `tsc` reporta otro literal de `RegistroSesion` incompleto que no sea uno de esos dos, aplicarle el mismo arreglo.
 
 ### A4 — Normalizar `modalidad` en `/api/booking/route.ts`
 
@@ -340,7 +352,9 @@ git add supabase/migrations/20260908_reconcile_ingest_schema.sql \
         src/types/index.ts \
         src/app/api/booking/bookingUtils.ts \
         src/app/api/booking/__tests__/normalizeModalidad.test.ts \
-        src/app/api/booking/route.ts
+        src/app/api/booking/route.ts \
+        src/hooks/__tests__/useBusinessIntelligence.test.ts \
+        src/components/dashboard/__tests__/SessionInsightsSection.test.tsx
 git commit -m "fix(esquema): reconcilia identidad de consultoria, duracion de sesion y CHECK de status
 
 Resuelve los cuatro drifts documentados en exploration.md §2:
