@@ -40,13 +40,18 @@ declare
   v_aviso    text;
   v_booking  text;
 begin
-  for r in select value from jsonb_array_elements(p_filas) as t(value)
+  for r in
+    select value
+      from jsonb_array_elements(
+        case when jsonb_typeof(p_filas) = 'array' then p_filas else '[]'::jsonb end
+      ) as t(value)
   loop
-    v_fila := (r->>'fila')::int;
+    v_fila := null;
     v_accion := null;
     v_aviso := null;
 
     begin
+      v_fila := (r->>'fila')::int;
       v_lead_j := r->'lead';
       v_con_j  := r->'consultoria';
       v_booking := nullif(v_con_j->>'booking_id', '');
@@ -126,7 +131,7 @@ begin
           (nullif(v_con_j->>'hora_inicio', ''))::time,
           (nullif(v_con_j->>'hora_fin', ''))::time,
           (nullif(v_con_j->>'duracion_minutos', ''))::int,
-          v_con_j->>'modalidad',
+          nullif(v_con_j->>'modalidad', ''),
           nullif(v_con_j->>'servicio', ''),
           nullif(v_con_j->>'staff_name', ''),
           nullif(v_con_j->>'staff_email', ''),
@@ -145,7 +150,7 @@ begin
           hora_inicio      = coalesce((nullif(v_con_j->>'hora_inicio', ''))::time, hora_inicio),
           hora_fin         = coalesce((nullif(v_con_j->>'hora_fin', ''))::time, hora_fin),
           duracion_minutos = coalesce((nullif(v_con_j->>'duracion_minutos', ''))::int, duracion_minutos),
-          modalidad        = v_con_j->>'modalidad',
+          modalidad        = coalesce(nullif(v_con_j->>'modalidad', ''), modalidad),
           servicio         = coalesce(nullif(v_con_j->>'servicio', ''), servicio),
           staff_name       = coalesce(nullif(v_con_j->>'staff_name', ''), staff_name),
           staff_email      = coalesce(nullif(v_con_j->>'staff_email', ''), staff_email),
@@ -205,13 +210,18 @@ declare
   v_status    text;
   v_id_ext    text;
 begin
-  for r in select value from jsonb_array_elements(p_filas) as t(value)
+  for r in
+    select value
+      from jsonb_array_elements(
+        case when jsonb_typeof(p_filas) = 'array' then p_filas else '[]'::jsonb end
+      ) as t(value)
   loop
-    v_fila := (r->>'fila')::int;
+    v_fila := null;
     v_accion := null;
     v_aviso := null;
 
     begin
+      v_fila := (r->>'fila')::int;
       v_lead_j := r->'lead';
       v_con_j  := r->'consultoria';
       v_reg_j  := r->'registro';
@@ -292,7 +302,7 @@ begin
           (nullif(v_con_j->>'hora_inicio', ''))::time,
           (nullif(v_con_j->>'hora_fin', ''))::time,
           (nullif(v_con_j->>'duracion_minutos', ''))::int,
-          v_con_j->>'modalidad',
+          nullif(v_con_j->>'modalidad', ''),
           nullif(v_con_j->>'staff_name', ''),
           nullif(v_con_j->>'staff_email', ''),
           nullif(v_con_j->>'nivel_potencia', ''),
@@ -309,7 +319,7 @@ begin
           hora_inicio      = coalesce((nullif(v_con_j->>'hora_inicio', ''))::time, hora_inicio),
           hora_fin         = coalesce((nullif(v_con_j->>'hora_fin', ''))::time, hora_fin),
           duracion_minutos = coalesce((nullif(v_con_j->>'duracion_minutos', ''))::int, duracion_minutos),
-          modalidad        = v_con_j->>'modalidad',
+          modalidad        = coalesce(nullif(v_con_j->>'modalidad', ''), modalidad),
           staff_name       = coalesce(nullif(v_con_j->>'staff_name', ''), staff_name),
           staff_email      = coalesce(nullif(v_con_j->>'staff_email', ''), staff_email),
           nivel_potencia   = coalesce(nullif(v_con_j->>'nivel_potencia', ''), nivel_potencia),
@@ -340,7 +350,7 @@ begin
         nullif(v_reg_j->>'estimacion_impacto', ''),
         nullif(v_reg_j->>'entregables', ''),
         coalesce((nullif(v_reg_j->>'cantidad_productos', ''))::int, 0),
-        coalesce((v_reg_j->>'sesion_grabada')::boolean, false),
+        coalesce((nullif(v_reg_j->>'sesion_grabada', ''))::boolean, false),
         nullif(v_reg_j->>'enlace_grabacion', ''),
         nullif(v_reg_j->>'adjuntar_evidencia', ''),
         (nullif(v_reg_j->>'confirmo_no_automatizacion', ''))::boolean,
@@ -390,7 +400,24 @@ $$;
 revoke all on function public.ingest_bookings(jsonb, boolean) from public;
 revoke all on function public.ingest_sesiones(jsonb, boolean) from public;
 
+-- REVOKE FROM PUBLIC no basta en Supabase: el proyecto trae
+-- ALTER DEFAULT PRIVILEGES ... GRANT ALL ON FUNCTIONS TO anon, authenticated,
+-- que son grants explícitos por rol y sobreviven al revoke de arriba. Sin estas
+-- dos líneas, dos funciones security definer que saltan RLS quedarían
+-- ejecutables con la llave anónima que viaja en el bundle del navegador.
+revoke all on function public.ingest_bookings(jsonb, boolean) from anon, authenticated;
+revoke all on function public.ingest_sesiones(jsonb, boolean) from anon, authenticated;
+
 grant execute on function public.ingest_bookings(jsonb, boolean) to service_role;
 grant execute on function public.ingest_sesiones(jsonb, boolean) to service_role;
 
 commit;
+
+-- Verificación de permisos (correr tras aplicar, en el editor SQL):
+--   select p.proname,
+--          coalesce(array_to_string(p.proacl, E'\n'), '(default: PUBLIC EXECUTE)') as acl
+--     from pg_proc p
+--     join pg_namespace n on n.oid = p.pronamespace
+--    where n.nspname = 'public'
+--      and p.proname in ('ingest_bookings', 'ingest_sesiones');
+-- No debe aparecer ninguna entrada anon=X/ ni authenticated=X/.
