@@ -18,6 +18,14 @@
 - **TDD estricto** (`openspec/config.yaml: strict_tdd: true`). Test rojo antes de implementación, siempre.
 - **Tests co-locados** en `__tests__/`, patrón `src/**/*.test.{ts,tsx}`, `environment: 'node'`.
 - Comandos: `npm test` · `npm run lint` · `npx tsc --noEmit` · `npm run build`
+- **Baseline de lint:** `npm run lint` **ya falla en `main`** con 17 problemas preexistentes
+  (9 errores, 8 avisos) en `metricas.ts`, `insights/route.ts`, `dashboard/page.tsx`,
+  `consultores/page.tsx`, `LeadModal.tsx`, `useNovedades.ts`, `useWindowWidth.ts`,
+  `useBusinessIntelligence.ts` y tres archivos de test. **No los arregles**: están fuera de
+  alcance y `metricas.ts` no se toca. El criterio real es: `npx eslint <los archivos de tu
+  unidad>` sale limpio, y `npm run lint` no gana ningún problema nuevo respecto al baseline.
+  Cuando un paso diga «Run: `npm run lint`», corre además el `npx eslint` de tus archivos y
+  reporta las dos salidas.
 - **`src/lib/metricas.ts` NO se modifica en este cambio** (alta blast radius por `openspec/config.yaml`).
 - **`n8n/` NO se toca.** Convivencia deliberada.
 - Los módulos de `src/lib/ingest/` **no usan DOM, red, ni `Date` dependiente de zona horaria local**. Corren idénticos en navegador y Worker.
@@ -868,8 +876,9 @@ Expected: PASS en ambas, con el mismo número de tests. Si alguna difiere, hay u
 
 - [ ] Verificar lint y typecheck:
 
-Run: `npm run lint && npx tsc --noEmit`
-Expected: sin errores.
+Run: `npx eslint <los archivos de esta unidad> && npx tsc --noEmit`
+Expected: sin errores en los archivos de la unidad, y `tsc` limpio. Corre también
+`npm run lint` y confirma que el conteo de problemas es el del baseline (17), sin nuevos.
 
 ### B5 — Commit de la Work Unit B
 
@@ -1077,8 +1086,9 @@ Expected: PASS, todos los casos.
 
 - [ ] Verificar lint y typecheck:
 
-Run: `npm run lint && npx tsc --noEmit`
-Expected: sin errores.
+Run: `npx eslint <los archivos de esta unidad> && npx tsc --noEmit`
+Expected: sin errores en los archivos de la unidad, y `tsc` limpio. Corre también
+`npm run lint` y confirma que el conteo de problemas es el del baseline (17), sin nuevos.
 
 ### C3 — Commit de la Work Unit C
 
@@ -1554,8 +1564,9 @@ Expected: sin resultados (exit 1). Solo se permiten los getters UTC dentro de `c
 
 - [ ] Verificar lint y typecheck:
 
-Run: `npm run lint && npx tsc --noEmit`
-Expected: sin errores.
+Run: `npx eslint <los archivos de esta unidad> && npx tsc --noEmit`
+Expected: sin errores en los archivos de la unidad, y `tsc` limpio. Corre también
+`npm run lint` y confirma que el conteo de problemas es el del baseline (17), sin nuevos.
 
 ### D4 — Commit de la Work Unit D
 
@@ -2065,8 +2076,9 @@ Expected: sin resultados (exit 1).
 
 - [ ] Correr la suite completa y verificar lint y typecheck:
 
-Run: `npm test && npm run lint && npx tsc --noEmit`
-Expected: PASS sin regresiones.
+Run: `npm test && npx tsc --noEmit && npx eslint <los archivos de esta unidad>`
+Expected: PASS sin regresiones, `tsc` limpio, y los archivos de la unidad sin problemas de
+lint. Corre también `npm run lint` y confirma que sigue en el baseline (17 problemas), sin nuevos.
 
 ### E4 — Commit de la Work Unit E
 
@@ -3045,8 +3057,9 @@ Expected: PASS, todos los casos.
 
 - [ ] Correr la suite completa, lint y typecheck:
 
-Run: `npm test && npm run lint && npx tsc --noEmit`
-Expected: PASS sin regresiones.
+Run: `npm test && npx tsc --noEmit && npx eslint <los archivos de esta unidad>`
+Expected: PASS sin regresiones, `tsc` limpio, y los archivos de la unidad sin problemas de
+lint. Corre también `npm run lint` y confirma que sigue en el baseline (17 problemas), sin nuevos.
 
 - [ ] Verificar que la ruta no registra contenido de filas. Buscar cualquier `console` que interpole una fila completa:
 
@@ -3260,8 +3273,9 @@ Expected: PASS, todos los casos.
 
 - [ ] Verificar lint y typecheck:
 
-Run: `npm run lint && npx tsc --noEmit`
-Expected: sin errores.
+Run: `npx eslint <los archivos de esta unidad> && npx tsc --noEmit`
+Expected: sin errores en los archivos de la unidad, y `tsc` limpio. Corre también
+`npm run lint` y confirma que el conteo de problemas es el del baseline (17), sin nuevos.
 
 ### H4 — Commit de la Work Unit H
 
@@ -3691,8 +3705,9 @@ Expected: `1`
 
 - [ ] Correr la suite completa, lint y typecheck:
 
-Run: `npm test && npm run lint && npx tsc --noEmit`
-Expected: PASS sin regresiones.
+Run: `npm test && npx tsc --noEmit && npx eslint <los archivos de esta unidad>`
+Expected: PASS sin regresiones, `tsc` limpio, y los archivos de la unidad sin problemas de
+lint. Corre también `npm run lint` y confirma que sigue en el baseline (17 problemas), sin nuevos.
 
 - [ ] Verificar que el build pasa. Es el paso que confirma que la importación dinámica no arrastra `read-excel-file` al bundle del Worker:
 
@@ -3747,8 +3762,8 @@ menu solo oculta el enlace."
 
 - [ ] Suite completa, lint, typecheck y build:
 
-Run: `npm test && npm run lint && npx tsc --noEmit && npm run build`
-Expected: todo PASS.
+Run: `npm test && npx tsc --noEmit && npm run build`
+Expected: todo PASS. Y `npm run lint` en el baseline (17 problemas preexistentes), sin nuevos.
 
 - [ ] Confirmar que `src/lib/metricas.ts` no fue modificado en toda la rama:
 
