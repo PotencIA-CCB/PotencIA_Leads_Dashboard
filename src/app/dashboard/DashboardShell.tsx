@@ -17,6 +17,7 @@ const navItems = [
   { label: 'Business Intelligence', href: '/dashboard/bi', icon: 'insights' },
   { label: 'Novedades', href: '/dashboard/novedades', icon: 'campaign' },
   { label: 'Consultores', href: '/dashboard/consultores', icon: 'psychology', adminOnly: true },
+  { label: 'Cargas', href: '/dashboard/cargas', icon: 'upload_file', adminOnly: true },
 ]
 
 export default function DashboardShell({ nombre, rol, children }: DashboardShellProps) {
