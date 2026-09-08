@@ -7,11 +7,11 @@ import type { RawRow } from './types'
 export function normKey(s: string): string {
   return String(s)
     .replace(/[–—]/g, '-')
-    .replace(/[\s ]+/g, ' ')
+    .replace(/[\s\u00a0]+/g, ' ')
     .trim()
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
 }
 
 function valorUtil(v: unknown): string | null {
