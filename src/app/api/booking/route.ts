@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { extractNombreCompleto } from './bookingUtils'
+import { extractNombreCompleto, normalizeModalidad } from './bookingUtils'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,16 +44,7 @@ export async function POST(req: NextRequest) {
     const durationRaw = body.duration ?? null
     const duration = typeof durationRaw === 'number' ? durationRaw : (typeof durationRaw === 'string' ? parseInt(durationRaw, 10) || null : null)
 
-    const modalidadRaw = body.modalidad
-    const modalidad = (() => {
-      if (typeof modalidadRaw !== 'string') return 'Virtual'
-      const cleaned = modalidadRaw.trim()
-      if (!cleaned) return 'Virtual'
-      const key = cleaned.toLowerCase()
-      if (key === 'virtual') return 'Virtual'
-      if (key === 'presencial') return 'Presencial'
-      return cleaned
-    })()
+    const modalidad = normalizeModalidad(body.modalidad)
 
     function parseBookingDate(dt: string): { fecha: string; hora: string } {
       if (!dt) return { fecha: '', hora: '' }

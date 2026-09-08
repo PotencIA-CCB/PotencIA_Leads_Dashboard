@@ -64,8 +64,10 @@ export interface Consultoria {
   updated_at: string
   id_lead: string
   id_consultor: string | null
+  /** Booking Id de Microsoft Bookings. Identidad natural de la consultoría. */
   booking_id: string | null
-  id_externo: string | null
+  /** Vestigial: solo la escribía trg_bookings_after_insert vía bookings_entrante, tabla sin inserts. */
+  id_reserva?: string | null
   fecha: string
   hora_inicio: string | null
   hora_fin: string | null
@@ -99,6 +101,10 @@ export interface RegistroSesion {
   id: string
   created_at: string
   id_consultoria: string
+  /** Columna `Id` del Excel de registro de sesión. Identidad natural del registro. */
+  id_externo: string | null
+  /** Duración reportada en el Excel. La lee metricas.ts en 6 puntos. */
+  duracion_sesion_minutos: number | null
   pregunta: string | null
   motivo_consulta: string | null
   estado_inicial: string | null
