@@ -2161,13 +2161,18 @@ declare
   v_aviso    text;
   v_booking  text;
 begin
-  for r in select value from jsonb_array_elements(p_filas) as t(value)
+  for r in
+    select value
+      from jsonb_array_elements(
+        case when jsonb_typeof(p_filas) = 'array' then p_filas else '[]'::jsonb end
+      ) as t(value)
   loop
-    v_fila := (r->>'fila')::int;
+    v_fila := null;
     v_accion := null;
     v_aviso := null;
 
     begin
+      v_fila := (r->>'fila')::int;
       v_lead_j := r->'lead';
       v_con_j  := r->'consultoria';
       v_booking := nullif(v_con_j->>'booking_id', '');
@@ -2247,7 +2252,7 @@ begin
           (nullif(v_con_j->>'hora_inicio', ''))::time,
           (nullif(v_con_j->>'hora_fin', ''))::time,
           (nullif(v_con_j->>'duracion_minutos', ''))::int,
-          v_con_j->>'modalidad',
+          nullif(v_con_j->>'modalidad', ''),
           nullif(v_con_j->>'servicio', ''),
           nullif(v_con_j->>'staff_name', ''),
           nullif(v_con_j->>'staff_email', ''),
@@ -2266,7 +2271,7 @@ begin
           hora_inicio      = coalesce((nullif(v_con_j->>'hora_inicio', ''))::time, hora_inicio),
           hora_fin         = coalesce((nullif(v_con_j->>'hora_fin', ''))::time, hora_fin),
           duracion_minutos = coalesce((nullif(v_con_j->>'duracion_minutos', ''))::int, duracion_minutos),
-          modalidad        = v_con_j->>'modalidad',
+          modalidad        = coalesce(nullif(v_con_j->>'modalidad', ''), modalidad),
           servicio         = coalesce(nullif(v_con_j->>'servicio', ''), servicio),
           staff_name       = coalesce(nullif(v_con_j->>'staff_name', ''), staff_name),
           staff_email      = coalesce(nullif(v_con_j->>'staff_email', ''), staff_email),
@@ -2326,13 +2331,18 @@ declare
   v_status    text;
   v_id_ext    text;
 begin
-  for r in select value from jsonb_array_elements(p_filas) as t(value)
+  for r in
+    select value
+      from jsonb_array_elements(
+        case when jsonb_typeof(p_filas) = 'array' then p_filas else '[]'::jsonb end
+      ) as t(value)
   loop
-    v_fila := (r->>'fila')::int;
+    v_fila := null;
     v_accion := null;
     v_aviso := null;
 
     begin
+      v_fila := (r->>'fila')::int;
       v_lead_j := r->'lead';
       v_con_j  := r->'consultoria';
       v_reg_j  := r->'registro';
@@ -2413,7 +2423,7 @@ begin
           (nullif(v_con_j->>'hora_inicio', ''))::time,
           (nullif(v_con_j->>'hora_fin', ''))::time,
           (nullif(v_con_j->>'duracion_minutos', ''))::int,
-          v_con_j->>'modalidad',
+          nullif(v_con_j->>'modalidad', ''),
           nullif(v_con_j->>'staff_name', ''),
           nullif(v_con_j->>'staff_email', ''),
           nullif(v_con_j->>'nivel_potencia', ''),
@@ -2430,7 +2440,7 @@ begin
           hora_inicio      = coalesce((nullif(v_con_j->>'hora_inicio', ''))::time, hora_inicio),
           hora_fin         = coalesce((nullif(v_con_j->>'hora_fin', ''))::time, hora_fin),
           duracion_minutos = coalesce((nullif(v_con_j->>'duracion_minutos', ''))::int, duracion_minutos),
-          modalidad        = v_con_j->>'modalidad',
+          modalidad        = coalesce(nullif(v_con_j->>'modalidad', ''), modalidad),
           staff_name       = coalesce(nullif(v_con_j->>'staff_name', ''), staff_name),
           staff_email      = coalesce(nullif(v_con_j->>'staff_email', ''), staff_email),
           nivel_potencia   = coalesce(nullif(v_con_j->>'nivel_potencia', ''), nivel_potencia),
@@ -2461,7 +2471,7 @@ begin
         nullif(v_reg_j->>'estimacion_impacto', ''),
         nullif(v_reg_j->>'entregables', ''),
         coalesce((nullif(v_reg_j->>'cantidad_productos', ''))::int, 0),
-        coalesce((v_reg_j->>'sesion_grabada')::boolean, false),
+        coalesce((nullif(v_reg_j->>'sesion_grabada', ''))::boolean, false),
         nullif(v_reg_j->>'enlace_grabacion', ''),
         nullif(v_reg_j->>'adjuntar_evidencia', ''),
         (nullif(v_reg_j->>'confirmo_no_automatizacion', ''))::boolean,
@@ -2511,10 +2521,27 @@ $$;
 revoke all on function public.ingest_bookings(jsonb, boolean) from public;
 revoke all on function public.ingest_sesiones(jsonb, boolean) from public;
 
+-- REVOKE FROM PUBLIC no basta en Supabase: el proyecto trae
+-- ALTER DEFAULT PRIVILEGES ... GRANT ALL ON FUNCTIONS TO anon, authenticated,
+-- que son grants explícitos por rol y sobreviven al revoke de arriba. Sin estas
+-- dos líneas, dos funciones security definer que saltan RLS quedarían
+-- ejecutables con la llave anónima que viaja en el bundle del navegador.
+revoke all on function public.ingest_bookings(jsonb, boolean) from anon, authenticated;
+revoke all on function public.ingest_sesiones(jsonb, boolean) from anon, authenticated;
+
 grant execute on function public.ingest_bookings(jsonb, boolean) to service_role;
 grant execute on function public.ingest_sesiones(jsonb, boolean) to service_role;
 
 commit;
+
+-- Verificación de permisos (correr tras aplicar, en el editor SQL):
+--   select p.proname,
+--          coalesce(array_to_string(p.proacl, E'\n'), '(default: PUBLIC EXECUTE)') as acl
+--     from pg_proc p
+--     join pg_namespace n on n.oid = p.pronamespace
+--    where n.nspname = 'public'
+--      and p.proname in ('ingest_bookings', 'ingest_sesiones');
+-- No debe aparecer ninguna entrada anon=X/ ni authenticated=X/.
 ```
 
 - [ ] Verificar que ambos RPC revocan permisos de `public`:
@@ -2612,6 +2639,14 @@ Dependency: D2, E2 (los normalizadores) y F2 (los RPC aplicados)
 **Interfaces:**
 - Consumes: `normalizeBookingRow` de `@/lib/ingest/bookings`, `normalizeSesionRow` de `@/lib/ingest/sesiones`, tipos de `@/lib/ingest/types`, `createClient` de `@/lib/supabase-server`, `createClient` de `@supabase/supabase-js`, y los RPC `ingest_bookings` / `ingest_sesiones`.
 - Produces: `POST /api/cargas` que acepta `CargaRequest` y responde `CargaResponse` (200), `{ error }` con 400 (cuerpo o parámetros inválidos), 403 (no admin) o 500 (fallo del RPC).
+
+**Requisito añadido por ruling F-2:** la ruta detecta **claves duplicadas dentro del mismo lote**
+y emite un aviso por cada repetición. Hace falta porque el dry-run del RPC revierte cada fila
+antes de procesar la siguiente, así que no puede ver las filas creadas antes en el mismo archivo:
+dos filas de la misma reserva previsualizarían como «crear + crear» cuando la carga real dará
+«crear + actualizar». La ruta sí tiene todas las filas a la vista. No se intentó arreglar dentro
+del RPC: eso exigiría rastrear estado que divergiría del camino real de escritura, y haría la
+previsualización menos fiel, no más.
 
 **Nota de simplificación:** el cliente **no** normaliza filas. Parsea el archivo y valida los encabezados localmente (para rechazar de inmediato un archivo del tipo equivocado), y toda la clasificación por fila viene del dry-run del servidor. Normalizar también en el cliente sería redundante: la previsualización ya es un round trip.
 
@@ -2799,6 +2834,32 @@ describe('POST /api/cargas — normalización autoritativa', () => {
 
     const body = await res.json()
     expect(body.fallidas.map((f: { fila: number }) => f.fila)).toEqual([2, 3])
+  })
+
+  it('N3: avisa de filas duplicadas dentro del mismo archivo', async () => {
+    // El dry-run del RPC revierte cada fila antes de procesar la siguiente, así que
+    // no puede ver duplicados intra-lote. La ruta sí, porque tiene todas las filas.
+    const filas = [
+      filaBooking({ 'Booking Id': 'BK-DUP' }),
+      filaBooking({ 'Booking Id': 'BK-DUP' }),
+    ]
+    const res = await POST(pedir({ accion: 'preview', tipo: 'bookings', filas }) as never)
+    const body = await res.json()
+
+    const dup = body.avisos.filter((a: { fila: number; motivo: string }) => /duplicado/i.test(a.motivo))
+    expect(dup).toHaveLength(1)
+    expect(dup[0].fila).toBe(3)
+    expect(dup[0].motivo).toContain('fila 2')
+  })
+
+  it('N4: no avisa de duplicado cuando las claves difieren', async () => {
+    const filas = [
+      filaBooking({ 'Booking Id': 'BK-1' }),
+      filaBooking({ 'Booking Id': 'BK-2' }),
+    ]
+    const res = await POST(pedir({ accion: 'preview', tipo: 'bookings', filas }) as never)
+    const body = await res.json()
+    expect(body.avisos.filter((a: { motivo: string }) => /duplicado/i.test(a.motivo))).toHaveLength(0)
   })
 })
 
@@ -2998,6 +3059,23 @@ export async function POST(req: NextRequest) {
       for (const e of resultado.errores) fallidas.push({ fila: e.fila, motivo: e.motivo })
     }
   })
+
+  // Filas duplicadas dentro del mismo archivo. El dry-run del RPC no puede verlas:
+  // revierte cada fila antes de procesar la siguiente, así que dos filas de la misma
+  // reserva previsualizan como «crear + crear» cuando la carga real dará
+  // «crear + actualizar». Acá sí se ven todas juntas, así que se avisan.
+  const primeraAparicion = new Map<string, number>()
+  for (const row of validas) {
+    const previa = primeraAparicion.get(row.clave)
+    if (previa === undefined) {
+      primeraAparicion.set(row.clave, row.fila)
+    } else {
+      avisos.push({
+        fila: row.fila,
+        motivo: `Duplicado dentro del archivo: ya aparece en la fila ${previa}. La previsualización lo cuenta como nuevo, pero la carga real lo actualizará.`,
+      })
+    }
+  }
 
   let creadas = 0
   let actualizadas = 0
