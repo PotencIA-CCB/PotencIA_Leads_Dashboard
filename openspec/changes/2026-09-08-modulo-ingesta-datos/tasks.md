@@ -3449,8 +3449,14 @@ const TIPOS: Array<{
  * read-excel-file no entre en el bundle inicial ni en el del Worker.
  */
 async function leerXlsx(file: File): Promise<RawRow[]> {
-  const { default: readXlsxFile } = await import('read-excel-file/browser')
-  return matrizARawRows((await readXlsxFile(file)) as unknown[][])
+  // Se usa el export nombrado `readSheet`, NO el export por defecto.
+  // `readXlsxFile` (el default) devuelve `Sheet[]` — un objeto `{ sheet, data }`
+  // por cada hoja del libro — mientras que `matrizARawRows` espera la matriz de
+  // celdas de UNA hoja. Pasarle el default haría que llamara `.map` sobre un
+  // objeto y reventara en la primera carga. `readSheet` sin hoja explícita toma
+  // la primera, que es lo que queremos.
+  const { readSheet } = await import('read-excel-file/browser')
+  return matrizARawRows(await readSheet(file))
 }
 
 export default function CargasPage() {
@@ -3777,6 +3783,11 @@ Run: `grep -nE "^import .*read-excel-file" src/app/dashboard/cargas/page.tsx`
 Expected: sin resultados (exit 1) — solo debe aparecer dentro de un `await import(...)`.
 
 Run: `grep -c "await import('read-excel-file/browser')" src/app/dashboard/cargas/page.tsx`
+Expected: `1`
+
+- [ ] Verificar que se usa el export nombrado y no el default (ver el comentario en `leerXlsx`):
+
+Run: `grep -c "const { readSheet } = await import" src/app/dashboard/cargas/page.tsx`
 Expected: `1`
 
 ### I3 — Verificar el build y la calidad
