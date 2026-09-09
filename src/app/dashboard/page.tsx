@@ -10,13 +10,16 @@ import { matchesSearch, paginate } from './searchHelpers'
 
 const etapaOptions: Array<'Todos' | EtapaLead> = ['Todos', ...ETAPAS]
 
-const etapaChip: Record<string, { active: string; idle: string }> = {
-  Todos:           { active: 'bg-[#003087] text-white border border-[#003087]',     idle: 'bg-white text-slate-600 border border-slate-200' },
-  'Sin actividad': { active: 'bg-slate-600 text-white border border-slate-600',     idle: 'bg-white text-slate-600 border border-slate-200' },
-  Registrado:      { active: 'bg-amber-500 text-white border border-amber-500',     idle: 'bg-white text-amber-700 border border-amber-200' },
-  Agendado:        { active: 'bg-sky-600 text-white border border-sky-600',         idle: 'bg-white text-sky-700 border border-sky-200' },
-  'No asistió':    { active: 'bg-rose-600 text-white border border-rose-600',       idle: 'bg-white text-rose-700 border border-rose-200' },
-  Resuelto:        { active: 'bg-emerald-600 text-white border border-emerald-600', idle: 'bg-white text-emerald-700 border border-emerald-200' },
+// Tipado por la union, no por `string`: asi agregar o renombrar una etapa
+// rompe la compilacion en vez de dejar una clave sin estilo. Con
+// Record<string, ...> y un `!` en el acceso, 'Sin agendar' quedo sin entrada y
+// la pagina entera caia con "Cannot read properties of undefined".
+const etapaChip: Record<'Todos' | EtapaLead, { active: string; idle: string }> = {
+  Todos:          { active: 'bg-[#003087] text-white border border-[#003087]',     idle: 'bg-white text-slate-600 border border-slate-200' },
+  'Sin agendar':  { active: 'bg-slate-600 text-white border border-slate-600',     idle: 'bg-white text-slate-600 border border-slate-200' },
+  Agendado:       { active: 'bg-sky-600 text-white border border-sky-600',         idle: 'bg-white text-sky-700 border border-sky-200' },
+  'No asistió':   { active: 'bg-rose-600 text-white border border-rose-600',       idle: 'bg-white text-rose-700 border border-rose-200' },
+  Resuelto:       { active: 'bg-emerald-600 text-white border border-emerald-600', idle: 'bg-white text-emerald-700 border border-emerald-200' },
 }
 
 
@@ -264,7 +267,7 @@ const fetchData = async () => {
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mr-1">Estado</span>
           {etapaOptions.map((s) => {
             const active = filterStatus === s
-            const styles = etapaChip[s]!
+            const styles = etapaChip[s]
             return (
               <button
                 key={s}
