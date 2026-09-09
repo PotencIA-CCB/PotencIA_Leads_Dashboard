@@ -251,3 +251,34 @@ describe('normalizeSesionRow', () => {
     }
   })
 })
+
+/**
+ * El .xlsx real llega desde read-excel-file con las celdas ya tipadas: las de
+ * fecha y hora como Date y las numéricas como number. `col` las convertía a
+ * texto antes de que `coerce` las viera, y el String de un Date
+ * ("Sun Mar 01 2026 19:00:00 GMT-0500…") no lo entiende ningún parser de los
+ * nuestros. En producción eso hizo fallar 397 de 399 filas con
+ * "Fecha de la sesión ilegible".
+ */
+describe('celdas tipadas de Excel', () => {
+  it('normaliza una fila con Date y number como los entrega read-excel-file', () => {
+    const r = normalizeSesionRow(
+      fila({
+        'Fecha de la Sesión': new Date(Date.UTC(2026, 8, 15)),
+        'Hora de inicio': new Date(Date.UTC(2026, 8, 15, 14, 0)),
+        'Hora de finalización': new Date(Date.UTC(2026, 8, 15, 15, 0)),
+        'Duración de la Sesión / Minutos': 60,
+        'Cantidad de nuevos productos creados': 2,
+      }),
+      2,
+    )
+
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.row.consultoria.fecha).toBe('2026-09-15')
+    expect(r.row.consultoria.hora_inicio).toBe('14:00')
+    expect(r.row.consultoria.hora_fin).toBe('15:00')
+    expect(r.row.consultoria.duracion_minutos).toBe(60)
+    expect(r.row.registro.cantidad_productos).toBe(2)
+  })
+})

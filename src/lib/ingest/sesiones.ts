@@ -1,6 +1,6 @@
 import type { ConsultoriaStatus } from '@/types'
 import { toBool, toDate, toInt, toTime } from './coerce'
-import { col, normKey } from './columns'
+import { col, colValor, normKey } from './columns'
 import type {
   NormalizeResult,
   NormalizedSesionRow,
@@ -71,7 +71,7 @@ export function normalizeSesionRow(
     errores.push({ fila, severidad: 'error', motivo: 'Correo del usuario atendido ausente o inválido' })
   }
 
-  const fechaRaw = col(raw, 'Fecha de la Sesión', 'Fecha', 'fecha_sesion')
+  const fechaRaw = colValor(raw, 'Fecha de la Sesión', 'Fecha', 'fecha_sesion')
   const fecha = toDate(fechaRaw)
   if (fecha === null) {
     errores.push({
@@ -87,7 +87,7 @@ export function normalizeSesionRow(
     return { ok: false, fila, errores }
   }
 
-  const duracion = toInt(col(raw, 'Duración de la Sesión / Minutos', 'Duración de la sesión', 'duracion'))
+  const duracion = toInt(colValor(raw, 'Duración de la Sesión / Minutos', 'Duración de la sesión', 'duracion'))
   const resultado = col(raw, 'Resultado de la sesión', 'resultado')
   const status = mapResultadoAStatus(resultado)
 
@@ -138,8 +138,8 @@ export function normalizeSesionRow(
       consultoria: {
         booking_id: null,
         fecha,
-        hora_inicio: toTime(col(raw, 'Hora de inicio', 'hora_inicio')),
-        hora_fin: toTime(col(raw, 'Hora de finalización', 'hora_fin')),
+        hora_inicio: toTime(colValor(raw, 'Hora de inicio', 'hora_inicio')),
+        hora_fin: toTime(colValor(raw, 'Hora de finalización', 'hora_fin')),
         duracion_minutos: duracion,
         modalidad: normalizarModalidad(col(raw, 'Modalidad de la Sesión', 'modalidad')),
         servicio: null,
@@ -159,12 +159,12 @@ export function normalizeSesionRow(
         resultado_final: col(raw, 'Resultado Final', 'resultado_final'),
         estimacion_impacto: col(raw, 'Estimación del Impacto Generado', 'Estimacion del Impacto Generado', 'estimacion_impacto'),
         entregables: col(raw, 'Entregables Producidos', 'entregables'),
-        cantidad_productos: toInt(col(raw, 'Cantidad de nuevos productos creados', 'cantidad_productos')) ?? 0,
-        sesion_grabada: toBool(col(raw, '¿La sesión fue grabada?', 'sesion_grabada')),
+        cantidad_productos: toInt(colValor(raw, 'Cantidad de nuevos productos creados', 'cantidad_productos')) ?? 0,
+        sesion_grabada: toBool(colValor(raw, '¿La sesión fue grabada?', 'sesion_grabada')),
         enlace_grabacion: col(raw, 'Enlace de Grabación', 'enlace_grabacion'),
         adjuntar_evidencia: col(raw, 'Adjuntar Evidencia', 'adjuntar_evidencia'),
         confirmo_no_automatizacion: toBool(
-          col(
+          colValor(
             raw,
             'Confirmo que este caso NO corresponde a automatización o integración de sistemas complejos.',
             'Confirmo que este caso NO corresponde a automatización',

@@ -81,6 +81,14 @@ export function toDate(v: unknown): string | null {
 export function toTime(v: unknown): string | null {
   if (v === null || v === undefined) return null
 
+  // read-excel-file entrega las celdas de hora como Date. Se lee en UTC por la
+  // misma razón que toDate usa utcYmd: la librería construye la fecha a
+  // medianoche UTC y leerla en horario local corre el valor un día.
+  if (v instanceof Date) {
+    if (Number.isNaN(v.getTime())) return null
+    return `${pad2(v.getUTCHours())}:${pad2(v.getUTCMinutes())}`
+  }
+
   if (typeof v === 'number') {
     if (!(v >= 0 && v < 1)) return null
     const total = Math.round(v * 1440)

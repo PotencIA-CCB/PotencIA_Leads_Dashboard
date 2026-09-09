@@ -175,3 +175,22 @@ describe('trimOrNull', () => {
     expect(trimOrNull(undefined)).toBeNull()
   })
 })
+
+/**
+ * read-excel-file entrega las celdas de fecha y hora como objetos Date, no
+ * como texto. toDate ya lo contemplaba; toTime no, y el .xlsx de producción
+ * trae `Hora de inicio` y `Hora de finalización` así.
+ */
+describe('toTime con celdas Date de Excel', () => {
+  it('lee la hora en UTC, igual que toDate lee el día', () => {
+    expect(toTime(new Date(Date.UTC(2026, 8, 15, 14, 30)))).toBe('14:30')
+  })
+
+  it('devuelve 00:00 para una fecha sin componente de hora', () => {
+    expect(toTime(new Date(Date.UTC(2026, 8, 15)))).toBe('00:00')
+  })
+
+  it('devuelve null para una fecha inválida', () => {
+    expect(toTime(new Date(NaN))).toBeNull()
+  })
+})
