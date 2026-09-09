@@ -7,7 +7,7 @@
  * BI no puedan contradecirse.
  */
 import { describe, it, expect } from 'vitest'
-import { etapaLead, etapaConsultoria, agendamientoMostrado, consultorMostrado } from '../LeadCard'
+import { etapaLead, etapaConsultoria, agendamientoMostrado, consultorMostrado, consultoresMostrados } from '../LeadCard'
 import type { LeadWithMeta, SessionHistoryItem } from '../LeadCard'
 
 const HOY = '2026-09-09'
@@ -143,30 +143,82 @@ describe('agendamientoMostrado', () => {
   })
 })
 
+describe('consultoresMostrados', () => {
+  it('prefiere el nombre canónico de la tabla consultores', () => {
+    const l = lead({
+      origen: 'booking',
+      consultor_nombre: 'Adrian Andres Gutierrez Regino',
+      consultoria: { staff_name: 'Adrián Gutiérrez' } as LeadWithMeta['consultoria'],
+    })
+    // staff_name trae la misma persona escrita distinto; la tabla manda.
+    expect(consultoresMostrados(l)).toEqual(['Adrian Andres Gutierrez Regino'])
+  })
+
+  it('parte el staff_name con varios nombres separados por punto y coma', () => {
+    const l = lead({
+      origen: 'booking',
+      consultoria: {
+        staff_name: 'Carlos Alberto Ortiz Correa; Santiago Andres Comas Duran',
+      } as LeadWithMeta['consultoria'],
+    })
+    expect(consultoresMostrados(l)).toEqual([
+      'Carlos Alberto Ortiz Correa',
+      'Santiago Andres Comas Duran',
+    ])
+  })
+
+  it('descarta los fragmentos vacíos que deja Bookings', () => {
+    const l = lead({
+      origen: 'booking',
+      consultoria: { staff_name: 'Felipe De Jesus Zapata Linero; ;' } as LeadWithMeta['consultoria'],
+    })
+    expect(consultoresMostrados(l)).toEqual(['Felipe De Jesus Zapata Linero'])
+  })
+
+  it('un staff_name que es solo separadores no deja ningún consultor', () => {
+    const l = lead({
+      origen: 'booking',
+      consultoria: { staff_name: ';' } as LeadWithMeta['consultoria'],
+    })
+    expect(consultoresMostrados(l)).toEqual([])
+  })
+
+  it('no repite un nombre que venga dos veces', () => {
+    const l = lead({
+      origen: 'booking',
+      consultoria: { staff_name: 'Felipe Zapata; Felipe Zapata' } as LeadWithMeta['consultoria'],
+    })
+    expect(consultoresMostrados(l)).toEqual(['Felipe Zapata'])
+  })
+
+  it('sin consultor asignado ni staff devuelve lista vacía', () => {
+    expect(consultoresMostrados(lead())).toEqual([])
+  })
+})
+
 describe('consultorMostrado', () => {
-  it('para un lead de booking prefiere el staff de la consultoría', () => {
+  it('prefiere el consultor asignado, sin importar el origen', () => {
     const l = lead({
       origen: 'booking',
       consultor_nombre: 'Asignado En Base',
       consultoria: { staff_name: 'Staff Del Archivo' } as LeadWithMeta['consultoria'],
-    })
-    expect(consultorMostrado(l)).toBe('Staff Del Archivo')
-  })
-
-  it('para un lead de booking sin staff cae al consultor asignado', () => {
-    const l = lead({
-      origen: 'booking',
-      consultor_nombre: 'Asignado En Base',
-      consultoria: { staff_name: null } as LeadWithMeta['consultoria'],
     })
     expect(consultorMostrado(l)).toBe('Asignado En Base')
   })
 
-  it('para un lead que no es de booking usa el consultor asignado', () => {
+  it('junta varios nombres cuando no hay asignado', () => {
     const l = lead({
-      origen: 'landing',
+      origen: 'booking',
+      consultoria: { staff_name: 'Ana Pérez; Luis Gómez' } as LeadWithMeta['consultoria'],
+    })
+    expect(consultorMostrado(l)).toBe('Ana Pérez, Luis Gómez')
+  })
+
+  it('sin staff cae al consultor asignado', () => {
+    const l = lead({
+      origen: 'booking',
       consultor_nombre: 'Asignado En Base',
-      consultoria: { staff_name: 'Staff Del Archivo' } as LeadWithMeta['consultoria'],
+      consultoria: { staff_name: null } as LeadWithMeta['consultoria'],
     })
     expect(consultorMostrado(l)).toBe('Asignado En Base')
   })

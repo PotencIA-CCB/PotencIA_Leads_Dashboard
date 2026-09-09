@@ -147,15 +147,36 @@ export function etapaLead(lead: LeadWithMeta, hoy: string): EtapaLead {
  * lista y el filtro de la página tienen que preguntar exactamente lo mismo: si
  * difieren, hay consultores visibles en las cards que el filtro no encuentra.
  */
-export function consultorMostrado(lead: LeadWithMeta): string | null {
-  const asignado = lead.consultor_nombre ?? null
-  const staff = lead.consultoria?.staff_name ?? null
+/**
+ * Los consultores del lead, ya normalizados. Vive acá y no suelto en el render
+ * porque la lista y el filtro de la página tienen que preguntar exactamente lo
+ * mismo: si difieren, hay consultores visibles en las cards que el filtro no
+ * encuentra.
+ *
+ * Manda el nombre de la tabla `consultores`, resuelto vía `id_consultor`, y no
+ * el `staff_name` de Bookings. Ese texto viene sin normalizar: la misma persona
+ * aparece como "Adrian Andres Gutierrez Regino" y "Adrián Gutiérrez", y una
+ * reserva con varios miembros de staff los junta con `;`, a veces dejando
+ * fragmentos vacíos ("Felipe De Jesus Zapata Linero; ;") o solo el separador.
+ * Al 2026-09-09, 819 de 847 consultorías tienen el consultor resuelto, así que
+ * el respaldo es el caso raro — pero cuando toca, se parte y se limpia.
+ */
+export function consultoresMostrados(lead: LeadWithMeta): string[] {
+  const asignado = lead.consultor_nombre?.trim()
+  if (asignado) return [asignado]
 
-  // El origen decide a quien creerle primero: en una reserva manda el staff que
-  // trajo Bookings; en el resto, la asignacion de la base. Pero siempre hay
-  // respaldo: sin el, un lead con staff_name y sin id_consultor no mostraba
-  // consultor y quedaba fuera del filtro aunque supieramos quien lo atendio.
-  return lead.origen === 'booking' ? (staff ?? asignado) : (asignado ?? staff)
+  const vistos = new Set<string>()
+  for (const parte of (lead.consultoria?.staff_name ?? '').split(';')) {
+    const nombre = parte.trim()
+    if (nombre !== '') vistos.add(nombre)
+  }
+  return [...vistos]
+}
+
+/** Los mismos, en una línea, para pintarlos en la card. */
+export function consultorMostrado(lead: LeadWithMeta): string | null {
+  const nombres = consultoresMostrados(lead)
+  return nombres.length === 0 ? null : nombres.join(', ')
 }
 
 function getInitials(name: string): string {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
 import { Lead, Consultor } from '@/types'
-import LeadCard, { etapaLead, agendamientoMostrado, consultorMostrado, hoyYmd, ETAPAS, type EtapaLead, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
+import LeadCard, { etapaLead, agendamientoMostrado, consultoresMostrados, hoyYmd, ETAPAS, type EtapaLead, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
 import { buildSessionHistory } from './sessionHistoryUtils'
 import LeadModal from '@/components/LeadModal'
 import { matchesSearch, paginate } from './searchHelpers'
@@ -175,9 +175,10 @@ const fetchData = async () => {
 
   const consultoresUnicos = useMemo(() => {
     const names = new Set<string>()
+    // Nombre por nombre, no la linea junta: una reserva con dos miembros de
+    // staff aportaba una opcion "Fulano; Mengano" que no era nadie.
     leads.forEach((l) => {
-      const nombre = consultorMostrado(l)
-      if (nombre) names.add(nombre)
+      for (const nombre of consultoresMostrados(l)) names.add(nombre)
     })
     return Array.from(names).sort((a, b) => a.localeCompare(b))
   }, [leads])
@@ -201,7 +202,7 @@ const fetchData = async () => {
       // todavia no reservo. Antes miraba 'Pendiente', que ya no existe.
       const matchPendientes5 = !pendientesMas5 || (eff === 'Sin agendar' && regTs !== null && regTs <= hace5)
       const matchRenovado = !filterRenovado || l.renovado === filterRenovado
-      const matchConsultor = !filterConsultor || consultorMostrado(l) === filterConsultor
+      const matchConsultor = !filterConsultor || consultoresMostrados(l).includes(filterConsultor)
 
       return matchSearch && matchStatus && matchDateFrom && matchDateTo && matchPendientes5 && matchRenovado && matchConsultor
     })
