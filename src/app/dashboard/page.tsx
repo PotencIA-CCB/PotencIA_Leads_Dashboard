@@ -6,7 +6,7 @@ import { Lead, Consultor } from '@/types'
 import LeadCard, { etapaLead, agendamientoMostrado, consultoresMostrados, hoyYmd, ETAPAS, type EtapaLead, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
 import { buildSessionHistory } from './sessionHistoryUtils'
 import LeadModal from '@/components/LeadModal'
-import { matchesSearch, paginate } from './searchHelpers'
+import { matchesSearch, paginate, opcionesDeConsultor } from './searchHelpers'
 
 const etapaOptions: Array<'Todos' | EtapaLead> = ['Todos', ...ETAPAS]
 
@@ -173,15 +173,7 @@ const fetchData = async () => {
     return () => { ignore = true }
   }, [])
 
-  const consultoresUnicos = useMemo(() => {
-    const names = new Set<string>()
-    // Nombre por nombre, no la linea junta: una reserva con dos miembros de
-    // staff aportaba una opcion "Fulano; Mengano" que no era nadie.
-    leads.forEach((l) => {
-      for (const nombre of consultoresMostrados(l)) names.add(nombre)
-    })
-    return Array.from(names).sort((a, b) => a.localeCompare(b))
-  }, [leads])
+  const consultoresUnicos = useMemo(() => opcionesDeConsultor(leads), [leads])
 
   const filtered = useMemo(() => {
     const hoy = hoyYmd()

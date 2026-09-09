@@ -52,3 +52,25 @@ export function paginate<T>(items: T[], page: number, size: number): PaginateRes
   const slice = items.slice((page - 1) * size, page * size)
   return { slice, totalPages, from, to }
 }
+
+/**
+ * Nombres que ofrece el desplegable de consultor: solo los que vienen de la
+ * tabla `consultores`, resueltos vía `id_consultor`.
+ *
+ * A propósito NO usa `consultoresMostrados`, que es lo que pinta la card. Las
+ * dos responden preguntas distintas: la card dice quién atendió al lead —dato
+ * real, venga de `consultores` o del `staff_name` de la reserva— y el filtro
+ * solo ofrece a quien está dado de alta. Al 2026-09-09 la diferencia es Felipe,
+ * que atendió 19 leads y no está en la tabla: se ve en su card y no se ofrece
+ * como opción.
+ */
+export function opcionesDeConsultor(
+  leads: Array<{ consultor_nombre?: string | null }>,
+): string[] {
+  const nombres = new Set<string>()
+  for (const lead of leads) {
+    const nombre = lead.consultor_nombre?.trim()
+    if (nombre) nombres.add(nombre)
+  }
+  return [...nombres].sort((a, b) => a.localeCompare(b))
+}
