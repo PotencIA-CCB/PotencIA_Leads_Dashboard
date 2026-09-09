@@ -186,6 +186,11 @@ $$;
 -- ============================================================================
 -- ingest_sesiones — .xlsx de registro de sesión → leads + consultorias + registro_sesion
 -- ============================================================================
+--
+-- OJO: `20260909_ingest_sesiones_registro_propio.sql` redefine esta función.
+-- Si volvés a correr este archivo, corré ese después, o reinstalarás el cuerpo
+-- viejo y con él el bug de las dos sesiones del mismo lead en la misma fecha.
+-- ============================================================================
 
 create or replace function public.ingest_sesiones(
   p_filas jsonb,
