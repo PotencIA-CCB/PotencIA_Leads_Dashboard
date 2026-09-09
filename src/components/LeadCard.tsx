@@ -122,20 +122,24 @@ export function etapaConsultoria(c: ConParaEtapa, hoy: string): Exclude<EtapaLea
 }
 
 /**
- * Estado del lead: el de la consultoría que la card está mostrando.
+ * Estado del lead, mirando todas sus consultorías: describe a la persona, no a
+ * una sesión.
  *
- * No mira a las demás. Si mirara —"le basta una sesión registrada para estar
- * Resuelto"— la card podría afirmar Resuelto mientras el historial del modal
- * dice No asistió de la misma sesión, y las dos pantallas se contradirían sobre
- * el mismo lead. El chip acompaña a la fecha, la hora y el consultor que están
- * ahí al lado: describe esa consultoría.
+ * Una sola sesión registrada alcanza para dejarlo Resuelto, porque *No asistió*
+ * está reservado a quien agendó y nunca apareció. De ahí que el chip pueda
+ * decir Resuelto mientras el historial del modal marca No asistió en alguna
+ * fila: no se contradicen, hablan de cosas distintas — el chip del lead, cada
+ * fila de su propia sesión.
  */
 export function etapaLead(lead: LeadWithMeta, hoy: string): EtapaLead {
   const consultorias: ConParaEtapa[] =
     lead.sesiones ?? (lead.consultoria ? [lead.consultoria] : [])
 
   const elegida = agendamientoMostrado(consultorias, hoy)
-  return elegida ? etapaConsultoria(elegida, hoy) : 'Sin agendar'
+  if (!elegida) return 'Sin agendar'
+
+  if (consultorias.some((c) => c.registro_sesion != null)) return 'Resuelto'
+  return etapaConsultoria(elegida, hoy)
 }
 
 /**
