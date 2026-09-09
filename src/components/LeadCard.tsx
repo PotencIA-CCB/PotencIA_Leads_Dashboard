@@ -65,22 +65,25 @@ interface LeadCardProps {
 }
 
 /**
- * Etapas del embudo. Reemplazan al status de la consultoría en el chip de la
- * card: el status describe una sesión, no al lead, y un lead con cuatro
- * consultorías tenía tantos estados como sesiones.
+ * Estados del lead. Los tres que importan describen la consultoría y salen
+ * enteros del dato cargado, no de una edición manual:
+ *
+ *   Agendado    hay consultoría — la trajo la carga de Microsoft Bookings
+ *   No asistió  la fecha ya pasó y no aparece en el Excel de registro de sesión
+ *   Resuelto    aparece en el Excel de registro de sesión
+ *
+ * El cuarto cubre al que nunca reservó, que no tiene consultoría que describir.
+ * No hay estado "Registrado" porque todo lead lo está: no distingue nada.
  */
-export type EtapaLead = 'Sin actividad' | 'Registrado' | 'Agendado' | 'No asistió' | 'Resuelto'
+export type EtapaLead = 'Sin agendar' | 'Agendado' | 'No asistió' | 'Resuelto'
 
-export const ETAPAS: readonly EtapaLead[] = [
-  'Sin actividad', 'Registrado', 'Agendado', 'No asistió', 'Resuelto',
-]
+export const ETAPAS: readonly EtapaLead[] = ['Sin agendar', 'Agendado', 'No asistió', 'Resuelto']
 
-const etapaStyle: Record<EtapaLead, { dot: string; text: string }> = {
-  'Sin actividad': { dot: 'bg-slate-400',   text: 'text-slate-500' },
-  Registrado:      { dot: 'bg-amber-500',   text: 'text-amber-700' },
-  Agendado:        { dot: 'bg-sky-500',     text: 'text-sky-700' },
-  'No asistió':    { dot: 'bg-rose-500',    text: 'text-rose-700' },
-  Resuelto:        { dot: 'bg-emerald-500', text: 'text-emerald-700' },
+export const ETAPA_ESTILO: Record<EtapaLead, { dot: string; text: string }> = {
+  'Sin agendar': { dot: 'bg-slate-400',   text: 'text-slate-500' },
+  Agendado:      { dot: 'bg-sky-500',     text: 'text-sky-700' },
+  'No asistió':  { dot: 'bg-rose-500',    text: 'text-rose-700' },
+  Resuelto:      { dot: 'bg-emerald-500', text: 'text-emerald-700' },
 }
 
 /** `YYYY-MM-DD` de hoy en horario local, que es el que ve quien usa el panel. */
@@ -112,22 +115,26 @@ export function agendamientoMostrado<T extends { fecha: string }>(
   return [...consultorias].sort((a, b) => b.fecha.localeCompare(a.fecha))[0]!
 }
 
+/** Estado de UNA consultoría, mirando solo su fecha y su registro de sesión. */
+export function etapaConsultoria(c: ConParaEtapa, hoy: string): Exclude<EtapaLead, 'Sin agendar'> {
+  if (c.registro_sesion != null) return 'Resuelto'
+  return c.fecha >= hoy ? 'Agendado' : 'No asistió'
+}
+
 /**
- * Etapa del embudo del lead, derivada de los mismos tres hechos que usa
- * `computeFunnelStats` en capturaStats.ts: si llenó el formulario, si tiene
- * consultoría y si esa consultoría tiene sesión registrada. La fecha solo
- * separa al que todavía no llegó del que no apareció.
+ * Estado del lead. Le basta una sesión registrada, entre todas sus
+ * consultorías, para estar Resuelto; si no tiene ninguna registrada, lo
+ * describe la consultoría que muestra la card.
  */
 export function etapaLead(lead: LeadWithMeta, hoy: string): EtapaLead {
   const consultorias: ConParaEtapa[] =
     lead.sesiones ?? (lead.consultoria ? [lead.consultoria] : [])
 
-  if (consultorias.some((c) => c.registro_sesion != null)) return 'Resuelto'
-
   const elegida = agendamientoMostrado(consultorias, hoy)
-  if (elegida) return elegida.fecha >= hoy ? 'Agendado' : 'No asistió'
+  if (!elegida) return 'Sin agendar'
 
-  return lead.formulario ? 'Registrado' : 'Sin actividad'
+  if (consultorias.some((c) => c.registro_sesion != null)) return 'Resuelto'
+  return etapaConsultoria(elegida, hoy)
 }
 
 /**
@@ -175,7 +182,7 @@ function daysAgo(iso: string): string {
 
 export default function LeadCard({ lead, onClick }: LeadCardProps) {
   const etapa = etapaLead(lead, hoyYmd())
-  const status = etapaStyle[etapa]
+  const status = ETAPA_ESTILO[etapa]
   const con = lead.consultoria
   const form = lead.formulario
   const fullName = leadFullName(lead)

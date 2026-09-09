@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
-import { Lead, ConsultoriaStatus, Consultor } from '@/types'
+import { Lead, Consultor } from '@/types'
 import LeadCard, { etapaLead, agendamientoMostrado, consultorMostrado, hoyYmd, ETAPAS, type EtapaLead, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
 import { buildSessionHistory } from './sessionHistoryUtils'
 import LeadModal from '@/components/LeadModal'
@@ -158,22 +158,6 @@ const fetchData = async () => {
     return () => { ignore = true }
   }, [])
 
-  async function handleStatusChange(_leadId: string, consultoriaId: string, status: ConsultoriaStatus) {
-    const supabase = createClient()
-    await supabase.from('consultorias').update({ status }).eq('id', consultoriaId)
-    setLeads((prev) => prev.map((l) =>
-      l.consultoria?.id === consultoriaId
-        ? { ...l, consultoria: { ...l.consultoria!, status } }
-        : l
-    ))
-    if (selectedLead?.consultoria?.id === consultoriaId) {
-      setSelectedLead((prev) => prev ? {
-        ...prev,
-        consultoria: { ...prev.consultoria!, status },
-      } : prev)
-    }
-  }
-
   const consultoresUnicos = useMemo(() => {
     const names = new Set<string>()
     leads.forEach((l) => {
@@ -198,7 +182,9 @@ const fetchData = async () => {
       const regTs = regRaw ? new Date(regRaw) : null
       const matchDateFrom = !fromTs || (regTs !== null && regTs >= fromTs)
       const matchDateTo = !toTs || (regTs !== null && regTs <= toTs)
-      const matchPendientes5 = !pendientesMas5 || (eff === 'Registrado' && regTs !== null && regTs <= hace5)
+      // Su equivalente ahora es 'Sin agendar': se registro hace mas de 5 dias y
+      // todavia no reservo. Antes miraba 'Pendiente', que ya no existe.
+      const matchPendientes5 = !pendientesMas5 || (eff === 'Sin agendar' && regTs !== null && regTs <= hace5)
       const matchRenovado = !filterRenovado || l.renovado === filterRenovado
       const matchConsultor = !filterConsultor || consultorMostrado(l) === filterConsultor
 
@@ -287,7 +273,7 @@ const fetchData = async () => {
             }`}
           >
             <span className="material-symbols-outlined text-[13px]" aria-hidden="true">schedule</span>
-            Pendientes +5 días
+            Sin agendar +5 días
           </button>
         </div>
 
@@ -383,7 +369,6 @@ const fetchData = async () => {
         <LeadModal
           lead={selectedLead}
           onClose={() => setSelectedLead(null)}
-          onStatusChange={handleStatusChange}
         />
       )}
     </>

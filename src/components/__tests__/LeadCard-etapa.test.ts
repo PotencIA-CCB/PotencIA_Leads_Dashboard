@@ -7,7 +7,7 @@
  * BI no puedan contradecirse.
  */
 import { describe, it, expect } from 'vitest'
-import { etapaLead, agendamientoMostrado, consultorMostrado } from '../LeadCard'
+import { etapaLead, etapaConsultoria, agendamientoMostrado, consultorMostrado } from '../LeadCard'
 import type { LeadWithMeta, SessionHistoryItem } from '../LeadCard'
 
 const HOY = '2026-09-09'
@@ -43,13 +43,13 @@ function lead(over: Partial<LeadWithMeta> = {}): LeadWithMeta {
 }
 
 describe('etapaLead', () => {
-  it('sin formulario ni consultoría es Sin actividad', () => {
-    expect(etapaLead(lead(), HOY)).toBe('Sin actividad')
+  it('sin consultoría es Sin agendar', () => {
+    expect(etapaLead(lead(), HOY)).toBe('Sin agendar')
   })
 
-  it('con formulario y sin consultoría es Registrado', () => {
+  it('haber llenado el formulario no cambia nada: sin consultoría sigue siendo Sin agendar', () => {
     const l = lead({ formulario: { tema: 'IA', descripcion: null, fecha_registro: '2026-08-01' } })
-    expect(etapaLead(l, HOY)).toBe('Registrado')
+    expect(etapaLead(l, HOY)).toBe('Sin agendar')
   })
 
   it('con consultoría futura y sin sesión es Agendado', () => {
@@ -73,12 +73,35 @@ describe('etapaLead', () => {
     expect(etapaLead(l, HOY)).toBe('Resuelto')
   })
 
-  it('la consultoría manda sobre el formulario: registrado y agendado es Agendado', () => {
+  it('la consultoría manda sobre el formulario', () => {
     const l = lead({
       formulario: { tema: 'IA', descripcion: null, fecha_registro: '2026-08-01' },
       sesiones: [sesion('2026-09-20')],
     })
     expect(etapaLead(l, HOY)).toBe('Agendado')
+  })
+})
+
+describe('etapaConsultoria', () => {
+  it('con registro de sesión es Resuelto', () => {
+    expect(etapaConsultoria(sesion('2026-08-20', true), HOY)).toBe('Resuelto')
+  })
+
+  it('futura y sin registro es Agendado', () => {
+    expect(etapaConsultoria(sesion('2026-09-20'), HOY)).toBe('Agendado')
+  })
+
+  it('pasada y sin registro es No asistió', () => {
+    expect(etapaConsultoria(sesion('2026-08-20'), HOY)).toBe('No asistió')
+  })
+
+  it('a diferencia de etapaLead, mira solo su propia sesión', () => {
+    const conRegistro = sesion('2026-08-20', true)
+    const sinRegistro = sesion('2026-08-21')
+    const l = lead({ sesiones: [conRegistro, sinRegistro] })
+
+    expect(etapaLead(l, HOY)).toBe('Resuelto')
+    expect(etapaConsultoria(sinRegistro, HOY)).toBe('No asistió')
   })
 })
 

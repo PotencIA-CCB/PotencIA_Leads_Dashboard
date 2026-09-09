@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Lead, ConsultoriaStatus, leadFullName } from '@/types'
+import { useEffect } from 'react'
+import { Lead, leadFullName } from '@/types'
+import { etapaLead, etapaConsultoria, hoyYmd, ETAPA_ESTILO } from '@/components/LeadCard'
 import type { LeadWithMeta, LeadCardConsultoria, SessionHistoryItem } from '@/components/LeadCard'
 
 /**
@@ -15,17 +16,9 @@ export function shouldShowSessionHistory(
   return Array.isArray(sesiones) && sesiones.length > 1
 }
 
-// Los 7 que admite el CHECK de consultorias desde la migracion de reconciliacion
-// (20260908_reconcile_ingest_schema.sql). Con 5, una consultoria en 'Escalar' o
-// 'No asistio' mostraba un desplegable donde su propio valor no existia.
-const statusOptions: ConsultoriaStatus[] = [
-  'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado', 'No asistió', 'Escalar',
-]
-
 interface LeadModalProps {
   lead: LeadWithMeta
   onClose: () => void
-  onStatusChange: (id: string, consultoriaId: string, status: ConsultoriaStatus) => void
 }
 
 /**
@@ -71,9 +64,9 @@ export function hasRegistroSesionData(
   )
 }
 
-export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalProps) {
-  const [saved, setSaved] = useState(false)
+export default function LeadModal({ lead, onClose }: LeadModalProps) {
   const fullName = leadFullName(lead)
+  const etapa = etapaLead(lead, hoyYmd())
   const con = lead.consultoria as (LeadCardConsultoria & { id_consultor?: string | null }) | undefined | null
   const form = lead.formulario
   const channels = lead.origen
@@ -86,11 +79,6 @@ export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalPr
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
-
-  function showSaved() {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 1800)
-  }
 
   return (
     <div
@@ -129,11 +117,6 @@ export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalPr
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {saved && (
-                <span className="text-xs text-emerald-600 font-medium" aria-live="polite">
-                  Guardado
-                </span>
-              )}
               <button
                 onClick={onClose}
                 className="w-9 h-9 rounded-lg text-slate-400 flex items-center justify-center cursor-pointer"
@@ -151,13 +134,10 @@ export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalPr
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {con && (
               <Field label="Estado">
-                <select
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#00C8FF]/30 focus:border-[#00C8FF]/50 focus-visible:ring-2 focus-visible:ring-[#00C8FF]/40 transition-colors cursor-pointer"
-                  value={con.status}
-                  onChange={(e) => { onStatusChange(lead.id, con.id, e.target.value as ConsultoriaStatus); showSaved() }}
-                >
-                  {statusOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-100 text-sm text-slate-700">
+                  <span className={`w-1.5 h-1.5 rounded-full ${ETAPA_ESTILO[etapa].dot}`} aria-hidden="true" />
+                  {etapa}
+                </span>
               </Field>
             )}
 
@@ -276,18 +256,9 @@ export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalPr
 // SessionHistoryCard — file-private sub-component
 // ---------------------------------------------------------------------------
 
-const historyStatusStyle: Record<string, { dot: string; text: string }> = {
-  Pendiente:        { dot: 'bg-amber-500',   text: 'text-amber-700' },
-  Agendado:         { dot: 'bg-sky-500',     text: 'text-sky-700' },
-  'En seguimiento': { dot: 'bg-indigo-500',  text: 'text-indigo-700' },
-  Resuelto:         { dot: 'bg-emerald-500', text: 'text-emerald-700' },
-  Cancelado:        { dot: 'bg-slate-400',   text: 'text-slate-500' },
-  'No asistió':     { dot: 'bg-rose-500',    text: 'text-rose-700' },
-  Escalar:          { dot: 'bg-orange-500',  text: 'text-orange-700' },
-}
-
 function SessionHistoryCard({ sesion }: { sesion: SessionHistoryItem }) {
-  const badge = historyStatusStyle[sesion.status] ?? historyStatusStyle['Pendiente']!
+  const etapa = etapaConsultoria(sesion, hoyYmd())
+  const badge = ETAPA_ESTILO[etapa]
   const formattedDate = new Date(sesion.fecha + 'T00:00:00').toLocaleDateString('es-CO', {
     weekday: 'long',
     day: '2-digit',
@@ -310,7 +281,7 @@ function SessionHistoryCard({ sesion }: { sesion: SessionHistoryItem }) {
         </div>
         <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider shrink-0 ${badge.text}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} aria-hidden="true" />
-          {sesion.status}
+          {etapa}
         </span>
       </div>
 
