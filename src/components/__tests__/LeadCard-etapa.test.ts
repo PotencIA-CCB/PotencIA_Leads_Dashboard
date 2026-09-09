@@ -68,9 +68,20 @@ describe('etapaLead', () => {
     expect(etapaLead(lead({ sesiones: [sesion('2026-08-20', true)] }), HOY)).toBe('Resuelto')
   })
 
-  it('basta una sesión registrada entre varias para ser Resuelto', () => {
+  it('describe la consultoría que muestra la card, no a las demás', () => {
+    // La card muestra la futura: su chip dice Agendado aunque una sesión vieja
+    // ya esté registrada. Antes bastaba una registrada para decir Resuelto, y
+    // entonces la card contradecía al historial del modal sobre el mismo lead.
     const l = lead({ sesiones: [sesion('2026-09-20'), sesion('2026-08-20', true)] })
-    expect(etapaLead(l, HOY)).toBe('Resuelto')
+    expect(etapaLead(l, HOY)).toBe('Agendado')
+  })
+
+  it('coincide siempre con lo que el historial dice de la consultoría mostrada', () => {
+    const futura = sesion('2026-09-20')
+    const pasada = sesion('2026-08-20', true)
+    const l = lead({ sesiones: [futura, pasada] })
+
+    expect(etapaLead(l, HOY)).toBe(etapaConsultoria(futura, HOY))
   })
 
   it('la consultoría manda sobre el formulario', () => {
@@ -95,13 +106,15 @@ describe('etapaConsultoria', () => {
     expect(etapaConsultoria(sesion('2026-08-20'), HOY)).toBe('No asistió')
   })
 
-  it('a diferencia de etapaLead, mira solo su propia sesión', () => {
+  it('evalúa cada sesión por separado: dos del mismo lead pueden diferir', () => {
     const conRegistro = sesion('2026-08-20', true)
     const sinRegistro = sesion('2026-08-21')
-    const l = lead({ sesiones: [conRegistro, sinRegistro] })
 
-    expect(etapaLead(l, HOY)).toBe('Resuelto')
+    expect(etapaConsultoria(conRegistro, HOY)).toBe('Resuelto')
     expect(etapaConsultoria(sinRegistro, HOY)).toBe('No asistió')
+
+    // Y el chip del lead es el de la que muestra la card: la más reciente.
+    expect(etapaLead(lead({ sesiones: [conRegistro, sinRegistro] }), HOY)).toBe('No asistió')
   })
 })
 

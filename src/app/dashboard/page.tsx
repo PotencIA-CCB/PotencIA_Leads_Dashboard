@@ -49,6 +49,7 @@ const fetchData = async () => {
       .from('leads')
       .select('*')
       .order('updated_at', { ascending: false })
+      .limit(20000)
 
     const baseLeads = (leadsData as Lead[]) || []
     if (baseLeads.length === 0) {
@@ -57,14 +58,15 @@ const fetchData = async () => {
       return
     }
 
-    const leadIds = baseLeads.map((l) => l.id)
-
     // 2) Fetch latest formulario_landing per lead
+    // Sin `.in('id_lead', leadIds)`: leads se trae completa, asi que el filtro no
+    // acotaba nada y con 573 leads ya eran ~21 KB de UUIDs en la URL. Mismo
+    // riesgo que tenia registro_sesion, todavia sin estallar.
     const { data: formulariosData } = await supabase
       .from('formularios_landing')
       .select('id_lead, tema, descripcion, fecha_registro')
-      .in('id_lead', leadIds)
       .order('created_at', { ascending: true })
+      .limit(20000)
 
     const formularioByLead: Record<string, LeadCardFormulario> = {}
     if (formulariosData) {
@@ -79,21 +81,17 @@ const fetchData = async () => {
     const { data: consultoriasData } = await supabase
       .from('consultorias')
       .select('id, id_lead, id_consultor, fecha, hora_inicio, hora_fin, modalidad, duracion_minutos, servicio, staff_name, staff_email, categoria_caso_uso, status')
-      .in('id_lead', leadIds)
       .order('fecha', { ascending: false })
       .order('hora_inicio', { ascending: false })
+      .limit(20000)
 
     // La card muestra el agendamiento futuro mas proximo, no el mas lejano: se
     // agrupa por lead y se elige con agendamientoMostrado.
     const consultoriaByLead: Record<string, LeadCardConsultoria> = {}
-    const allConsultorIds: string[] = []
-    const allConsultoriaIds: string[] = []
     if (consultoriasData) {
       const porLead: Record<string, LeadCardConsultoria[]> = {}
       for (const c of consultoriasData) {
         ;(porLead[c.id_lead] ??= []).push(c as LeadCardConsultoria)
-        if (c.id_consultor) allConsultorIds.push(c.id_consultor)
-        if (c.id) allConsultoriaIds.push(c.id)
       }
       const hoy = hoyYmd()
       for (const [leadId, lista] of Object.entries(porLead)) {
@@ -103,12 +101,26 @@ const fetchData = async () => {
     }
 
     // 4) Fetch consultores + registro_sesion (parallel — independent)
+    //
+    // registro_sesion se trae entera, sin `.in(allConsultoriaIds)`: con 851
+    // consultorias ese filtro armaba una URL de ~31 KB de UUIDs que el gateway
+    // rechaza, y la respuesta vacia se veia identica a "este lead no tiene
+    // sesiones" — todos los Resueltos desaparecian. Es la misma consulta sin
+    // filtro que ya hace dashboard/consultores/page.tsx:118. El .limit()
+    // explicito sustituye al tope silencioso de 1000 filas de PostgREST.
     const [consRes, sesionRes] = await Promise.all([
       supabase.from('consultores').select('id, nombre, email, rol, created_at'),
-      allConsultoriaIds.length > 0
-        ? supabase.from('registro_sesion').select('id_consultoria, estado_inicial, acciones_realizadas, resultado_final, resultado').in('id_consultoria', allConsultoriaIds)
-        : Promise.resolve({ data: [] as Array<{ id_consultoria: string; estado_inicial: string | null; acciones_realizadas: string | null; resultado_final: string | null; resultado: string | null }> }),
+      supabase
+        .from('registro_sesion')
+        .select('id_consultoria, estado_inicial, acciones_realizadas, resultado_final, resultado')
+        .limit(20000),
     ])
+
+    // Un error aca no puede pasar por silencio: sin registros, cada consultoria
+    // pasada se etiqueta No asistio, que es data equivocada y no un vacio.
+    if (sesionRes.error) {
+      console.error('No se pudieron leer los registros de sesion:', sesionRes.error.message)
+    }
 
     const allConsultores = (consRes.data as Consultor[]) || []
     const consultorById: Record<string, string> = {}
