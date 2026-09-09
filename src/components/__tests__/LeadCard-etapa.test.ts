@@ -136,7 +136,16 @@ describe('consultorMostrado', () => {
     expect(consultorMostrado(l)).toBe('Asignado En Base')
   })
 
+  it('para un lead que no es de booking cae al staff cuando no hay asignado', () => {
+    const l = lead({
+      origen: 'ambos',
+      consultoria: { staff_name: 'Staff Del Archivo' } as LeadWithMeta['consultoria'],
+    })
+    expect(consultorMostrado(l)).toBe('Staff Del Archivo')
+  })
+
   it('devuelve null cuando no hay ninguno', () => {
     expect(consultorMostrado(lead({ origen: 'booking' }))).toBeNull()
+    expect(consultorMostrado(lead({ origen: 'landing' }))).toBeNull()
   })
 })

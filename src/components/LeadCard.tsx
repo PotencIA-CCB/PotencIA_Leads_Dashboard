@@ -136,9 +136,14 @@ export function etapaLead(lead: LeadWithMeta, hoy: string): EtapaLead {
  * difieren, hay consultores visibles en las cards que el filtro no encuentra.
  */
 export function consultorMostrado(lead: LeadWithMeta): string | null {
-  return lead.origen === 'booking'
-    ? (lead.consultoria?.staff_name ?? lead.consultor_nombre ?? null)
-    : (lead.consultor_nombre ?? null)
+  const asignado = lead.consultor_nombre ?? null
+  const staff = lead.consultoria?.staff_name ?? null
+
+  // El origen decide a quien creerle primero: en una reserva manda el staff que
+  // trajo Bookings; en el resto, la asignacion de la base. Pero siempre hay
+  // respaldo: sin el, un lead con staff_name y sin id_consultor no mostraba
+  // consultor y quedaba fuera del filtro aunque supieramos quien lo atendio.
+  return lead.origen === 'booking' ? (staff ?? asignado) : (asignado ?? staff)
 }
 
 function getInitials(name: string): string {
