@@ -235,3 +235,101 @@ describe('normalizeBookingRow', () => {
     expect(r.row.consultoria.staff_email).toBe('carlos@camarabaq.org.co')
   })
 })
+
+/**
+ * El export real que descarga la Cámara viene con los encabezados en español
+ * (`BookingsReportingData.tsv`, 2026-09-09). n8n/WF-2 se escribió contra un
+ * export en inglés, así que el módulo heredó solo esos nombres y rechazaba el
+ * archivo de producción entero antes de previsualizar una sola fila.
+ */
+const HEADERS_ES = [
+  'Fecha y hora',
+  'Nombre del cliente',
+  'Correo electrónico del cliente',
+  'Teléfono del cliente',
+  'Dirección del cliente',
+  'Personal',
+  'Nombre de personal',
+  'Correo electrónico de personal',
+  'Servicio',
+  'Ubicación',
+  'Duración (min)',
+  'Tipo de precios',
+  'Precio',
+  'Moneda',
+  'Asistentes con CC',
+  'Recuento de asistentes con sesión iniciada',
+  'Se han habilitado las notificaciones de texto',
+  ' Campos personalizados',
+  'Tipo de evento',
+  'Id. de reserva',
+  'Datos de seguimiento',
+]
+
+function filaEs(valores: Partial<Record<string, string>> = {}): Record<string, unknown> {
+  return {
+    'Fecha y hora': '15/09/2026 14:30',
+    'Nombre del cliente': 'Ana Pérez',
+    'Correo electrónico del cliente': 'ana@empresa.com',
+    'Teléfono del cliente': '+57 300 1234567',
+    'Nombre de personal': 'Carlos Consultor',
+    'Correo electrónico de personal': 'carlos@camarabaq.org.co',
+    'Servicio': 'Consultoría PotencIA',
+    'Duración (min)': '120',
+    'Id. de reserva': 'BK-ES-001',
+    ' Campos personalizados': '',
+    ...valores,
+  }
+}
+
+describe('export de Bookings en español', () => {
+  it('headersLookLikeBookings reconoce los encabezados en español', () => {
+    expect(headersLookLikeBookings(HEADERS_ES)).toBe(true)
+  })
+
+  it('normalizeBookingRow lee una fila en español igual que una en inglés', () => {
+    const r = normalizeBookingRow(filaEs(), 2)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+
+    expect(r.row.clave).toBe('BK-ES-001')
+    expect(r.row.lead.p_email).toBe('ana@empresa.com')
+    expect(r.row.lead.p_nombre_completo).toBe('Ana Pérez')
+    expect(r.row.lead.p_phone).toBe('+57 300 1234567')
+    expect(r.row.lead.p_booking_customer_id).toBe('BK-ES-001')
+
+    expect(r.row.consultoria.booking_id).toBe('BK-ES-001')
+    expect(r.row.consultoria.fecha).toBe('2026-09-15')
+    expect(r.row.consultoria.hora_inicio).toBe('14:30')
+    expect(r.row.consultoria.duracion_minutos).toBe(120)
+    expect(r.row.consultoria.hora_fin).toBe('16:30')
+    expect(r.row.consultoria.staff_name).toBe('Carlos Consultor')
+    expect(r.row.consultoria.staff_email).toBe('carlos@camarabaq.org.co')
+    expect(r.row.consultoria.servicio).toBe('Consultoría PotencIA')
+    expect(r.avisos).toEqual([])
+  })
+
+  it('lee la modalidad desde Campos personalizados, con el espacio inicial del export', () => {
+    const r = normalizeBookingRow(
+      filaEs({
+        ' Campos personalizados':
+          '{"Selecciona la Modalidad de tu sesión":"Presencial en la sede"}',
+      }),
+      2,
+    )
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.row.consultoria.modalidad).toBe('Presencial')
+  })
+
+  it('cae a Nombre de personal ausente usando la columna Personal', () => {
+    const sinNombre = filaEs({ 'Personal': 'Carlos Consultor' })
+    delete sinNombre['Nombre de personal']
+    delete sinNombre['Correo electrónico de personal']
+
+    const r = normalizeBookingRow(sinNombre, 2)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.row.consultoria.staff_name).toBe('Carlos Consultor')
+  })
+})

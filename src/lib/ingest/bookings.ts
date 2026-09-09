@@ -9,17 +9,22 @@ import type {
 
 /**
  * Encabezados mínimos que identifican el export de Microsoft Bookings.
- * Se usan para rechazar el archivo completo cuando corresponde al otro tipo
- * de carga, en vez de dejar que fallen 142 filas una por una.
+ * Cada entrada es un grupo de variantes: basta con que una esté presente.
+ *
+ * Bookings localiza los encabezados según el idioma de la cuenta. n8n/WF-2 se
+ * escribió contra un export en inglés, pero el que descarga la Cámara viene en
+ * español, así que ambos idiomas tienen que resolver.
  */
-export const EXPECTED_BOOKING_HEADERS: readonly string[] = [
-  'Customer Email',
-  'Date Time',
+const GRUPOS_BOOKING: readonly (readonly string[])[] = [
+  ['Customer Email', 'Correo electrónico del cliente'],
+  ['Date Time', 'Fecha y hora'],
 ]
+
+export const EXPECTED_BOOKING_HEADERS: readonly string[] = GRUPOS_BOOKING.map((g) => g[0]!)
 
 export function headersLookLikeBookings(headers: string[]): boolean {
   const presentes = new Set(headers.map((h) => normKey(h)))
-  return EXPECTED_BOOKING_HEADERS.every((h) => presentes.has(normKey(h)))
+  return GRUPOS_BOOKING.every((grupo) => grupo.some((v) => presentes.has(normKey(v))))
 }
 
 /** Parsea el .tsv crudo: tabs, sin quotes, fila 0 = encabezados. */
@@ -75,13 +80,13 @@ export function normalizeBookingRow(
   const errores: RowIssue[] = []
   const avisos: RowIssue[] = []
 
-  const emailRaw = col(raw, 'Customer Email')
+  const emailRaw = col(raw, 'Customer Email', 'Correo electrónico del cliente')
   const email = emailRaw === null ? null : emailRaw.toLowerCase()
   if (email === null || !email.includes('@')) {
     errores.push({ fila, severidad: 'error', motivo: 'Correo del cliente ausente o inválido' })
   }
 
-  const dtRaw = col(raw, 'Date Time')
+  const dtRaw = col(raw, 'Date Time', 'Fecha y hora')
   const dt = dtRaw === null ? null : parseBookingDateTime(dtRaw)
   if (dt === null) {
     errores.push({
@@ -97,7 +102,7 @@ export function normalizeBookingRow(
     return { ok: false, fila, errores }
   }
 
-  const duracion = toInt(col(raw, 'Duration (mins.)', 'Duration'))
+  const duracion = toInt(col(raw, 'Duration (mins.)', 'Duration', 'Duración (min)', 'Duración'))
   if (duracion === null) {
     avisos.push({
       fila,
@@ -106,9 +111,9 @@ export function normalizeBookingRow(
     })
   }
 
-  const staffEmailRaw = col(raw, 'Staff Email')
+  const staffEmailRaw = col(raw, 'Staff Email', 'Correo electrónico de personal')
   const staffEmail = staffEmailRaw === null ? null : staffEmailRaw.toLowerCase()
-  const staffName = col(raw, 'Staff Name', 'Staff')
+  const staffName = col(raw, 'Staff Name', 'Staff', 'Nombre de personal', 'Personal')
   if (staffEmail === null && staffName === null) {
     avisos.push({
       fila,
@@ -117,8 +122,8 @@ export function normalizeBookingRow(
     })
   }
 
-  const bookingId = col(raw, 'Booking Id')
-  const servicio = col(raw, 'Service')
+  const bookingId = col(raw, 'Booking Id', 'Id. de reserva')
+  const servicio = col(raw, 'Service', 'Servicio')
 
   return {
     ok: true,
@@ -128,8 +133,8 @@ export function normalizeBookingRow(
       clave: bookingId ?? `${email}|${dt.fecha}|${dt.hora}`,
       lead: {
         p_email: email,
-        p_nombre_completo: col(raw, 'Customer Name') ?? 'Sin nombre',
-        p_phone: col(raw, 'Customer Phone'),
+        p_nombre_completo: col(raw, 'Customer Name', 'Nombre del cliente') ?? 'Sin nombre',
+        p_phone: col(raw, 'Customer Phone', 'Teléfono del cliente'),
         p_id_num: null,
         p_nit: null,
         p_city: null,
@@ -149,7 +154,7 @@ export function normalizeBookingRow(
         hora_inicio: dt.hora,
         hora_fin: addMinutes(dt.hora, duracion),
         duracion_minutos: duracion,
-        modalidad: extraerModalidad(col(raw, 'Custom Fields')),
+        modalidad: extraerModalidad(col(raw, 'Custom Fields', 'Campos personalizados')),
         servicio,
         staff_name: staffName,
         staff_email: staffEmail,
