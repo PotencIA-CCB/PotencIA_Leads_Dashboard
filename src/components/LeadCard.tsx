@@ -64,12 +64,81 @@ interface LeadCardProps {
   onClick: (lead: LeadWithMeta) => void
 }
 
-const statusStyle: Record<string, { dot: string; label: string; text: string }> = {
-  Pendiente:        { dot: 'bg-amber-500',    label: 'Pendiente',      text: 'text-amber-700' },
-  Agendado:         { dot: 'bg-sky-500',      label: 'Agendado',       text: 'text-sky-700' },
-  'En seguimiento': { dot: 'bg-indigo-500',   label: 'En seguimiento', text: 'text-indigo-700' },
-  Resuelto:         { dot: 'bg-emerald-500',  label: 'Resuelto',       text: 'text-emerald-700' },
-  Cancelado:        { dot: 'bg-slate-400',    label: 'Cancelado',      text: 'text-slate-500' },
+/**
+ * Etapas del embudo. Reemplazan al status de la consultoría en el chip de la
+ * card: el status describe una sesión, no al lead, y un lead con cuatro
+ * consultorías tenía tantos estados como sesiones.
+ */
+export type EtapaLead = 'Sin actividad' | 'Registrado' | 'Agendado' | 'No asistió' | 'Resuelto'
+
+export const ETAPAS: readonly EtapaLead[] = [
+  'Sin actividad', 'Registrado', 'Agendado', 'No asistió', 'Resuelto',
+]
+
+const etapaStyle: Record<EtapaLead, { dot: string; text: string }> = {
+  'Sin actividad': { dot: 'bg-slate-400',   text: 'text-slate-500' },
+  Registrado:      { dot: 'bg-amber-500',   text: 'text-amber-700' },
+  Agendado:        { dot: 'bg-sky-500',     text: 'text-sky-700' },
+  'No asistió':    { dot: 'bg-rose-500',    text: 'text-rose-700' },
+  Resuelto:        { dot: 'bg-emerald-500', text: 'text-emerald-700' },
+}
+
+/** `YYYY-MM-DD` de hoy en horario local, que es el que ve quien usa el panel. */
+export function hoyYmd(d: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+type ConParaEtapa = { fecha: string; registro_sesion?: LeadCardConsultoria['registro_sesion'] }
+
+/**
+ * De todas las consultorías de un lead, la que representa a la card: el
+ * agendamiento futuro más próximo, y si no hay ninguno, el pasado más reciente.
+ *
+ * Las fechas son `YYYY-MM-DD`, así que se comparan como texto: sin `Date`, sin
+ * zona horaria de por medio.
+ */
+export function agendamientoMostrado<T extends { fecha: string }>(
+  consultorias: T[],
+  hoy: string,
+): T | null {
+  if (consultorias.length === 0) return null
+
+  const futuras = consultorias
+    .filter((c) => c.fecha >= hoy)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+  if (futuras.length > 0) return futuras[0]!
+
+  return [...consultorias].sort((a, b) => b.fecha.localeCompare(a.fecha))[0]!
+}
+
+/**
+ * Etapa del embudo del lead, derivada de los mismos tres hechos que usa
+ * `computeFunnelStats` en capturaStats.ts: si llenó el formulario, si tiene
+ * consultoría y si esa consultoría tiene sesión registrada. La fecha solo
+ * separa al que todavía no llegó del que no apareció.
+ */
+export function etapaLead(lead: LeadWithMeta, hoy: string): EtapaLead {
+  const consultorias: ConParaEtapa[] =
+    lead.sesiones ?? (lead.consultoria ? [lead.consultoria] : [])
+
+  if (consultorias.some((c) => c.registro_sesion != null)) return 'Resuelto'
+
+  const elegida = agendamientoMostrado(consultorias, hoy)
+  if (elegida) return elegida.fecha >= hoy ? 'Agendado' : 'No asistió'
+
+  return lead.formulario ? 'Registrado' : 'Sin actividad'
+}
+
+/**
+ * El consultor que se muestra. Vive acá y no suelto en el render porque la
+ * lista y el filtro de la página tienen que preguntar exactamente lo mismo: si
+ * difieren, hay consultores visibles en las cards que el filtro no encuentra.
+ */
+export function consultorMostrado(lead: LeadWithMeta): string | null {
+  return lead.origen === 'booking'
+    ? (lead.consultoria?.staff_name ?? lead.consultor_nombre ?? null)
+    : (lead.consultor_nombre ?? null)
 }
 
 function getInitials(name: string): string {
@@ -99,23 +168,16 @@ function daysAgo(iso: string): string {
   return months === 1 ? 'Hace 1 mes' : `Hace ${months} meses`
 }
 
-export function effectiveStatus(lead: LeadWithMeta): string {
-  return lead.consultoria?.status ?? 'Pendiente'
-}
-
 export default function LeadCard({ lead, onClick }: LeadCardProps) {
-  const effStatus = effectiveStatus(lead)
-  const status = statusStyle[effStatus] ?? statusStyle['Pendiente']
+  const etapa = etapaLead(lead, hoyYmd())
+  const status = etapaStyle[etapa]
   const con = lead.consultoria
   const form = lead.formulario
   const fullName = leadFullName(lead)
   const initials = getInitials(fullName)
 
   const casoDeUso = con?.categoria_caso_uso ?? form?.tema ?? form?.descripcion ?? null
-  const displayConsultor =
-    lead.origen === 'booking'
-      ? (con?.staff_name ?? lead.consultor_nombre ?? null)
-      : (lead.consultor_nombre ?? null)
+  const displayConsultor = consultorMostrado(lead)
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -151,7 +213,7 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
           </h3>
           <span className={`inline-flex items-center gap-1.5 mt-1 text-[10px] font-semibold uppercase tracking-wider ${status.text}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-            {status.label}
+            {etapa}
           </span>
         </div>
 

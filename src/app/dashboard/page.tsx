@@ -3,20 +3,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient, getCurrentConsultor } from '@/lib/supabase-browser'
 import { Lead, ConsultoriaStatus, Consultor } from '@/types'
-import LeadCard, { effectiveStatus, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
+import LeadCard, { etapaLead, agendamientoMostrado, consultorMostrado, hoyYmd, ETAPAS, type EtapaLead, type LeadWithMeta, type LeadCardConsultoria, type LeadCardFormulario } from '@/components/LeadCard'
 import { buildSessionHistory } from './sessionHistoryUtils'
 import LeadModal from '@/components/LeadModal'
 import { matchesSearch, paginate } from './searchHelpers'
 
-const statusOptions: Array<'Todos' | ConsultoriaStatus> = ['Todos', 'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
+const etapaOptions: Array<'Todos' | EtapaLead> = ['Todos', ...ETAPAS]
 
-const statusChip: Record<string, { active: string; idle: string }> = {
-  Todos:            { active: 'bg-[#003087] text-white border border-[#003087]',     idle: 'bg-white text-slate-600 border border-slate-200' },
-  Pendiente:        { active: 'bg-amber-500 text-white border border-amber-500',     idle: 'bg-white text-amber-700 border border-amber-200' },
-  Agendado:         { active: 'bg-sky-600 text-white border border-sky-600',         idle: 'bg-white text-sky-700 border border-sky-200' },
-  'En seguimiento': { active: 'bg-indigo-600 text-white border border-indigo-600',   idle: 'bg-white text-indigo-700 border border-indigo-200' },
-  Resuelto:         { active: 'bg-emerald-600 text-white border border-emerald-600', idle: 'bg-white text-emerald-700 border border-emerald-200' },
-  Cancelado:        { active: 'bg-slate-600 text-white border border-slate-600',     idle: 'bg-white text-slate-600 border border-slate-200' },
+const etapaChip: Record<string, { active: string; idle: string }> = {
+  Todos:           { active: 'bg-[#003087] text-white border border-[#003087]',     idle: 'bg-white text-slate-600 border border-slate-200' },
+  'Sin actividad': { active: 'bg-slate-600 text-white border border-slate-600',     idle: 'bg-white text-slate-600 border border-slate-200' },
+  Registrado:      { active: 'bg-amber-500 text-white border border-amber-500',     idle: 'bg-white text-amber-700 border border-amber-200' },
+  Agendado:        { active: 'bg-sky-600 text-white border border-sky-600',         idle: 'bg-white text-sky-700 border border-sky-200' },
+  'No asistió':    { active: 'bg-rose-600 text-white border border-rose-600',       idle: 'bg-white text-rose-700 border border-rose-200' },
+  Resuelto:        { active: 'bg-emerald-600 text-white border border-emerald-600', idle: 'bg-white text-emerald-700 border border-emerald-200' },
 }
 
 
@@ -25,7 +25,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<LeadWithMeta | null>(null)
   const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'Todos' | ConsultoriaStatus>('Todos')
+  const [filterStatus, setFilterStatus] = useState<'Todos' | EtapaLead>('Todos')
   const [filterRenovado, setFilterRenovado] = useState<string>('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
@@ -83,14 +83,22 @@ const fetchData = async () => {
       .order('fecha', { ascending: false })
       .order('hora_inicio', { ascending: false })
 
+    // La card muestra el agendamiento futuro mas proximo, no el mas lejano: se
+    // agrupa por lead y se elige con agendamientoMostrado.
     const consultoriaByLead: Record<string, LeadCardConsultoria> = {}
     const allConsultorIds: string[] = []
     const allConsultoriaIds: string[] = []
     if (consultoriasData) {
+      const porLead: Record<string, LeadCardConsultoria[]> = {}
       for (const c of consultoriasData) {
-        if (!consultoriaByLead[c.id_lead]) consultoriaByLead[c.id_lead] = c as LeadCardConsultoria
+        ;(porLead[c.id_lead] ??= []).push(c as LeadCardConsultoria)
         if (c.id_consultor) allConsultorIds.push(c.id_consultor)
         if (c.id) allConsultoriaIds.push(c.id)
+      }
+      const hoy = hoyYmd()
+      for (const [leadId, lista] of Object.entries(porLead)) {
+        const elegida = agendamientoMostrado(lista, hoy)
+        if (elegida) consultoriaByLead[leadId] = elegida
       }
     }
 
@@ -169,28 +177,30 @@ const fetchData = async () => {
   const consultoresUnicos = useMemo(() => {
     const names = new Set<string>()
     leads.forEach((l) => {
-      if (l.consultor_nombre) names.add(l.consultor_nombre)
+      const nombre = consultorMostrado(l)
+      if (nombre) names.add(nombre)
     })
     return Array.from(names).sort((a, b) => a.localeCompare(b))
   }, [leads])
 
   const filtered = useMemo(() => {
+    const hoy = hoyYmd()
     const hace5 = new Date(Date.now() - 5 * 86400000)
     const fromTs = filterDateFrom ? new Date(filterDateFrom + 'T00:00:00') : null
     const toTs = filterDateTo ? new Date(filterDateTo + 'T23:59:59') : null
 
     return leads.filter((l) => {
       const matchSearch = matchesSearch(l, search)
-      const eff = effectiveStatus(l)
+      const eff = etapaLead(l, hoy)
       const matchStatus = filterStatus === 'Todos' || eff === filterStatus
 
       const regRaw = l.formulario?.fecha_registro ?? l.created_at
       const regTs = regRaw ? new Date(regRaw) : null
       const matchDateFrom = !fromTs || (regTs !== null && regTs >= fromTs)
       const matchDateTo = !toTs || (regTs !== null && regTs <= toTs)
-      const matchPendientes5 = !pendientesMas5 || (eff === 'Pendiente' && regTs !== null && regTs <= hace5)
+      const matchPendientes5 = !pendientesMas5 || (eff === 'Registrado' && regTs !== null && regTs <= hace5)
       const matchRenovado = !filterRenovado || l.renovado === filterRenovado
-      const matchConsultor = !filterConsultor || l.consultor_nombre === filterConsultor
+      const matchConsultor = !filterConsultor || consultorMostrado(l) === filterConsultor
 
       return matchSearch && matchStatus && matchDateFrom && matchDateTo && matchPendientes5 && matchRenovado && matchConsultor
     })
@@ -254,9 +264,9 @@ const fetchData = async () => {
 
         <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mr-1">Estado</span>
-          {statusOptions.map((s) => {
+          {etapaOptions.map((s) => {
             const active = filterStatus === s
-            const styles = statusChip[s]
+            const styles = etapaChip[s]!
             return (
               <button
                 key={s}

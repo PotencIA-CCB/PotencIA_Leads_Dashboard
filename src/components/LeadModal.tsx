@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { Lead, ConsultoriaStatus, leadFullName } from '@/types'
-import { effectiveStatus } from '@/components/LeadCard'
 import type { LeadWithMeta, LeadCardConsultoria, SessionHistoryItem } from '@/components/LeadCard'
 
 /**
@@ -16,7 +15,12 @@ export function shouldShowSessionHistory(
   return Array.isArray(sesiones) && sesiones.length > 1
 }
 
-const statusOptions: ConsultoriaStatus[] = ['Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado']
+// Los 7 que admite el CHECK de consultorias desde la migracion de reconciliacion
+// (20260908_reconcile_ingest_schema.sql). Con 5, una consultoria en 'Escalar' o
+// 'No asistio' mostraba un desplegable donde su propio valor no existia.
+const statusOptions: ConsultoriaStatus[] = [
+  'Pendiente', 'Agendado', 'En seguimiento', 'Resuelto', 'Cancelado', 'No asistió', 'Escalar',
+]
 
 interface LeadModalProps {
   lead: LeadWithMeta
@@ -175,14 +179,13 @@ export default function LeadModal({ lead, onClose, onStatusChange }: LeadModalPr
           </Section>
 
           {/* Información profesional */}
-          {(lead.id_num || lead.nit || lead.cargo || lead.company_role_level || lead.company_role_area || lead.sector || lead.empresa) && (
+          {(lead.id_num || lead.nit || lead.cargo || lead.company_role_level || lead.company_role_area || lead.empresa) && (
             <Section title="Información profesional">
               <Row label="Cédula" value={lead.id_num} />
               <Row label="NIT" value={lead.nit} />
               <Row label="Cargo" value={lead.cargo} />
               <Row label="Nivel del cargo" value={lead.company_role_level} />
               <Row label="Área" value={lead.company_role_area} />
-              <Row label="Sector" value={lead.sector} />
               <Row label="Empresa" value={lead.empresa} />
               <Row label="Sexo" value={lead.sexo} />
             </Section>
@@ -279,6 +282,8 @@ const historyStatusStyle: Record<string, { dot: string; text: string }> = {
   'En seguimiento': { dot: 'bg-indigo-500',  text: 'text-indigo-700' },
   Resuelto:         { dot: 'bg-emerald-500', text: 'text-emerald-700' },
   Cancelado:        { dot: 'bg-slate-400',   text: 'text-slate-500' },
+  'No asistió':     { dot: 'bg-rose-500',    text: 'text-rose-700' },
+  Escalar:          { dot: 'bg-orange-500',  text: 'text-orange-700' },
 }
 
 function SessionHistoryCard({ sesion }: { sesion: SessionHistoryItem }) {
