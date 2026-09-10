@@ -9,6 +9,8 @@ import { createClient } from '@supabase/supabase-js'
 import { buildImpactContext, buildSessionDataset } from '@/lib/insights-context'
 
 export const dynamic = 'force-dynamic'
+// Techo del plan Hobby de Vercel. El timeout del LLM (45s) debe caber debajo.
+export const maxDuration = 60
 
 function getSupabase() {
   return createClient(
@@ -255,13 +257,13 @@ Responde ÚNICAMENTE con JSON sin texto adicional:
     const requestHeaders = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${openAiKey}`,
-      'HTTP-Referer': 'https://potencia.ccc.org.co',
+      'HTTP-Referer': 'https://potencia-leads-dashboard.vercel.app',
       'X-Title': 'PotencIA Dashboard',
     }
 
     async function callLLM(): Promise<Response> {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 55_000)
+      const timeoutId = setTimeout(() => controller.abort(), 45_000)
       return fetch(`${openAiBase}/chat/completions`, {
         method: 'POST',
         signal: controller.signal,
@@ -270,13 +272,10 @@ Responde ÚNICAMENTE con JSON sin texto adicional:
       }).finally(() => clearTimeout(timeoutId))
     }
 
-    let response = await callLLM()
-
-    // Retry once on 429 after a short pause
-    if (response.status === 429) {
-      await new Promise((r) => setTimeout(r, 8_000))
-      response = await callLLM()
-    }
+    // Un solo intento: reintentar tras un 429 excedia el maxDuration de 60s,
+    // y la plataforma cortaba la funcion antes de que la ruta respondiera.
+    // Un 429 cae en la rama upstream_error de abajo, que el frontend ya maneja.
+    const response = await callLLM()
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => '')
@@ -388,13 +387,13 @@ Responde ÚNICAMENTE con JSON sin texto adicional:
     }> = []
 
     for (const item of parsed.insights ?? []) {
-      rows.push({ tipo: 'insight', metrica: 'insight_text', valor_texto: item, descripcion: item, fuente: process.env.OPENCODE_MODEL ?? 'AI', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+      rows.push({ tipo: 'insight', metrica: 'insight_text', valor_texto: item, descripcion: item, fuente: process.env.OPENROUTER_MODEL ?? 'AI', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
     }
     for (const item of parsed.recomendaciones ?? []) {
-      rows.push({ tipo: 'recomendacion', metrica: 'recomendacion_text', valor_texto: item, descripcion: item, fuente: process.env.OPENCODE_MODEL ?? 'AI', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+      rows.push({ tipo: 'recomendacion', metrica: 'recomendacion_text', valor_texto: item, descripcion: item, fuente: process.env.OPENROUTER_MODEL ?? 'AI', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
     }
     for (const item of parsed.alertas ?? []) {
-      rows.push({ tipo: 'alerta', metrica: 'alerta_text', valor_texto: item, descripcion: item, fuente: process.env.OPENCODE_MODEL ?? 'AI', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
+      rows.push({ tipo: 'alerta', metrica: 'alerta_text', valor_texto: item, descripcion: item, fuente: process.env.OPENROUTER_MODEL ?? 'AI', periodo_inicio: pInicio, periodo_fin: pFin, id_consultor: idConsultor })
     }
 
     // Also store aggregate KPI metrics

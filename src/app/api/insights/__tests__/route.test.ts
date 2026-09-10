@@ -113,7 +113,7 @@ function setupSupabaseMock() {
 // not possible in Vitest without resetModules). Instead, we import once at top
 // level — mocks registered with vi.mock are hoisted before imports.
 
-import { POST } from '../route'
+import { POST, maxDuration } from '../route'
 import { buildImpactContext } from '@/lib/insights-context'
 
 // ─── Helper: build a minimal NextRequest-like object ─────────────────────────
@@ -541,5 +541,55 @@ describe('POST /api/insights — novedades event dates in prompt', () => {
 
     expect(ref.body).toContain('[caso_de_uso] RAG:')
     expect(ref.body).not.toContain('[caso_de_uso] (')
+  })
+})
+
+// ─── Vercel Hobby: la función se corta a los 60s ──────────────────────────────
+// El plan Hobby corta la invocación a los 60s. Antes de la migración la ruta
+// pedía 55s de timeout y reintentaba tras un 429 esperando 8s (hasta ~118s),
+// así que un rate limit devolvía un error de plataforma en vez del JSON de la
+// ruta. Un solo intento de 45s cabe con margen bajo el techo.
+
+describe('POST /api/insights — cabe bajo el maxDuration de 60s', () => {
+  const validPayload = JSON.stringify({
+    insights: ['insight 1'],
+    recomendaciones: ['rec 1'],
+    alertas: ['alerta 1'],
+  })
+
+  beforeEach(() => {
+    setEnv()
+    setupSupabaseMock()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('declara maxDuration = 60 para el techo del plan Hobby', () => {
+    expect(maxDuration).toBe(60)
+  })
+
+  it('no reintenta tras un 429: una sola llamada y skipped/upstream_error', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeFetchResponse({ error: 'rate limited' }, false, 429))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await POST(makeRequest() as never)
+    const json = await res.json()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(json.skipped).toBe(true)
+    expect(json.reason).toBe('upstream_error')
+  })
+
+  it('aborta la llamada al LLM a los 45s, no a los 55s', async () => {
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeFetchResponse(makeAiResponse(validPayload))))
+
+    await POST(makeRequest() as never)
+
+    const delays = timeoutSpy.mock.calls.map((call) => call[1])
+    expect(delays).toContain(45_000)
+    expect(delays).not.toContain(55_000)
   })
 })

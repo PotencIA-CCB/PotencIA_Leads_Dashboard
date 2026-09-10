@@ -9,6 +9,9 @@ function getSupabase() {
   )
 }
 
+// Techo del plan Hobby de Vercel. El timeout del LLM aqui es de 30s.
+export const maxDuration = 60
+
 const VALID_TYPES = new Set(['caso_uso', 'sector', 'herramienta', 'efectividad', 'patron'])
 const CACHE_MS = 24 * 60 * 60 * 1000
 
