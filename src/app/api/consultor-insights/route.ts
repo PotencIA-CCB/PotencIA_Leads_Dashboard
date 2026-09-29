@@ -125,6 +125,8 @@ REGLAS:
   const timeoutId = setTimeout(() => controller.abort(), 30_000)
 
   let raw: string
+  let finishReason: string | undefined
+  let usage: Record<string, unknown> | undefined
   try {
     const res = await fetch(`${apiUrl}/chat/completions`, {
       method: 'POST',
@@ -151,19 +153,34 @@ REGLAS:
       const txt = await res.text()
       return NextResponse.json({ error: `LLM error ${res.status}`, detail: txt }, { status: 502 })
     }
+    type Msg = {
+      role?: string
+      content?: string | null
+      reasoning?: string | null
+      reasoning_content?: string | null
+      reasoning_details?: { text?: string | null }[] | null
+    }
     const data = await res.json() as {
-      choices?: { message?: { content?: string | null; reasoning_content?: string | null } }[]
+      choices?: { message?: Msg; finish_reason?: string }[]
+      usage?: Record<string, unknown>
     }
     const choice = data?.choices?.[0]?.message
-    // Las variantes de DeepSeek devuelven el texto en reasoning_content y dejan
-    // content vacio. Mismo fallback que /api/insights (commit db5ef53) y
-    // tools-extraction.ts; esta ruta se escribio despues y se quedo sin el.
-    const content =
-      typeof choice?.content === 'string' && choice.content.length > 0
-        ? choice.content
-        : typeof choice?.reasoning_content === 'string'
-          ? choice.reasoning_content
-          : ''
+    finishReason = data?.choices?.[0]?.finish_reason
+    usage = data?.usage
+
+    // Con un modelo de razonamiento, content puede venir null y el texto util
+    // llega por otro campo. OpenRouter normaliza a `reasoning`; reasoning_content
+    // es el nombre de la API directa de DeepSeek, y reasoning_details es la
+    // variante estructurada. Se prueban los tres.
+    // https://openrouter.ai/docs/use-cases/reasoning-tokens
+    const detailsText = Array.isArray(choice?.reasoning_details)
+      ? choice.reasoning_details.map(d => (typeof d?.text === 'string' ? d.text : '')).join('')
+      : ''
+    const candidates = [choice?.content, choice?.reasoning, choice?.reasoning_content, detailsText]
+    const content = candidates.find(
+      (c): c is string => typeof c === 'string' && c.trim().length > 0,
+    ) ?? ''
+
     if (content.length === 0) {
       return NextResponse.json(
         {
@@ -171,8 +188,11 @@ REGLAS:
           reason: 'missing_content',
           debug: {
             choicesLen: data?.choices?.length ?? 0,
-            hasContent: typeof choice?.content === 'string',
-            hasReasoning: typeof choice?.reasoning_content === 'string',
+            // Las claves reales del mensaje: distinguen "el campo se llama de
+            // otra forma" de "el razonamiento agoto max_tokens".
+            messageKeys: choice ? Object.keys(choice).slice(0, 15) : [],
+            finishReason,
+            usage,
             topKeys: data ? Object.keys(data).slice(0, 10) : [],
           },
         },
@@ -197,7 +217,12 @@ REGLAS:
     }
     if (!parsed) {
       try { parsed = JSON.parse(repairJSON(raw)) } catch {
-        return NextResponse.json({ error: 'JSON parse failed', raw }, { status: 502 })
+        // finishReason 'length' + usage revela que el texto se corto por
+        // agotar max_tokens, que no se distingue de un modelo que no devuelve JSON.
+        return NextResponse.json(
+          { error: 'JSON parse failed', reason: 'parse_error', finishReason, usage, raw: raw.slice(0, 2000) },
+          { status: 502 },
+        )
       }
     }
   }

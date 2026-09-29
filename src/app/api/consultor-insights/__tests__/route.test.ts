@@ -139,9 +139,62 @@ describe('POST /api/consultor-insights — respuestas de DeepSeek', () => {
     expect(data.insights).toHaveLength(1)
   })
 
-  it('cuando no hay contenido en ningun campo responde 502 con la forma de la respuesta, no raw vacio', async () => {
+  it('usa reasoning cuando es el unico campo con texto', async () => {
+    // OpenRouter normaliza el razonamiento a message.reasoning. reasoning_content
+    // es el nombre de la API directa de DeepSeek; por OpenRouter no llega.
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-      makeFetchResponse({ id: 'gen-1', choices: [] })
+      makeFetchResponse({ choices: [{ message: { content: null, reasoning: PAYLOAD } }] })
+    ))
+
+    const res = await POST(makeRequest())
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(data.insights).toHaveLength(1)
+  })
+
+  it('usa reasoning_details[].text cuando reasoning viene estructurado', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      makeFetchResponse({
+        choices: [{
+          message: {
+            content: null,
+            reasoning_details: [
+              { type: 'reasoning.text', text: 'Reviso las acciones. ' },
+              { type: 'reasoning.text', text: PAYLOAD },
+            ],
+          },
+        }],
+      })
+    ))
+
+    const res = await POST(makeRequest())
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(data.insights).toHaveLength(1)
+  })
+
+  it('prefiere content sobre reasoning cuando ambos traen texto', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      makeFetchResponse({
+        choices: [{ message: { content: PAYLOAD, reasoning: '{"insights":[{"titulo":"ruido","detalle":"x","tipo":"patron"}]}' } }],
+      })
+    ))
+
+    const res = await POST(makeRequest())
+    const data = await res.json()
+
+    expect(data.insights[0].titulo).toBe('Especialista en n8n')
+  })
+
+  it('cuando no hay contenido en ningun campo responde 502 con las claves reales del mensaje', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      makeFetchResponse({
+        id: 'gen-1',
+        choices: [{ finish_reason: 'length', message: { role: 'assistant', content: null } }],
+        usage: { completion_tokens: 600, completion_tokens_details: { reasoning_tokens: 600 } },
+      })
     ))
 
     const res = await POST(makeRequest())
@@ -149,8 +202,30 @@ describe('POST /api/consultor-insights — respuestas de DeepSeek', () => {
 
     expect(res.status).toBe(502)
     expect(data.reason).toBe('missing_content')
-    expect(data.debug).toBeTruthy()
-    expect(data.debug.choicesLen).toBe(0)
+    expect(data.debug.choicesLen).toBe(1)
+    // Sin estas tres no se puede distinguir "campo con otro nombre" de
+    // "el razonamiento se comio el presupuesto de tokens".
+    expect(data.debug.messageKeys).toEqual(['role', 'content'])
+    expect(data.debug.finishReason).toBe('length')
+    expect(data.debug.usage.completion_tokens_details.reasoning_tokens).toBe(600)
+  })
+
+  it('si el texto no es JSON, el 502 de parseo incluye finishReason y usage', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      makeFetchResponse({
+        choices: [{ finish_reason: 'length', message: { content: null, reasoning: 'Estoy pensando en las acciones y' } }],
+        usage: { completion_tokens: 600 },
+      })
+    ))
+
+    const res = await POST(makeRequest())
+    const data = await res.json()
+
+    expect(res.status).toBe(502)
+    expect(data.reason).toBe('parse_error')
+    expect(data.finishReason).toBe('length')
+    expect(data.usage.completion_tokens).toBe(600)
+    expect(data.raw).toContain('Estoy pensando')
   })
 
   it('persiste los insights generados en la tabla insights', async () => {
