@@ -228,6 +228,21 @@ describe('POST /api/consultor-insights — respuestas de DeepSeek', () => {
     expect(data.raw).toContain('Estoy pensando')
   })
 
+  it('pide max_tokens suficiente para que el razonamiento no agote el presupuesto', async () => {
+    // En produccion con max_tokens 600 el modelo gastaba reasoning_tokens 600 y
+    // devolvia finish_reason 'length' sin llegar a escribir el JSON.
+    let capturedBody: Record<string, unknown> | null = null
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: RequestInit) => {
+      capturedBody = JSON.parse(opts.body as string) as Record<string, unknown>
+      return Promise.resolve(makeFetchResponse({ choices: [{ message: { content: PAYLOAD } }] }))
+    }))
+
+    await POST(makeRequest())
+
+    expect(capturedBody).not.toBeNull()
+    expect(capturedBody!['max_tokens']).toBe(2000)
+  })
+
   it('persiste los insights generados en la tabla insights', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
       makeFetchResponse({ choices: [{ message: { content: '', reasoning_content: PAYLOAD } }] })

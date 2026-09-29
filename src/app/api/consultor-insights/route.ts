@@ -135,7 +135,10 @@ REGLAS:
         model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
-        max_tokens: 600,
+        // 600 no alcanzaba: el razonamiento consumia los 600 y finish_reason volvia
+        // 'length' sin JSON. El razonamiento observado ronda los 600; 2000 deja
+        // margen para la respuesta sin acercarse al abort de 30s.
+        max_tokens: 2000,
         ...(model.startsWith('openai/') ||
           model.startsWith('anthropic/') ||
           model.startsWith('google/gemini') ||
