@@ -151,8 +151,35 @@ REGLAS:
       const txt = await res.text()
       return NextResponse.json({ error: `LLM error ${res.status}`, detail: txt }, { status: 502 })
     }
-    const data = await res.json()
-    raw = data.choices?.[0]?.message?.content ?? ''
+    const data = await res.json() as {
+      choices?: { message?: { content?: string | null; reasoning_content?: string | null } }[]
+    }
+    const choice = data?.choices?.[0]?.message
+    // Las variantes de DeepSeek devuelven el texto en reasoning_content y dejan
+    // content vacio. Mismo fallback que /api/insights (commit db5ef53) y
+    // tools-extraction.ts; esta ruta se escribio despues y se quedo sin el.
+    const content =
+      typeof choice?.content === 'string' && choice.content.length > 0
+        ? choice.content
+        : typeof choice?.reasoning_content === 'string'
+          ? choice.reasoning_content
+          : ''
+    if (content.length === 0) {
+      return NextResponse.json(
+        {
+          error: 'Respuesta del proveedor IA sin contenido',
+          reason: 'missing_content',
+          debug: {
+            choicesLen: data?.choices?.length ?? 0,
+            hasContent: typeof choice?.content === 'string',
+            hasReasoning: typeof choice?.reasoning_content === 'string',
+            topKeys: data ? Object.keys(data).slice(0, 10) : [],
+          },
+        },
+        { status: 502 },
+      )
+    }
+    raw = content
   } catch {
     clearTimeout(timeoutId)
     return NextResponse.json({ error: 'LLM timeout or network error' }, { status: 502 })
