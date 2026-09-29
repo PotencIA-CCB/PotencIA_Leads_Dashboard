@@ -243,6 +243,30 @@ describe('POST /api/consultor-insights — respuestas de DeepSeek', () => {
     expect(capturedBody!['max_tokens']).toBe(2000)
   })
 
+  it('aborta si el cuerpo de la respuesta se queda colgado, sin llegar al maxDuration', async () => {
+    // El clearTimeout se llamaba en cuanto fetch resolvia las cabeceras, asi que
+    // leer el cuerpo quedaba sin limite: la funcion corria hasta los 60s de
+    // maxDuration y Vercel devolvia 504 en vez del 502 de la ruta.
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn((_url: string, opts: RequestInit) => Promise.resolve({
+      ok: true,
+      status: 200,
+      // Cabeceras al instante, cuerpo que no llega nunca salvo que aborte la senal.
+      json: () => new Promise((_resolve, reject) => {
+        opts.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+      }),
+      text: () => Promise.resolve(''),
+    } as unknown as Response)))
+
+    const pending = POST(makeRequest())
+    await vi.advanceTimersByTimeAsync(46_000)
+    const res = await pending
+
+    expect(res.status).toBe(502)
+    expect((await res.json()).error).toContain('timeout')
+    vi.useRealTimers()
+  })
+
   it('persiste los insights generados en la tabla insights', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
       makeFetchResponse({ choices: [{ message: { content: '', reasoning_content: PAYLOAD } }] })

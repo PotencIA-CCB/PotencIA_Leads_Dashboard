@@ -122,7 +122,10 @@ REGLAS:
 
   // Call LLM
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 30_000)
+  // 45s como /api/insights: cabe en maxDuration 60 con margen para las
+  // consultas a Supabase. La senal sigue viva hasta terminar de leer el
+  // cuerpo, no solo hasta recibir las cabeceras.
+  const timeoutId = setTimeout(() => controller.abort(), 45_000)
 
   let raw: string
   let finishReason: string | undefined
@@ -148,7 +151,6 @@ REGLAS:
       }),
       signal: controller.signal,
     })
-    clearTimeout(timeoutId)
     if (!res.ok) {
       if (res.status === 429) {
         return NextResponse.json({ skipped: true, reason: 'rate_limit' })
@@ -204,8 +206,10 @@ REGLAS:
     }
     raw = content
   } catch {
-    clearTimeout(timeoutId)
     return NextResponse.json({ error: 'LLM timeout or network error' }, { status: 502 })
+  } finally {
+    // Hasta aqui: cubre tambien la lectura del cuerpo, que es donde se colgaba.
+    clearTimeout(timeoutId)
   }
 
   // Parse JSON with 3-strategy fallback
